@@ -184,7 +184,7 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
 const playTop = () => G.safeTop + 80;
-const playBottom = () => G.H - G.safeBottom - (G.mode === 'ear' ? 40 : 108);  // leave room for the tool bar
+const playBottom = () => G.H - G.safeBottom - 108;  // leave room for the tool bar
 
 // ---------------------------------------------------------------- spawning
 function placePimple(type) {
@@ -418,12 +418,17 @@ function startEar(n) {
   G.combo = 0;
   G.stats = freshStats();
   G.paused = false;
-  newScene(n * 104729 + 7);
+  // a different person each time: their own skin tone, hair, jewellery, and problem
+  const who = LEVELS[(n * 7 + 3) % LEVELS.length];
+  newScene(n * 104729 + 7, { name: who.name, age: who.age, mix: {}, skin: (n * 2 + 1) % 5, goals: [] });
+  G.earTool = 'scoop';
+  document.querySelectorAll('#ear-tools .tool').forEach((b) => b.classList.toggle('active', b.dataset.ear === 'scoop'));
   G.ear = new Ear(G, n, playTop(), playBottom(), tone());
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
-  toast(n === 1 ? 'Hold wax to loosen it, then drag it out 👂' : n === 2 ? 'Careful — don\'t poke the eardrum!' : `Ear #${n}`, 2600);
+  G.say = { text: G.ear.case.say, t: 4.5 };
+  toast(`${G.ear.case.title}: ${G.ear.case.tip}`, 4200);
 }
 
 function onEarPull() {
@@ -743,6 +748,7 @@ function stat(v, label) { return `<div class="stat"><b>${v}</b><span>${label}</s
 
 // ---------------------------------------------------------------- input
 const pointers = new Map(); // pointerId → { kind, p?, x, y }
+G.pointersNear = pointers;  // the ear's bug runs from nearby fingers
 
 function pimpleAt(x, y) {
   let best = null, bestD = Infinity;
@@ -863,9 +869,12 @@ function drawSay(ctx) {
   const a = Math.min(1, sy.t * 3, (1.9 - sy.t) * 8);
   ctx.save();
   ctx.globalAlpha = a;
-  ctx.font = '800 15px ui-rounded, -apple-system, system-ui, sans-serif';
+  // long lines shrink to fit rather than running off the screen
+  let size = 15;
+  ctx.font = `800 ${size}px ui-rounded, -apple-system, system-ui, sans-serif`;
+  while (ctx.measureText(sy.text).width + 26 > G.W - 20 && size > 10) { size -= 0.5; ctx.font = `800 ${size}px ui-rounded, -apple-system, system-ui, sans-serif`; }
   const tw = ctx.measureText(sy.text).width, bw = tw + 26, bh = 34;
-  const bx = G.W - bw - 12, by = playTop() - 4 - (1 - a) * 6;
+  const bx = Math.max(8, G.W - bw - 12), by = playTop() - 4 - (1 - a) * 6;
   ctx.fillStyle = 'rgba(40,30,80,0.25)';
   ctx.beginPath(); ctx.roundRect(bx + 2, by + 3, bw, bh, 15); ctx.fill();
   ctx.fillStyle = '#ffffff';
@@ -1149,7 +1158,7 @@ function render() {
   for (const p of G.pimples) p.drawPatch(ctx);
   for (const p of G.pimples) if (p.state !== 'done') p.draw(ctx, G.time);
   for (const p of G.pimples) p.drawRing(ctx, G.time);
-  if (G.ear) G.ear.drawChunks(ctx);
+  if (G.ear) { G.ear.drawChunks(ctx); G.ear.drawTools(ctx); }
   if (G.salon) G.salon.draw(ctx);
   if (G.treat) G.treat.draw(ctx);
   G.sup.draw(ctx);
@@ -1198,7 +1207,7 @@ function updateHud() {
       setText('hud-sub', G.allDone ? `${Math.round(G.fx.cleanliness() * 100)}% clean` : `${left} left${timeLeft()}`);
     }
   } else if (G.mode === 'ear') {
-    setText('hud-title', `Ear ${G.level}`);
+    setText('hud-title', `Ear ${G.level} · ${G.def ? G.def.name : ''}`);
     setText('hud-sub', G.allDone ? `${Math.round(G.fx.cleanliness() * 100)}% clean` : `${G.ear.left} left`);
   } else {
     setText('hud-title', 'Zen');
@@ -1239,6 +1248,7 @@ function refreshTools() {
   document.querySelectorAll('#tools .tool').forEach((b) => b.classList.toggle('locked', !toolUnlocked(b.dataset.tool)));
   if (!toolUnlocked(G.tool)) document.querySelector('#tools [data-tool="finger"]').click();
   $('tools').classList.toggle('hidden', !show);
+  $('ear-tools').classList.toggle('hidden', !(currentScreen === null && G.mode === 'ear'));
   const mk = currentScreen === null && (G.mode === 'makeup' || (G.mode === 'hair' && G.salon && !!G.salon.bar()));
   $('makeup-bar').classList.toggle('hidden', !mk);
   document.body.classList.toggle('mk', mk);
@@ -1425,6 +1435,12 @@ on('btn-shop', () => showShop());
 on('btn-intro-start', () => startLevel(introLevel));
 on('btn-intro-back', () => showLevels());
 on('btn-zen', () => startZen());
+document.querySelectorAll('#ear-tools .tool').forEach((b) => b.addEventListener('click', () => {
+  audio.unlock(); audio.click(); buzz('light');
+  G.earTool = b.dataset.ear;
+  if (G.ear) G.ear.releaseAll();
+  document.querySelectorAll('#ear-tools .tool').forEach((o) => o.classList.toggle('active', o === b));
+}));
 on('btn-makeup', () => startSalon('makeup'));
 on('btn-haircut', () => showSalon());
 on('btn-salon-go', () => startSalon('hair'));

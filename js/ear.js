@@ -1,5 +1,6 @@
-// Ear cleaning mode: hold a chunk of wax to loosen it (wiggling helps), then drag it
-// out of the ear canal. Don't poke the eardrum in the middle.
+// Ear cleaning mode. Scoop: hold a lump to loosen it (wiggling helps), then drag it out.
+// Drops soften rock-hard wax, Tweezers grab stuck objects and bugs, Flush washes crumbs out.
+// Don't poke the eardrum in the middle.
 
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
@@ -15,16 +16,35 @@ const WAX = [
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+// Every ear is a different person with a different problem. The problem cycles through
+// five kinds, so no two levels in a row play the same.
+export const EAR_CASES = [
+  { id: 'wax', title: 'Waxy build-up', tip: 'Hold a lump to loosen it, then drag it out', say: "I can't hear a thing!" },
+  { id: 'hard', title: 'Rock-hard wax', tip: 'Soften the dark lumps with Drops, then scoop them out', say: "It's been years. It's like concrete." },
+  { id: 'object', title: "Something's stuck", tip: 'Grab the stuck things with Tweezers', say: 'My little brother put something in there…' },
+  { id: 'crumbs', title: 'Crumbly flakes', tip: 'Hold Flush to wash the flakes out', say: 'It itches and it crackles!' },
+  { id: 'bug', title: "There's a bug in there!", tip: 'Catch the bug with Tweezers. It runs!', say: 'SOMETHING IS MOVING IN MY EAR' },
+];
+const HAIRS = ['#3a2218', '#1a1310', '#c9a45c', '#8a3b1e', '#5a3825', '#7d55c7', '#b9b9b9'];
+const OBJECTS = ['bead', 'pebble', 'cotton', 'kernel', 'bead'];
+
 export class Ear {
   constructor(G, level, top, bottom, tone) {
     this.G = G;
     this.tone = tone;
+    this.level = level;
+    this.case = EAR_CASES[(level - 1) % EAR_CASES.length];
+    // who this ear belongs to: hair, which side, jewellery
+    this.hair = HAIRS[(level * 3 + 1) % HAIRS.length];
+    this.flip = level % 2 === 0;                           // left ear on even levels
+    this.earring = (level * 5 + 2) % 4;                    // 0 none, 1 stud, 2 hoop, 3 stud + cuff
     // the outer ear, drawn in "ear units": u, v in -1..1 across its width/height
     this.ew = Math.min(G.W * 1.25, (bottom - top) * 1.05 / 1.5);
     this.eh = this.ew * 1.5;
     this.ex = G.W / 2 - 0.175 * this.ew / 2;
     this.ey = (top + bottom) / 2 + 6;
     this.cx = this.ex - 0.02 * this.ew / 2;
+    if (this.flip) this.cx = G.W - this.cx;
     this.cy = this.ey + 0.1 * this.eh / 2;
     this.R = this.ew * 0.24;                                // canal opening
     this.Rd = this.R * 0.25;                                // eardrum
@@ -35,21 +55,29 @@ export class Ear {
     this.cooldown = 0;
     this.flash = 0;
     this.time = 0;
+    this.flush = null;       // { id, x, y } while water is spraying
+    this.spray = [];
+    this.wetT = 0;
+    this.hintT = 0;
 
     // little hairs around the rim
     this.hairs = [];
-    for (let i = 0; i < 26; i++) {
+    for (let i = 0; i < 30; i++) {
       const a = Math.random() * Math.PI * 2;
       this.hairs.push({ a, len: rand(0.12, 0.3) * this.R, bend: rand(-0.5, 0.5) });
     }
 
-    const count = Math.min(5 + level, 14);
-    for (let i = 0; i < count; i++) this.addChunk(false);
-    if (level >= 2) this.addChunk(true);   // the big plug over the eardrum
+    const more = Math.min(4, Math.floor(level / 5));        // later ears are a bit fuller
+    const id = this.case.id;
+    if (id === 'wax') { for (let i = 0; i < 6 + more * 2; i++) this.addChunk('wax'); if (level >= 2) this.addChunk('wax', true); }
+    if (id === 'hard') { for (let i = 0; i < 4 + more; i++) this.addChunk('hard'); for (let i = 0; i < 2; i++) this.addChunk('wax'); this.addChunk('hard', true); }
+    if (id === 'object') { for (let i = 0; i < 3 + Math.min(2, more); i++) this.addChunk('object'); for (let i = 0; i < 4; i++) this.addChunk('wax'); }
+    if (id === 'crumbs') { for (let i = 0; i < 20 + more * 3; i++) this.addChunk('crumb'); for (let i = 0; i < 3; i++) this.addChunk('wax'); }
+    if (id === 'bug') { for (let i = 0; i < 5 + more; i++) this.addChunk('wax'); for (let i = 0; i < (level > 10 ? 2 : 1); i++) this.addChunk('bug'); }
     this.total = this.chunks.length;
   }
 
-  addChunk(big) {
+  addChunk(kind, big = false) {
     const { R, Rd, cx, cy } = this;
     let x, y, r;
     if (big) {
@@ -57,49 +85,94 @@ export class Ear {
       x = cx + rand(-6, 6);
       y = cy + rand(-6, 6);
     } else {
-      r = rand(0.15, 0.25) * R;
+      r = (kind === 'crumb' ? rand(0.05, 0.085) : kind === 'object' ? rand(0.13, 0.17) : kind === 'bug' ? 0.13 : rand(0.15, 0.25)) * R;
       for (let t = 0; t < 40; t++) {
         const a = Math.random() * Math.PI * 2;
         const d = rand(Rd * 1.5 + r * 0.5, R * 0.86);
         x = cx + Math.cos(a) * d;
         y = cy + Math.sin(a) * d;
-        if (this.chunks.every((c) => Math.hypot(c.x - x, c.y - y) > (c.r + r) * 0.7)) break;
+        if (kind === 'crumb' || this.chunks.every((c) => Math.hypot(c.x - x, c.y - y) > (c.r + r) * 0.7)) break;
       }
     }
     const shape = [];
     const n = big ? 11 : 8;
     for (let i = 0; i < n; i++) shape.push(rand(0.72, 1.15));
     const depth = 1 - clamp(Math.hypot(x - cx, y - cy) / R, 0, 1);  // 1 = deep
-    const col = WAX[big ? 3 : Math.min(3, Math.floor(depth * 3 + Math.random() * 1.4))];
+    const col = kind === 'hard' ? ['#7a5026', '#33200c'] : kind === 'crumb' ? ['#f7e2a0', '#d9b45a']
+      : WAX[big ? 3 : Math.min(3, Math.floor(depth * 3 + Math.random() * 1.4))];
     const c = {
-      x, y, hx: x, hy: y, r, shape, col, big,
+      kind, x, y, hx: x, hy: y, r, shape, col, big,
       rot: Math.random() * 6,
-      stick: big ? 2.4 : rand(0.45, 1.1) + depth * 0.5,
+      stick: kind === 'crumb' ? 0.15 : big ? 2.4 : rand(0.45, 1.1) + depth * 0.5,
+      soft: kind !== 'hard', softT: 0,
+      what: OBJECTS[this.chunks.length % OBJECTS.length], tint: ['#e8548c', '#3d8bf0', '#12a89d', '#ff9f1c'][this.chunks.length % 4],
       prog: 0, state: 'stuck', held: null,
-      fx: x, fy: y, gx: 0, gy: 0, t: 0, vy: 0, tick: 0,
+      fx: x, fy: y, gx: 0, gy: 0, t: 0, vy: 0, vx: 0, tick: 0,
+      dir: Math.random() * 6.28, turn: 0,        // bugs wander
     };
     // big plug sits underneath everything else
     if (big) this.chunks.unshift(c); else this.chunks.push(c);
   }
 
   get left() { return this.chunks.filter((c) => c.state !== 'out').length; }
+  get tool() { return this.G.earTool || 'scoop'; }
 
   scaleOf(c) {
     return 0.62 + 0.38 * clamp(Math.hypot(c.x - this.cx, c.y - this.cy) / this.R, 0, 1);
   }
 
-  // ---- input ----
-  down(id, x, y) {
+  say(c, msg) {
+    if (this.hintT > 0) return;
+    this.hintT = 1.4;
+    this.G.fx.text(clamp(c.x, 90, this.G.W - 90), c.y - c.r - 20, msg, '#ffe7a8', 15);
+    buzz('light');
+  }
+
+  at(x, y, pad = 12) {
     for (let i = this.chunks.length - 1; i >= 0; i--) {
       const c = this.chunks[i];
       if (c.state === 'out' || c.held != null) continue;
-      if (Math.hypot(c.x - x, c.y - y) < c.r * this.scaleOf(c) + 12) {
-        c.held = id;
-        c.fx = x; c.fy = y;
-        c.gx = x - c.x; c.gy = y - c.y;
-        buzz('light');
+      if (Math.hypot(c.x - x, c.y - y) < c.r * this.scaleOf(c) + pad) return c;
+    }
+    return null;
+  }
+
+  grab(c, id, x, y) {
+    c.held = id;
+    c.fx = x; c.fy = y;
+    c.gx = x - c.x; c.gy = y - c.y;
+    buzz('light');
+  }
+
+  // ---- input ----
+  down(id, x, y) {
+    const tool = this.tool;
+    if (tool === 'flush') {                       // water goes anywhere, even on the eardrum
+      this.flush = { id, x, y };
+      return true;
+    }
+    const c = this.at(x, y, tool === 'tweezers' ? 20 : 12);
+    if (tool === 'drops') {
+      // a drop of oil: softens hard wax after a moment
+      this.spray.push({ x, y: y - 60, ty: y, t: 0, drop: true });
+      audio.bloop();
+      if (c && c.kind === 'hard' && !c.soft) { if (!c.softT) c.softT = 0.01; }
+      else if (c) this.say(c, c.kind === 'hard' ? 'already softening' : 'that one is soft already');
+      return true;
+    }
+    if (c) {
+      const needsTweezers = c.kind === 'object' || c.kind === 'bug';
+      if (tool === 'tweezers') {
+        if (!needsTweezers) { this.say(c, 'too soft for tweezers: use the scoop'); return true; }
+        c.state = 'loose';                        // pinched: it comes straight away
+        this.grab(c, id, x, y);
+        c.gx = 0; c.gy = 0;
+        audio.cap();
         return true;
       }
+      if (needsTweezers) { this.say(c, c.kind === 'bug' ? 'catch it with tweezers!' : 'it just rolls: use tweezers'); return true; }
+      this.grab(c, id, x, y);
+      return true;
     }
     if (Math.hypot(x - this.cx, y - this.cy) < this.Rd) {
       this.poke();
@@ -109,6 +182,7 @@ export class Ear {
   }
 
   move(id, x, y) {
+    if (this.flush && this.flush.id === id) { this.flush.x = x; this.flush.y = y; return; }
     const c = this.chunks.find((k) => k.held === id);
     if (!c) return;
     if (c.state === 'stuck') c.prog += Math.hypot(x - c.fx, y - c.fy) * 0.006;  // wiggle to loosen faster
@@ -116,15 +190,21 @@ export class Ear {
   }
 
   up(id) {
+    if (this.flush && this.flush.id === id) { this.flush = null; audio.loop('water', false); return; }
     const c = this.chunks.find((k) => k.held === id);
     if (!c) return;
     c.held = null;
     if (c.state !== 'loose') return;
     if (Math.hypot(c.x - this.cx, c.y - this.cy) > this.R * 1.02) this.remove(c);
+    else if (c.kind === 'bug') { c.state = 'stuck'; this.say(c, 'it wriggled free!'); }   // dropped inside: off it goes again
     else { c.hx = c.x; c.hy = c.y; }
   }
 
-  releaseAll() { for (const c of this.chunks) if (c.held != null) this.up(c.held); }
+  releaseAll() {
+    for (const c of this.chunks) if (c.held != null) this.up(c.held);
+    this.flush = null;
+    audio.loop('water', false);
+  }
 
   poke() {
     if (this.cooldown > 0) return;
@@ -144,6 +224,7 @@ export class Ear {
     const G = this.G;
     c.state = 'loose';
     c.gx *= 0.3; c.gy *= 0.3;
+    if (c.kind === 'crumb') { audio.plip(); return; }
     audio.pop(c.r / 16);
     buzz('heavy');
     G.shake = c.big ? 9 : 4;
@@ -159,12 +240,15 @@ export class Ear {
     c.t = 0;
     c.vy = -120;
     this.pulled++;
-    G.combo++;
+    if (c.kind !== 'crumb') G.combo++;
     const mult = Math.min(3, 1 + G.combo * 0.25);
-    const pts = Math.round((c.big ? 500 : 60 + c.r * 3) * mult);
+    const base = c.big ? 500 : c.kind === 'bug' ? 300 : c.kind === 'object' ? 150 : c.kind === 'crumb' ? 15 : 60 + c.r * 3;
+    const pts = Math.round(base * mult);
     G.score += pts;
-    G.fx.text(c.x, c.y - c.r - 14, c.big ? `THE BIG ONE! +${pts}` : `+${pts}`, c.big ? '#ffd84d' : '#fff', c.big ? 26 : 20);
-    if (c.big) { G.fx.sparkleBurst(c.x, c.y, 20); audio.sparkle(); } else audio.perfect();
+    if (c.kind === 'crumb') { if (Math.random() < 0.3) audio.plip(); G.onEarPull(c); return; }
+    const label = c.big ? `THE BIG ONE! +${pts}` : c.kind === 'bug' ? `GOT IT! +${pts}` : c.kind === 'object' ? `a ${c.what === 'kernel' ? 'popcorn kernel' : c.what === 'cotton' ? 'bit of cotton' : c.what}! +${pts}` : `+${pts}`;
+    G.fx.text(clamp(c.x, 90, G.W - 90), c.y - c.r - 14, label, c.big || c.kind === 'bug' ? '#ffd84d' : '#fff', c.big || c.kind === 'bug' ? 24 : 19);
+    if (c.big || c.kind === 'bug') { G.fx.sparkleBurst(c.x, c.y, 20); audio.sparkle(); } else audio.perfect(G.combo);
     buzz('medium');
     G.onEarPull(c);
   }
@@ -174,6 +258,26 @@ export class Ear {
     this.time += dt;
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.flash = Math.max(0, this.flash - dt);
+    this.hintT = Math.max(0, this.hintT - dt);
+    this.wetT = Math.max(0, this.wetT - dt);
+    const { cx, cy, R } = this;
+
+    // water: washes loose bits and crumbs outward, and out of the ear
+    if (this.flush) {
+      const f = this.flush;
+      audio.loop('water', true);
+      this.wetT = 4;
+      for (let k = 0; k < 3; k++) this.spray.push({ x: f.x + rand(-26, 26), y: f.y + rand(-26, 26), t: 0, a: Math.atan2(f.y - cy, f.x - cx) + rand(-0.8, 0.8) });
+      if (Math.random() < dt * 8) buzz('light');
+    }
+    for (let i = this.spray.length - 1; i >= 0; i--) {
+      const s = this.spray[i];
+      s.t += dt;
+      if (s.drop) { s.y += (s.ty - s.y) * Math.min(1, dt * 14); if (s.t > 0.5) this.spray.splice(i, 1); continue; }
+      s.x += Math.cos(s.a) * 160 * dt; s.y += Math.sin(s.a) * 160 * dt;
+      if (s.t > 0.45) this.spray.splice(i, 1);
+    }
+
     for (let i = this.chunks.length - 1; i >= 0; i--) {
       const c = this.chunks[i];
       if (c.state === 'out') {
@@ -184,9 +288,47 @@ export class Ear {
         if (c.t > 0.7) this.chunks.splice(i, 1);
         continue;
       }
+      // softening under the drops
+      if (c.softT > 0 && !c.soft) {
+        c.softT += dt;
+        if (Math.random() < dt * 9) audio.bloop();
+        if (c.softT > 1.6) { c.soft = true; c.stick = c.big ? 1.2 : 0.5; c.prog = 0; c.col = ['#b9803a', '#6a3f14']; this.G.fx.text(c.x, c.y - c.r - 16, 'softened!', '#8dffa8', 15); audio.plip(); }
+      }
+      // carried by the water
+      if (this.flush && c.held == null && (c.kind === 'crumb' || c.state === 'loose')) {
+        const f = this.flush, d = Math.hypot(c.x - f.x, c.y - f.y);
+        if (d < 80) {
+          const out = Math.atan2(c.y - cy, c.x - cx), away = Math.atan2(c.y - f.y, c.x - f.x);
+          const push = (1 - d / 80) * 900 * dt;
+          c.vx += (Math.cos(out) * 0.7 + Math.cos(away) * 0.3) * push;
+          c.vy += (Math.sin(out) * 0.7 + Math.sin(away) * 0.3) * push;
+          c.state = 'loose';
+        }
+      }
+      if (c.kind === 'crumb' || (c.state === 'loose' && c.held == null && c.kind !== 'bug')) {
+        c.x += c.vx * dt; c.y += c.vy * dt;
+        c.vx *= Math.pow(0.02, dt); c.vy *= Math.pow(0.02, dt);
+        c.hx = c.x; c.hy = c.y;
+        if (c.state === 'loose' && Math.hypot(c.x - cx, c.y - cy) > R * 1.02) { c.vy = -40; this.remove(c); continue; }
+      }
+      // a bug has a mind of its own
+      if (c.kind === 'bug' && c.held == null) {
+        c.turn -= dt;
+        if (c.turn <= 0) { c.turn = rand(0.3, 1.1); c.dir += rand(-1.6, 1.6); }
+        let speed = 26;
+        for (const [, p] of this.G.pointersNear || []) { if (Math.hypot(p.x - c.x, p.y - c.y) < 90) { speed = 95; c.dir = Math.atan2(c.y - p.y, c.x - p.x) + rand(-0.5, 0.5); } }
+        c.x += Math.cos(c.dir) * speed * dt; c.y += Math.sin(c.dir) * speed * dt;
+        const d = Math.hypot(c.x - cx, c.y - cy);
+        if (d > R * 0.82 || d < this.Rd * 1.6) c.dir = Math.atan2(cy - c.y, cx - c.x) + (d < this.Rd * 1.6 ? Math.PI : 0) + rand(-0.6, 0.6);
+        c.rot = c.dir + Math.PI / 2;
+        c.hx = c.x; c.hy = c.y;
+        continue;
+      }
       if (c.state === 'stuck') {
         if (c.held != null) {
           c.prog += dt;
+          // hard wax won't budge until it has been softened
+          if (!c.soft) { c.prog = Math.min(c.prog, c.stick * 0.3); this.say(c, c.softT ? 'still softening…' : 'rock hard: use the Drops'); }
           // stretch toward the finger while it resists
           const dx = c.fx - c.gx - c.hx, dy = c.fy - c.gy - c.hy;
           const d = Math.hypot(dx, dy) || 1;
@@ -206,7 +348,87 @@ export class Ear {
         const k = Math.min(1, dt * 28);
         c.x += (c.fx - c.gx - c.x) * k;
         c.y += (c.fy - c.gy - c.y) * k;
+        if (c.kind === 'bug') c.rot += dt * 14;          // wriggling in the tweezers
       }
+    }
+  }
+
+  /** Objects, crumbs and bugs (wax lumps are drawn in drawChunks). */
+  drawThing(ctx, c) {
+    const s = this.scaleOf(c), r = c.r * s;
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    if (c.state === 'out') ctx.globalAlpha = Math.max(0, 1 - c.t / 0.7);
+    ctx.rotate(c.rot);
+    ctx.fillStyle = 'rgba(20,5,5,0.35)';
+    ctx.beginPath(); ctx.ellipse(2, 4, r, r * 0.9, 0, 0, Math.PI * 2); ctx.fill();
+    if (c.kind === 'crumb') {
+      ctx.fillStyle = c.col[1]; this.blob(ctx, c, r * 1.1); ctx.fill();
+      ctx.fillStyle = c.col[0]; this.blob(ctx, c, r * 0.8); ctx.fill();
+    } else if (c.kind === 'bug') {
+      // a ladybird: legs first, then shell, spots and head
+      const wig = Math.sin(this.time * 22) * 0.35;
+      ctx.strokeStyle = '#1a1210'; ctx.lineWidth = Math.max(1, r * 0.12); ctx.lineCap = 'round';
+      for (const d of [-1, 1]) for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(d * r * 0.5, k * r * 0.45); ctx.lineTo(d * r * 1.2, k * r * 0.6 + wig * r * (k || 1) * d); ctx.stroke(); }
+      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+      g.addColorStop(0, '#ff6a5a'); g.addColorStop(1, '#b3121f');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, r * 0.1, r * 0.82, r, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#1a1210'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, -r * 0.8); ctx.lineTo(0, r * 1.05); ctx.stroke();
+      ctx.fillStyle = '#1a1210';
+      for (const [px, py] of [[-0.4, -0.1], [0.4, -0.1], [-0.35, 0.55], [0.35, 0.55]]) { ctx.beginPath(); ctx.arc(px * r, py * r, r * 0.16, 0, Math.PI * 2); ctx.fill(); }
+      ctx.beginPath(); ctx.arc(0, -r * 0.85, r * 0.42, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.ellipse(-r * 0.3, -r * 0.25, r * 0.2, r * 0.1, -0.6, 0, Math.PI * 2); ctx.fill();
+    } else if (c.what === 'bead') {
+      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
+      g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, c.tint); g.addColorStop(1, 'rgba(0,0,0,0.55)');
+      ctx.fillStyle = c.tint; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = g; ctx.globalAlpha *= 0.75; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha /= 0.75;
+      ctx.fillStyle = 'rgba(30,10,10,0.7)'; ctx.beginPath(); ctx.arc(0, 0, r * 0.25, 0, Math.PI * 2); ctx.fill();
+    } else if (c.what === 'pebble') {
+      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+      g.addColorStop(0, '#c9c9c4'); g.addColorStop(1, '#6f6d68');
+      ctx.fillStyle = g; this.blob(ctx, c, r); ctx.fill();
+      ctx.fillStyle = 'rgba(50,50,50,0.35)'; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(Math.cos(i * 2.2) * r * 0.5, Math.sin(i * 1.7) * r * 0.5, r * 0.07, 0, Math.PI * 2); ctx.fill(); }
+    } else if (c.what === 'cotton') {
+      ctx.fillStyle = '#f7f5f0';
+      for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(Math.cos(i * 1.05) * r * 0.45, Math.sin(i * 1.05) * r * 0.45, r * 0.55, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = 'rgba(200,170,90,0.4)'; ctx.beginPath(); ctx.arc(r * 0.2, r * 0.2, r * 0.4, 0, Math.PI * 2); ctx.fill();
+    } else {                                       // popcorn kernel
+      const g = ctx.createRadialGradient(-r * 0.2, -r * 0.3, r * 0.1, 0, 0, r);
+      g.addColorStop(0, '#fff0b3'); g.addColorStop(1, '#d08a1e');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, -r); ctx.quadraticCurveTo(r * 1.1, -r * 0.2, r * 0.5, r); ctx.quadraticCurveTo(0, r * 1.2, -r * 0.5, r); ctx.quadraticCurveTo(-r * 1.1, -r * 0.2, 0, -r); ctx.fill();
+      ctx.fillStyle = '#fff8dc'; ctx.beginPath(); ctx.ellipse(0, r * 0.75, r * 0.35, r * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** Water spray, falling drops, and tweezers on whatever is pinched. */
+  drawTools(ctx) {
+    ctx.lineCap = 'round';
+    for (const s of this.spray) {
+      if (s.drop) {
+        ctx.fillStyle = 'rgba(255,214,120,0.9)';
+        ctx.beginPath(); ctx.moveTo(s.x, s.y - 9); ctx.quadraticCurveTo(s.x + 7, s.y + 3, s.x, s.y + 6); ctx.quadraticCurveTo(s.x - 7, s.y + 3, s.x, s.y - 9); ctx.fill();
+        continue;
+      }
+      ctx.strokeStyle = `rgba(200,232,255,${0.8 * (1 - s.t / 0.45)})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - Math.cos(s.a) * 9, s.y - Math.sin(s.a) * 9); ctx.stroke();
+    }
+    if (this.flush) {
+      const f = this.flush;
+      ctx.fillStyle = 'rgba(200,232,255,0.25)';
+      ctx.beginPath(); ctx.arc(f.x, f.y, 34, 0, Math.PI * 2); ctx.fill();
+    }
+    for (const c of this.chunks) {
+      if (c.held == null || (c.kind !== 'object' && c.kind !== 'bug')) continue;
+      ctx.save();
+      ctx.translate(c.x, c.y); ctx.rotate(-0.9);
+      for (const [col, w] of [['rgba(40,20,20,0.3)', 6], ['#c5cbd6', 4.5], ['#ffffff', 1.3]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(34, -9); ctx.lineTo(90, -4); ctx.moveTo(0, 0); ctx.lineTo(34, 9); ctx.lineTo(90, 4); ctx.stroke();
+      }
+      ctx.restore();
     }
   }
 
@@ -214,7 +436,11 @@ export class Ear {
   drawBack(ctx) {
     const { cx, cy, R, Rd } = this;
 
+    // even-numbered patients show their other ear
+    ctx.save();
+    if (this.flip) { ctx.translate(this.G.W, 0); ctx.scale(-1, 1); }
     this.drawOuterEar(ctx);
+    ctx.restore();
 
     // canal
     const g = ctx.createRadialGradient(cx, cy, Rd * 0.5, cx, cy, R * 1.08);
@@ -269,7 +495,17 @@ export class Ear {
       ctx.quadraticCurveTo((x0 + x1) / 2 + h.bend * 14, (y0 + y1) / 2 + h.bend * 14, x1, y1);
       ctx.stroke();
     }
+    ctx.save();
+    if (this.flip) { ctx.translate(this.G.W, 0); ctx.scale(-1, 1); }
     this.drawFlaps(ctx);
+    ctx.restore();
+    // freshly rinsed: the canal glistens
+    if (this.wetT > 0) {
+      ctx.fillStyle = `rgba(210,235,255,${0.1 * Math.min(1, this.wetT)})`;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(255,255,255,${0.35 * Math.min(1, this.wetT)})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, -2.4, -1.5); ctx.stroke();
+    }
   }
 
   drawOuterEar(ctx) {
@@ -279,7 +515,7 @@ export class Ear {
     const bez = (a, b, c, d, e, f) => ctx.bezierCurveTo(X(a), Y(b), X(c), Y(d), X(e), Y(f));
 
     // hair tucked behind the ear
-    ctx.fillStyle = '#3a2218';
+    ctx.fillStyle = this.hair;
     ctx.beginPath();
     ctx.moveTo(G.W * 0.2, 0);
     ctx.lineTo(G.W, 0);
@@ -287,10 +523,10 @@ export class Ear {
     ctx.bezierCurveTo(G.W * 0.9, G.H * 0.62, G.W * 0.98, G.H * 0.4, G.W * 0.8, G.H * 0.22);
     ctx.bezierCurveTo(G.W * 0.62, G.H * 0.06, G.W * 0.4, G.H * 0.1, G.W * 0.2, 0);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(120,80,55,0.35)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
     ctx.lineWidth = 2;
-    for (let i = 0; i < 9; i++) {
-      const k = i / 8;
+    for (let i = 0; i < 16; i++) {
+      const k = i / 15;
       ctx.beginPath();
       ctx.moveTo(G.W * (0.35 + k * 0.6), 0);
       ctx.bezierCurveTo(G.W * (0.75 + k * 0.25), G.H * 0.12, G.W * (0.9 + k * 0.1), G.H * 0.35, G.W * (0.93 + k * 0.07), G.H * (0.55 + k * 0.2));
@@ -385,16 +621,29 @@ export class Ear {
     ctx.beginPath();
     ctx.arc(X(-0.12), Y(0.78), ew * 0.16, 0, Math.PI * 2);
     ctx.fill();
-    // small gold stud
-    const sx = X(-0.14), sy = Y(0.84), sr = ew * 0.02;
-    ctx.fillStyle = 'rgba(60,20,10,0.3)';
-    ctx.beginPath(); ctx.arc(sx + 1.5, sy + 2, sr, 0, Math.PI * 2); ctx.fill();
-    const sg = ctx.createRadialGradient(sx - sr * 0.3, sy - sr * 0.3, 0.5, sx, sy, sr);
-    sg.addColorStop(0, '#fff6c2');
-    sg.addColorStop(0.5, '#f4c430');
-    sg.addColorStop(1, '#b8860b');
-    ctx.fillStyle = sg;
-    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+    // jewellery: none, a stud, a hoop, or a stud with a cuff higher up
+    const gold = (px, py, pr) => {
+      ctx.fillStyle = 'rgba(60,20,10,0.3)';
+      ctx.beginPath(); ctx.arc(px + 1.5, py + 2, pr, 0, Math.PI * 2); ctx.fill();
+      const sg = ctx.createRadialGradient(px - pr * 0.3, py - pr * 0.3, 0.5, px, py, pr);
+      sg.addColorStop(0, '#fff6c2'); sg.addColorStop(0.5, '#f4c430'); sg.addColorStop(1, '#b8860b');
+      ctx.fillStyle = sg;
+      ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+    };
+    const lx = X(-0.14), ly = Y(0.84);
+    if (this.earring === 1 || this.earring === 3) gold(lx, ly, ew * 0.02);
+    if (this.earring === 2) {
+      ctx.strokeStyle = 'rgba(60,20,10,0.3)'; ctx.lineWidth = ew * 0.014;
+      ctx.beginPath(); ctx.arc(lx + 2, ly + ew * 0.05 + 3, ew * 0.055, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#e9bd3a';
+      ctx.beginPath(); ctx.arc(lx, ly + ew * 0.05, ew * 0.055, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(lx, ly + ew * 0.05, ew * 0.055, 3.6, 4.6); ctx.stroke();
+    }
+    if (this.earring === 3) {
+      ctx.strokeStyle = '#d0d5dd'; ctx.lineWidth = ew * 0.018; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(X(0.86), Y(-0.3), ew * 0.035, -1.2, 1.2); ctx.stroke();
+    }
   }
 
   /** Flaps that sit in front of the canal opening (drawn after the canal). */
@@ -444,6 +693,7 @@ export class Ear {
 
   drawChunks(ctx) {
     for (const c of this.chunks) {
+      if (c.kind === 'object' || c.kind === 'bug' || c.kind === 'crumb') { this.drawThing(ctx, c); continue; }
       const s = this.scaleOf(c);
       const r = c.r * s;
       const depth = c.state === 'stuck' ? 1 - clamp(Math.hypot(c.x - this.cx, c.y - this.cy) / this.R, 0, 1) : 0;
@@ -471,10 +721,22 @@ export class Ear {
       ctx.arc(r * 0.25, r * 0.2, r * 0.28, 0, Math.PI * 2);
       ctx.arc(-r * 0.3, r * 0.35, r * 0.16, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.beginPath();
-      ctx.ellipse(-r * 0.3, -r * 0.38, r * 0.3, r * 0.14, -0.5, 0, Math.PI * 2);
-      ctx.fill();
+      if (c.kind === 'hard' && !c.soft) {
+        // dry and cracked, no shine; it fizzes while the drops work
+        ctx.strokeStyle = 'rgba(20,10,4,0.55)'; ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.6, -r * 0.2); ctx.lineTo(-r * 0.1, r * 0.05); ctx.lineTo(r * 0.1, -r * 0.4); ctx.moveTo(-r * 0.1, r * 0.05); ctx.lineTo(r * 0.35, r * 0.5); ctx.moveTo(r * 0.1, -r * 0.4); ctx.lineTo(r * 0.6, -r * 0.1);
+        ctx.stroke();
+        if (c.softT > 0) {
+          ctx.fillStyle = 'rgba(255,236,170,0.8)';
+          for (let i = 0; i < 6; i++) { const k = (this.time * 1.5 + i / 6) % 1; ctx.beginPath(); ctx.arc(Math.cos(i * 2.4) * r * 0.6, Math.sin(i * 1.9) * r * 0.6 - k * 6, 1.5 + k * 2.5, 0, Math.PI * 2); ctx.fill(); }
+        }
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.3, -r * 0.38, r * 0.3, r * 0.14, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
       // deeper = darker
       if (depth > 0.05) {
         ctx.fillStyle = `rgba(30,8,8,${depth * 0.45})`;
