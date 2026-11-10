@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Zit Happens</title>
+  <meta name="description" content="A gloriously gross pimple popping game.">
+  <meta name="theme-color" content="#2a1720">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Zit Happens">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden">
+    <button id="btn-pause" class="icon-btn" aria-label="Pause"><i></i><i></i></button>
+    <div class="hud-center">
+      <div id="hud-title">Level 1</div>
+      <div id="hud-sub">5 left</div>
+    </div>
+    <div class="hud-score">
+      <div id="hud-score">0</div>
+      <div id="hud-combo"></div>
+    </div>
+  </div>
+  <div id="toast" class="hidden"></div>
+  <button id="btn-finish" class="pill hidden">All done ✨ Finish</button>
+
+  <!-- Main menu -->
+  <section id="menu" class="screen">
+    <div class="menu-inner">
+      <div class="logo">
+        <div class="logo-zit"><span></span></div>
+        <h1>Zit<br>Happens</h1>
+        <p class="tagline">squeeze. pop. wipe. repeat.</p>
+      </div>
+      <button id="btn-play" class="big">Play <small id="play-level">Level 1</small></button>
+      <button id="btn-zen" class="big alt">Zen Mode <small>endless &amp; chill</small></button>
+      <div class="row">
+        <button id="btn-stats" class="small">Stats</button>
+        <button id="btn-howto" class="small">How to</button>
+        <button id="btn-settings" class="small">Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- How to play -->
+  <section id="howto" class="screen hidden">
+    <div class="card">
+      <h2>How to pop</h2>
+      <ol class="howto-list">
+        <li><b>Press &amp; hold</b> a pimple to build pressure until it pops.</li>
+        <li><b>Keep holding</b> to drain it. Watch the ring empty out.</li>
+        <li><b>Let go</b> right when it's empty for a <em>Perfect</em>. Squeeze too long and it bleeds.</li>
+        <li><b>Swipe</b> anywhere else to wipe up the mess.</li>
+        <li>Cysts are big and stubborn. Blackheads are quick. Golden ones are lucky.</li>
+      </ol>
+      <button class="big back">Got it</button>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section id="stats" class="screen hidden">
+    <div class="card">
+      <h2>Stats</h2>
+      <div id="stats-grid" class="stats-grid"></div>
+      <button class="big back">Back</button>
+    </div>
+  </section>
+
+  <!-- Settings -->
+  <section id="settings" class="screen hidden">
+    <div class="card">
+      <h2>Settings</h2>
+      <label class="toggle"><span>Sound</span><input type="checkbox" id="set-sound"></label>
+      <label class="toggle"><span>Haptics</span><input type="checkbox" id="set-haptics"></label>
+      <div class="setting-label">Skin tone</div>
+      <div id="skin-tones" class="swatches"></div>
+      <button id="btn-reset" class="small danger">Reset progress</button>
+      <button class="big back">Done</button>
+    </div>
+  </section>
+
+  <!-- Pause -->
+  <section id="pause" class="screen hidden">
+    <div class="card">
+      <h2>Paused</h2>
+      <button id="btn-resume" class="big">Resume</button>
+      <button id="btn-restart" class="big alt">Restart</button>
+      <button id="btn-quit" class="big alt">Main menu</button>
+    </div>
+  </section>
+
+  <!-- Level complete -->
+  <section id="results" class="screen hidden">
+    <div class="card">
+      <h2 id="res-title">Squeaky clean!</h2>
+      <div id="res-stars" class="stars"><span>★</span><span>★</span><span>★</span></div>
+      <div id="res-grid" class="stats-grid"></div>
+      <button id="btn-next" class="big">Next patient</button>
+      <button id="btn-res-menu" class="big alt">Main menu</button>
+    </div>
+  </section>
+
+  <!-- iOS haptics trick: toggling a native switch fires a tap haptic on iOS 18+ -->
+  <label id="haptic-label" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
