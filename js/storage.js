@@ -15,6 +15,7 @@ const DEFAULTS = {
   earsCleaned: 0,
   earStars: {},
   coins: 0,
+  profile: { name: '', salon: '', theme: 'violet' },   // who you are, what your salon is called, your colour
   salon: { wash: 1, chair: 1, colour: 0, style: 0, decor: 0 },   // hair salon station levels
   salonClients: 0,
   salonHappy: 0,    // clients who got exactly what they asked for
@@ -44,7 +45,7 @@ export function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return structuredClone(DEFAULTS);
     const data = JSON.parse(raw);
-    return { ...structuredClone(DEFAULTS), ...data, settings: { ...DEFAULTS.settings, ...(data.settings || {}) }, salon: { ...DEFAULTS.salon, ...(data.salon || {}) } };
+    return { ...structuredClone(DEFAULTS), ...data, settings: { ...DEFAULTS.settings, ...(data.settings || {}) }, salon: { ...DEFAULTS.salon, ...(data.salon || {}) }, profile: { ...DEFAULTS.profile, ...(data.profile || {}) } };
   } catch {
     return structuredClone(DEFAULTS);
   }

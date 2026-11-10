@@ -63,6 +63,7 @@
         <div class="logo-zit"><span></span></div>
         <h1>Zit<br>Happens</h1>
         <p class="tagline">squeeze. pop. wipe. repeat.</p>
+        <p id="hello" class="streak"></p>
         <p id="streak" class="streak"></p>
       </div>
       <button id="btn-play" class="big">Pimples <small id="play-level">Level 1</small></button>
@@ -81,10 +82,23 @@
     </div>
   </section>
 
+  <!-- Welcome: shown once, the first time you play -->
+  <section id="welcome" class="screen hidden">
+    <div class="card">
+      <h2>Welcome!</h2>
+      <p class="welcome-sub">Let's set up your clinic and salon.</p>
+      <label class="field">What's your name?<input id="wel-name" maxlength="14" placeholder="Your name" autocomplete="off" autocapitalize="words"></label>
+      <label class="field">Name your salon<input id="wel-salon" maxlength="20" placeholder="The Glow Room" autocomplete="off" autocapitalize="words"></label>
+      <div class="setting-label">Pick your colour</div>
+      <div class="themes" data-themes></div>
+      <button id="btn-welcome" class="big">Let's go</button>
+    </div>
+  </section>
+
   <!-- Level map -->
   <section id="levels" class="screen hidden">
     <div class="card tall">
-      <h2>Patients</h2>
+      <h2 id="clinic-name">Patients</h2>
       <div id="levels-body" class="scroll"></div>
       <button class="big alt back">Back</button>
     </div>
@@ -110,7 +124,7 @@
   <!-- Hair salon hub -->
   <section id="salon" class="screen hidden">
     <div class="card tall">
-      <h2>Your Hair Salon</h2>
+      <h2 id="salon-name">Your Hair Salon</h2>
       <div id="salon-body" class="scroll"></div>
       <button id="btn-salon-go" class="big">Take a client</button>
       <button class="big alt back">Back</button>
@@ -161,6 +175,10 @@
       <label class="toggle"><span>Sound</span><input type="checkbox" id="set-sound"></label>
       <label class="toggle"><span>Haptics</span><input type="checkbox" id="set-haptics"></label>
       <label class="toggle"><span>Full treatment steps</span><input type="checkbox" id="set-steps"></label>
+      <label class="field">Your name<input id="set-name" maxlength="14" autocomplete="off" autocapitalize="words"></label>
+      <label class="field">Your salon's name<input id="set-salon" maxlength="20" autocomplete="off" autocapitalize="words"></label>
+      <div class="setting-label">Colour theme</div>
+      <div class="themes" data-themes></div>
       <div class="setting-label">Skin tone</div>
       <div id="skin-tones" class="swatches"></div>
       <button id="btn-reset" class="small danger">Reset progress</button>

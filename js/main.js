@@ -83,6 +83,38 @@ function checkAwards() {
 const awardsHtml = (list) => (list.length && setTimeout(() => audio.award(), 1300), list).map((a) => `<div class="reward award"><b>🏆 Award: ${a.name}</b><span>${a.desc} · +${a.coins} coins</span></div>`).join('');
 const awardCount = () => Object.keys(save.awards).length;
 
+// ---- you: your name, your salon's name, your colour
+const THEMES = {
+  violet: ['#7b61ff', '123, 97, 255'], teal: ['#12a89d', '18, 168, 157'], coral: ['#ff6b57', '255, 107, 87'],
+  rose: ['#e8548c', '232, 84, 140'], sky: ['#3d8bf0', '61, 139, 240'],
+};
+const esc = (t) => String(t).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const myName = () => save.profile.name || 'Doc';
+const mySalon = () => save.profile.salon || 'The Glow Room';
+function applyTheme() {
+  const t = THEMES[save.profile.theme] || THEMES.violet;
+  document.documentElement.style.setProperty('--accent', t[0]);
+  document.documentElement.style.setProperty('--accent-rgb', t[1]);
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', t[0]);
+}
+function renderThemes() {
+  document.querySelectorAll('[data-themes]').forEach((wrap) => {
+    wrap.innerHTML = '';
+    for (const [id, t] of Object.entries(THEMES)) {
+      const b = document.createElement('button');
+      b.className = 'theme' + (save.profile.theme === id ? ' active' : '');
+      b.style.background = t[0];
+      b.setAttribute('aria-label', id);
+      b.onclick = () => { audio.unlock(); audio.click(); save.profile.theme = id; store.save(save); applyTheme(); renderThemes(); };
+      wrap.appendChild(b);
+    }
+  });
+}
+function greeting() {
+  const h = new Date().getHours();
+  return `${h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'}, ${myName()}`;
+}
+
 const applyPus = () => setPusStyle((PUS_STYLES.find((p) => p.id === save.pus) || PUS_STYLES[0]).color);
 
 const G = {
@@ -496,7 +528,7 @@ function onSalonStage(sv) {
 function showSalon() {
   const lv = save.salon;
   let html = `<div class="lv-top"><span>${salonTitle(lv)} · level ${salonLevel(lv)}</span><span>🪙 ${save.coins.toLocaleString()}</span></div>
-    <img class="salon-view" alt="Your salon" src="${salonPicture(lv)}">
+    <img class="salon-view" alt="Your salon" src="${salonPicture(lv, 340, 220, mySalon())}">
     <p class="salon-note">${save.salonClients} client${save.salonClients === 1 ? '' : 's'} served. Upgrade stations to offer more and earn bigger tips.</p>`;
   for (const st of STATIONS) {
     const cur = lv[st.id] ?? st.start, max = st.start + st.costs.length, cost = st.costs[cur - st.start];
@@ -504,6 +536,7 @@ function showSalon() {
     html += `<div class="shop-item"><div><b>${st.name}</b><small>${st.desc[cur]}</small><div class="pips">${pips}</div></div>
       <button class="buy" data-st="${st.id}" ${cost == null || save.coins < cost ? 'disabled' : ''}>${cost == null ? 'MAX' : `${cur === 0 ? 'Buy' : 'Up'} ${cost} 🪙`}</button></div>`;
   }
+  $('salon-name').textContent = mySalon();
   $('salon-body').innerHTML = html;
   $('salon-body').querySelectorAll('[data-st]').forEach((b) => b.addEventListener('click', () => {
     const st = STATIONS.find((q) => q.id === b.dataset.st), cur = save.salon[st.id] ?? st.start, cost = st.costs[cur - st.start];
@@ -552,7 +585,7 @@ function endSalon() {
     save.salonClients++;
     save.haircutDone++;
     if (happy) save.salonHappy++;
-    unlock = `<div class="reward"><b>${happy ? '💖 Exactly what she asked for!' : 'She\'s happy enough'}</b><span>Tip: +${tip} coins${save.salon.decor ? ` (decor bonus +${save.salon.decor * 25}%)` : ''}</span></div>`;
+    unlock = `<div class="reward"><b>${happy ? `💖 “Exactly what I asked for, ${esc(myName())}!”` : 'She\'s happy enough'}</b><span>Tip: +${tip} coins${save.salon.decor ? ` (decor bonus +${save.salon.decor * 25}%)` : ''}</span></div>`;
   }
   if (kind === 'hair') { /* counted above */ } else if (kind === 'makeup') {
     save.makeupDone++;
@@ -812,16 +845,16 @@ function toolDown(id, x, y) {
 // ---- the patient reacts out loud
 const LINES = {
   pop: ['eek!', 'ooh!', 'ow ow', 'was that it?', 'gross…', 'oof'],
-  good: ['ahh, better', 'that\'s the spot', 'so satisfying', 'do another!', 'yesss'],
+  good: ['ahh, better', 'that\'s the spot', 'so satisfying', 'do another!', 'yesss', 'thanks, {n}!', 'you\'re good, {n}'],
   ouch: ['OW! careful!', 'hey!! gentle!', 'that HURT', 'too hard!'],
-  step: ['so fresh', 'mmm, nice', 'I needed this', 'that tingles'],
+  step: ['so fresh', 'mmm, nice', 'I needed this', 'that tingles', '{n}, you\'re the best'],
 };
 let sayCool = 0;
 function say(kind, always = false) {
   if (G.mode !== 'level' && G.mode !== 'zen') return;
   if (!always && (sayCool > 0 || Math.random() > 0.45)) return;
   const list = LINES[kind];
-  G.say = { text: list[Math.floor(Math.random() * list.length)], t: 1.9 };
+  G.say = { text: list[Math.floor(Math.random() * list.length)].replace('{n}', myName()), t: 1.9 };
   sayCool = 3;
 }
 function drawSay(ctx) {
@@ -1185,7 +1218,7 @@ function toast(msg, ms = 1600) {
   toastTimer = setTimeout(() => el.classList.add('hidden'), ms);
 }
 
-const SCREENS = ['menu', 'howto', 'stats', 'settings', 'pause', 'results', 'levels', 'intro', 'shop', 'salon'];
+const SCREENS = ['menu', 'howto', 'stats', 'settings', 'pause', 'results', 'levels', 'intro', 'shop', 'salon', 'welcome'];
 let currentScreen = 'menu';
 let screenReturn = 'menu';
 function showScreen(name) {
@@ -1195,6 +1228,7 @@ function showScreen(name) {
   if (name === 'menu') {
     $('play-level').textContent = `Level ${save.level} · ${levelDef(save.level).name}`;
     $('menu-coins').textContent = `🪙 ${save.coins.toLocaleString()}`;
+    $('hello').textContent = greeting();
     $('streak').textContent = `${rankFor(awardCount())} · 🏆 ${awardCount()}/${AWARDS.length}${save.streak > 1 ? ` · 🔥 ${save.streak} days` : ''}`;
     $('ear-level').textContent = `Level ${save.earLevel}`;
   }
@@ -1225,6 +1259,7 @@ function showLevels() {
   }
   const open = true;
   html += `<h3>Endless clinic</h3><button class="big alt lv-endless" data-n="${Math.max(LEVELS.length + 1, save.level)}" ${open ? '' : 'disabled'}>${open ? `Walk-in patient <small>Level ${save.level}</small>` : 'Finish Chapter 3 to unlock'}</button>`;
+  $('clinic-name').textContent = `${myName()}'s Clinic`;
   $('levels-body').innerHTML = html;
   $('levels-body').querySelectorAll('[data-n]').forEach((b) => b.addEventListener('click', () => {
     audio.unlock(); audio.click();
@@ -1333,6 +1368,9 @@ function renderStats() {
 }
 
 function renderSettings() {
+  $('set-name').value = save.profile.name;
+  $('set-salon').value = save.profile.salon;
+  renderThemes();
   $('set-sound').checked = save.settings.sound;
   $('set-haptics').checked = save.settings.haptics;
   $('set-steps').checked = save.settings.steps;
@@ -1368,6 +1406,19 @@ document.querySelectorAll('#tools .tool').forEach((b) => b.addEventListener('cli
   G.tool = b.dataset.tool;
   document.querySelectorAll('#tools .tool').forEach((o) => o.classList.toggle('active', o === b));
 }));
+
+// names: typed on the welcome screen the first time, editable later in Settings
+const clean = (v, max) => v.replace(/\s+/g, ' ').trim().slice(0, max);
+for (const [id, key, max] of [['set-name', 'name', 14], ['set-salon', 'salon', 20]]) {
+  $(id).addEventListener('input', (e) => { save.profile[key] = clean(e.target.value, max); store.save(save); });
+}
+on('btn-welcome', () => {
+  save.profile.name = clean($('wel-name').value, 14) || 'Doc';
+  save.profile.salon = clean($('wel-salon').value, 20) || 'The Glow Room';
+  store.save(save);
+  if (document.activeElement) document.activeElement.blur();
+  if (firstRun) { screenReturn = 'menu'; showScreen('howto'); } else showScreen('menu');
+});
 
 on('btn-play', () => showLevels());
 on('btn-shop', () => showShop());
@@ -1425,6 +1476,7 @@ on('btn-reset', () => {
 
 // ---------------------------------------------------------------- boot
 applyPus();
+applyTheme();
 // daily bonus: playing on consecutive days builds a streak worth more coins
 let dailyNote = '';
 {
@@ -1442,11 +1494,14 @@ let dailyNote = '';
 resize();
 startDemo();
 showScreen('menu');
-if (!localStorage.getItem('zit-seen-howto')) {
+const firstRun = !localStorage.getItem('zit-seen-howto');
+if (firstRun) {
   try { localStorage.setItem('zit-seen-howto', '1'); } catch {}
   screenReturn = 'menu';
   showScreen('howto');
 }
+// the very first thing: who are you, and what's your salon called?
+if (!save.profile.name) { renderThemes(); showScreen('welcome'); }
 requestAnimationFrame(frame);
 {
   const got = checkAwards();

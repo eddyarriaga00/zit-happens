@@ -276,7 +276,7 @@ function plant(x, px, py, s) {
 }
 
 /** The whole salon, for the hub screen. Returns an image URL. */
-export function salonPicture(lv, w = 340, h = 220) {
+export function salonPicture(lv, w = 340, h = 220, name = '') {
   const c = document.createElement('canvas');
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   c.width = w * dpr; c.height = h * dpr;
@@ -378,6 +378,13 @@ export function salonPicture(lv, w = 340, h = 220) {
     }
   }
   if (decor >= 3) { x.fillStyle = '#d9b24c'; rrect(x, w * 0.86, 40, 34, 42, 4); x.fill(); x.fillStyle = '#f7e9c8'; x.fillRect(w * 0.86 + 4, 44, 26, 34); }   // framed art
+  if (name) {            // the sign over the door
+    x.font = '800 12px ui-rounded, -apple-system, system-ui, sans-serif';
+    const tw = Math.min(w - 40, x.measureText(name).width + 22);
+    x.fillStyle = 'rgba(43,37,64,0.85)'; rrect(x, (w - tw) / 2, 6, tw, 20, 10); x.fill();
+    x.fillStyle = '#fff6cf'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(name, w / 2, 16.5, w - 60);
+  }
   return c.toDataURL('image/png');
 }
 
