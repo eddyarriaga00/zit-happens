@@ -3,6 +3,7 @@
 
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
+import { rgba } from './skin.js';
 
 const WAX = [
   ['#f6d277', '#cf9226'],
@@ -15,11 +16,17 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export class Ear {
-  constructor(G, level, top, bottom) {
+  constructor(G, level, top, bottom, tone) {
     this.G = G;
-    this.cx = G.W / 2;
-    this.cy = (top + bottom) / 2 + 10;
-    this.R = Math.min(G.W * 0.43, (bottom - top) * 0.37);   // canal opening
+    this.tone = tone;
+    // the outer ear, drawn in "ear units": u, v in -1..1 across its width/height
+    this.ew = Math.min(G.W * 1.25, (bottom - top) * 1.05 / 1.5);
+    this.eh = this.ew * 1.5;
+    this.ex = G.W / 2 - 0.175 * this.ew / 2;
+    this.ey = (top + bottom) / 2 + 6;
+    this.cx = this.ex - 0.02 * this.ew / 2;
+    this.cy = this.ey + 0.1 * this.eh / 2;
+    this.R = this.ew * 0.24;                                // canal opening
     this.Rd = this.R * 0.25;                                // eardrum
     this.chunks = [];
     this.ouches = 0;
@@ -50,7 +57,7 @@ export class Ear {
       x = cx + rand(-6, 6);
       y = cy + rand(-6, 6);
     } else {
-      r = rand(0.13, 0.22) * R;
+      r = rand(0.15, 0.25) * R;
       for (let t = 0; t < 40; t++) {
         const a = Math.random() * Math.PI * 2;
         const d = rand(Rd * 1.5 + r * 0.5, R * 0.86);
@@ -207,28 +214,15 @@ export class Ear {
   drawBack(ctx) {
     const { cx, cy, R, Rd } = this;
 
-    // outer ear folds
-    ctx.lineCap = 'round';
-    for (const [k, w, a] of [[1.55, 26, 0.16], [1.22, 18, 0.2]]) {
-      ctx.strokeStyle = `rgba(120,50,40,${a})`;
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, R * k, R * k * 1.12, 0, Math.PI * 0.75, Math.PI * 2.35);
-      ctx.stroke();
-      ctx.strokeStyle = `rgba(255,235,225,${a})`;
-      ctx.lineWidth = w * 0.3;
-      ctx.beginPath();
-      ctx.ellipse(cx - 4, cy - 5, R * k, R * k * 1.12, 0, Math.PI * 0.9, Math.PI * 1.9);
-      ctx.stroke();
-    }
+    this.drawOuterEar(ctx);
 
     // canal
     const g = ctx.createRadialGradient(cx, cy, Rd * 0.5, cx, cy, R * 1.08);
     g.addColorStop(0, '#2b0e0e');
     g.addColorStop(0.45, '#5e2620');
     g.addColorStop(0.8, '#a85a4e');
-    g.addColorStop(0.93, 'rgba(190,110,95,0.9)');
-    g.addColorStop(1, 'rgba(200,120,105,0)');
+    g.addColorStop(0.93, rgba(this.tone.blush, 0.9));
+    g.addColorStop(1, rgba(this.tone.bump, 0));
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(cx, cy, R * 1.08, 0, Math.PI * 2);
@@ -275,6 +269,157 @@ export class Ear {
       ctx.quadraticCurveTo((x0 + x1) / 2 + h.bend * 14, (y0 + y1) / 2 + h.bend * 14, x1, y1);
       ctx.stroke();
     }
+    this.drawFlaps(ctx);
+  }
+
+  drawOuterEar(ctx) {
+    const { ex, ey, ew, eh, tone } = this;
+    const G = this.G;
+    const X = (u) => ex + u * ew / 2, Y = (v) => ey + v * eh / 2;
+    const bez = (a, b, c, d, e, f) => ctx.bezierCurveTo(X(a), Y(b), X(c), Y(d), X(e), Y(f));
+
+    // hair tucked behind the ear
+    ctx.fillStyle = '#3a2218';
+    ctx.beginPath();
+    ctx.moveTo(G.W * 0.2, 0);
+    ctx.lineTo(G.W, 0);
+    ctx.lineTo(G.W, G.H * 0.8);
+    ctx.bezierCurveTo(G.W * 0.9, G.H * 0.62, G.W * 0.98, G.H * 0.4, G.W * 0.8, G.H * 0.22);
+    ctx.bezierCurveTo(G.W * 0.62, G.H * 0.06, G.W * 0.4, G.H * 0.1, G.W * 0.2, 0);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(120,80,55,0.35)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 9; i++) {
+      const k = i / 8;
+      ctx.beginPath();
+      ctx.moveTo(G.W * (0.35 + k * 0.6), 0);
+      ctx.bezierCurveTo(G.W * (0.75 + k * 0.25), G.H * 0.12, G.W * (0.9 + k * 0.1), G.H * 0.35, G.W * (0.93 + k * 0.07), G.H * (0.55 + k * 0.2));
+      ctx.stroke();
+    }
+
+    // ear silhouette
+    const outline = () => {
+      ctx.beginPath();
+      ctx.moveTo(X(-0.58), Y(-0.42));
+      bez(-0.62, -0.85, -0.2, -1.02, 0.2, -1.0);
+      bez(0.7, -0.98, 1.0, -0.6, 0.95, -0.15);
+      bez(0.9, 0.3, 0.62, 0.5, 0.45, 0.72);
+      bez(0.32, 0.92, 0.1, 1.03, -0.12, 1.0);
+      bez(-0.38, 0.97, -0.5, 0.75, -0.5, 0.55);
+      bez(-0.5, 0.35, -0.62, 0.2, -0.6, -0.05);
+      bez(-0.58, -0.2, -0.56, -0.3, -0.58, -0.42);
+      ctx.closePath();
+    };
+    ctx.save();
+    ctx.shadowColor = 'rgba(50,15,8,0.5)';
+    ctx.shadowBlur = 26;
+    ctx.shadowOffsetX = 6;
+    ctx.shadowOffsetY = 9;
+    const body = ctx.createRadialGradient(X(-0.1), Y(-0.2), ew * 0.1, X(0.1), Y(0), eh * 0.62);
+    body.addColorStop(0, tone.base);
+    body.addColorStop(0.7, tone.bump);
+    body.addColorStop(1, tone.blush);
+    ctx.fillStyle = body;
+    outline();
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = rgba(tone.pore, 0.45);
+    ctx.lineWidth = 2;
+    outline();
+    ctx.stroke();
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // helix: the curled outer rim, drawn as the groove on its inside
+    const helix = () => {
+      ctx.beginPath();
+      ctx.moveTo(X(-0.36), Y(-0.5));
+      bez(-0.3, -0.82, 0.1, -0.84, 0.3, -0.8);
+      bez(0.68, -0.74, 0.8, -0.4, 0.74, -0.08);
+      bez(0.7, 0.2, 0.55, 0.38, 0.42, 0.52);
+    };
+    ctx.strokeStyle = rgba(tone.pore, 0.22);
+    ctx.lineWidth = ew * 0.1;
+    helix(); ctx.stroke();
+    ctx.strokeStyle = rgba(tone.pore, 0.55);
+    ctx.lineWidth = ew * 0.03;
+    helix(); ctx.stroke();
+    ctx.save();
+    ctx.translate(ew * 0.012, -ew * 0.02);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = ew * 0.014;
+    helix(); ctx.stroke();
+    ctx.restore();
+
+    // antihelix: the Y-shaped ridge inside the rim
+    const anti = () => {
+      ctx.beginPath();
+      ctx.moveTo(X(0.34), Y(0.44));
+      bez(0.58, 0.18, 0.58, -0.2, 0.4, -0.38);
+      bez(0.3, -0.5, 0.2, -0.6, 0.04, -0.62);
+      ctx.moveTo(X(0.4), Y(-0.38));
+      bez(0.22, -0.44, 0.0, -0.42, -0.22, -0.44);
+    };
+    ctx.save();
+    ctx.translate(ew * 0.014, ew * 0.02);
+    ctx.strokeStyle = rgba(tone.pore, 0.35);
+    ctx.lineWidth = ew * 0.085;
+    anti(); ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = rgba(tone.base, 0.95);
+    ctx.lineWidth = ew * 0.075;
+    anti(); ctx.stroke();
+    ctx.save();
+    ctx.translate(-ew * 0.01, -ew * 0.012);
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = ew * 0.02;
+    anti(); ctx.stroke();
+    ctx.restore();
+
+    // soft lobe highlight + a little gold stud
+    const lg = ctx.createRadialGradient(X(-0.12), Y(0.78), 2, X(-0.12), Y(0.78), ew * 0.16);
+    lg.addColorStop(0, 'rgba(255,255,255,0.3)');
+    lg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = lg;
+    ctx.beginPath();
+    ctx.arc(X(-0.12), Y(0.78), ew * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+    const sx = X(-0.14), sy = Y(0.84), sr = ew * 0.022;
+    ctx.fillStyle = 'rgba(60,20,10,0.3)';
+    ctx.beginPath(); ctx.arc(sx + 1.5, sy + 2, sr, 0, Math.PI * 2); ctx.fill();
+    const sg = ctx.createRadialGradient(sx - sr * 0.3, sy - sr * 0.3, 0.5, sx, sy, sr);
+    sg.addColorStop(0, '#fff6c2');
+    sg.addColorStop(0.5, '#f4c430');
+    sg.addColorStop(1, '#b8860b');
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+  }
+
+  /** Flaps that sit in front of the canal opening (drawn after the canal). */
+  drawFlaps(ctx) {
+    const { ex, ey, ew, eh, tone } = this;
+    const X = (u) => ex + u * ew / 2, Y = (v) => ey + v * eh / 2;
+    const flap = (u, v, rx, ry, rot) => {
+      const x = X(u), y = Y(v);
+      ctx.fillStyle = 'rgba(40,10,8,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(x + 5, y + 5, rx, ry, rot, 0, Math.PI * 2);
+      ctx.fill();
+      const g = ctx.createRadialGradient(x - rx * 0.3, y - ry * 0.35, 1, x, y, Math.max(rx, ry));
+      g.addColorStop(0, tone.base);
+      g.addColorStop(1, tone.bump);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(x - rx * 0.25, y - ry * 0.35, rx * 0.4, ry * 0.25, rot, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    flap(-0.5, 0.1, ew * 0.07, eh * 0.065, 0.1);    // tragus (front flap)
+    flap(0.14, 0.5, ew * 0.1, ew * 0.05, -0.35);      // antitragus
   }
 
   blob(ctx, c, r) {

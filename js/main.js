@@ -174,7 +174,7 @@ function startEar(n) {
   G.stats = freshStats();
   G.paused = false;
   newScene(n * 104729 + 7);
-  G.ear = new Ear(G, n, playTop(), playBottom());
+  G.ear = new Ear(G, n, playTop(), playBottom(), SKIN_TONES[save.settings.skin] || SKIN_TONES[1]);
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
