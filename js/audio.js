@@ -200,6 +200,22 @@ export function fanfare() {
   [523, 659, 784, 1047].forEach((f, i) => tone(t + i * 0.11, 0.35, { freq: f, gain: 0.16, type: 'triangle' }));
 }
 
+/** A lid / cap popping open. */
+export function cap() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  tone(t, 0.06, { freq: 420, freqEnd: 1100, gain: 0.22, type: 'sine' });
+  noise(t, 0.04, { type: 'highpass', freq: 2500, q: 0.7, gain: 0.18 });
+}
+
+/** Something soft landing in the bin. */
+export function thud() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  tone(t, 0.12, { freq: 130, freqEnd: 60, gain: 0.3 });
+  noise(t, 0.06, { type: 'lowpass', freq: 500, q: 1, gain: 0.15 });
+}
+
 export function click() {
   if (!ready()) return;
   tone(ctx.currentTime, 0.04, { freq: 900, gain: 0.08, type: 'sine' });

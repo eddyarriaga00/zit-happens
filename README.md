@@ -15,6 +15,7 @@ Then open http://localhost:8765.
 - `js/main.js` – levels, scoring, input, menus
 - `js/ear.js` – ear wax mode
 - `js/levels.js` – the patients (levels), their goals, and shop items
+- `js/supplies.js` – the openable bottles, wipes, pad jar, gel, steamer and bin
 - `js/steps.js` – spa steps (lather, rinse, steam, soothe)
 - `js/fx.js` – droplets, splats, wipe
 - `js/skin.js` – skin texture and tones

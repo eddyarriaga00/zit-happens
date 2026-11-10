@@ -3,6 +3,7 @@ import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS
 import { FX } from './fx.js';
 import { Ear } from './ear.js';
 import { Treatment } from './steps.js';
+import { Supplies } from './supplies.js';
 import { SKIN_TONES, renderSkin } from './skin.js';
 import * as audio from './audio.js';
 import { buzz, setHapticsEnabled } from './haptics.js';
@@ -43,6 +44,7 @@ const G = {
   // callbacks used by pimples
   onPop, onDrain, onFinish, onEarPull,
   ear: null,
+  sup: null,             // the supplies on the tray (bottles, wipes, pads, bin)
   treat: null,           // spa steps (lather, rinse, steam, soothe) when enabled
   plan: null,
   onStepDone,
@@ -90,7 +92,8 @@ function placePimple(type) {
   for (let tries = 0; tries < 80; tries++) {
     const x = margin + Math.random() * (G.W - margin * 2);
     const y = playTop() + margin + Math.random() * (playBottom() - playTop() - margin * 2);
-    let ok = true;
+    // keep the bottom corners free for the pad jar and the bin
+    let ok = !(y > playBottom() - 100 && (x < 100 || x > G.W - 104));
     for (const o of G.pimples) {
       if (o.state === 'done') continue;
       const need = (o.r + rMax) * 2.4 + 28;
@@ -170,6 +173,7 @@ function newScene(seed, def = null) {
   G.time = 0;
   G.ear = null;
   G.treat = null;
+  G.sup = new Supplies(G);
 }
 
 function startLevel(n) {
@@ -194,7 +198,7 @@ function startLevel(n) {
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
-  if (G.treat) toast('Step 1: Lather up — rub all over the face 🫧', 3000);
+  if (G.treat) toast('Step 1: Open the cleanser, pump it, then rub 🫧', 3400);
   else toast(toolHint(n), 2800);
 }
 
@@ -207,11 +211,11 @@ function queueBreakouts() {
 // grime to wash off in the first step
 function addDirt() {
   for (let i = 0; i < 18; i++) {
-    const r = (8 + Math.random() * 16) * G.scale;
+    const r = (4 + Math.random() * 8) * G.scale;
     G.fx.addSplat({
       kind: 'drop', x: 20 + Math.random() * (G.W - 40), y: playTop() + Math.random() * (G.H - playTop() - 40),
       rx: r * (1 + Math.random()), ry: r, rot: Math.random() * 3, bx: r * 2,
-      color: Math.random() < 0.6 ? '#6f5340' : '#3d3a37', alpha: 0.35 + Math.random() * 0.25, mass: 1,
+      color: Math.random() < 0.6 ? '#6f5340' : '#3d3a37', alpha: 0.2 + Math.random() * 0.2, mass: 1,
     });
   }
 }
@@ -225,11 +229,11 @@ function onStepDone(phase) {
   buzz('medium');
   if (phase === 'lather') {
     G.treat.start('rinse');
-    toast('Now rinse — swipe the foam away 💦', 2600);
+    toast('Now open the wipes, pull one out and wipe the foam off 💦', 3400);
   } else if (phase === 'rinse') {
     G.fx.reset();
     G.treat.start('steam');
-    toast('Step 2: Steam — press and hold to open the pores ♨️', 3000);
+    toast('Step 2: Switch the steamer on, then press and hold ♨️', 3400);
   } else if (phase === 'steam') {
     G.treat.start('pop');
     queueBreakouts();
@@ -250,7 +254,7 @@ function afterWipe() {
   G.cleanAtWipe = G.fx.cleanliness();
   G.treat.start('soothe');
   refreshTools();
-  toast('Step 5: Soothe — spread the cooling gel 🌿', 3000);
+  toast('Step 5: Open the gel, squeeze some out, spread it 🌿', 3400);
 }
 
 function startZen() {
@@ -398,7 +402,8 @@ function checkLevelDone() {
     } else {
       $('btn-finish').textContent = G.treat ? 'Next step →' : 'All done ✨ Finish';
       $('btn-finish').classList.remove('hidden');
-      toast(G.treat ? 'Step 4: Wipe up the mess ✨' : 'All popped! Swipe to wipe up for a bonus ✨', 2600);
+      document.querySelector('#tools [data-tool="pad"]').click();   // hand them the cotton pads
+      toast(G.treat ? 'Step 4: Open the cotton pads and wipe up ✨' : 'All popped! Grab a cotton pad and wipe up ✨', 3200);
     }
   }
 }
@@ -470,6 +475,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (G.mode === 'demo' || G.paused || G.ended) return;
   try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   const x = e.clientX, y = e.clientY;
+  if (G.sup.down(x, y)) return idle(e.pointerId, x, y);   // tapped a bottle, pack, jar or the bin
   if (G.treat && G.treat.active) {
     pointers.set(e.pointerId, { kind: 'treat', x, y });
     G.treat.down(x, y);
@@ -599,6 +605,7 @@ function endPointer(e) {
   if (!ptr) return;
   pointers.delete(e.pointerId);
   if (ptr.kind === 'treat') G.treat?.up();
+  if (ptr.kind === 'treat' || ptr.kind === 'wipe') G.sup.hand = null;
   if (ptr.kind === 'ear') G.ear?.up(e.pointerId);
   if (ptr.kind === 'pinch') {
     const pin = ptr.pin;
@@ -628,12 +635,28 @@ function releaseAll() {
   pointers.clear();
   if (G.ear) G.ear.releaseAll();
   if (G.treat) G.treat.holding = 0;
+  G.sup.hand = null;
   audio.oozeStop();
 }
 
 function wipeAt(x, y, speed, big = false) {
-  G.fx.addTrail(x, y, big ? 46 * (1 + 0.2 * up('pad')) : 26);
-  const cleaned = G.fx.wipe(x, y, (big ? 44 * (1 + 0.2 * up('pad')) : 22) * G.scale, big ? 0.45 : 0.22);
+  let cleaned = 0;
+  if (big) {
+    // the Wipe tool needs a cotton pad from the jar, and pads fill up
+    const pad = G.sup.useCloth('pads');
+    if (!pad) return;
+    G.sup.hand = { x, y };
+    const k = 1 + 0.2 * up('pad');
+    cleaned = G.fx.wipe(x, y, 44 * k * G.scale, 0.45);
+    pad.dirt = Math.min(1, pad.dirt + cleaned / (G.fx.messMade * 0.34 * k + 2));   // ~3 pads per face
+  } else if (G.mode === 'ear') {
+    G.fx.addTrail(x, y, 26);
+    cleaned = G.fx.wipe(x, y, 22 * G.scale, 0.22);
+  } else {
+    // a bare finger only smears it around
+    G.fx.addTrail(x, y, 18);
+    cleaned = G.fx.wipe(x, y, 20 * G.scale, 0.04);
+  }
   if (cleaned > 0) {
     audio.wipe(Math.min(1, speed / 40));
     if (Math.random() < 0.3) buzz('light');
@@ -692,6 +715,8 @@ function update(dt) {
 
   for (const p of G.pimples) p.update(dt, G);
   if (G.ear) G.ear.update(dt);
+  G.sup.sync();
+  G.sup.update(dt);
   if (G.treat) { G.treat.update(dt); G.treat.updatePuffs(dt); }
   G.fx.update(dt);
   G.shake *= Math.pow(0.001, dt);
@@ -717,6 +742,7 @@ function render() {
   for (const p of G.pimples) p.drawRing(ctx, G.time);
   if (G.ear) G.ear.drawChunks(ctx);
   if (G.treat) G.treat.draw(ctx);
+  G.sup.draw(ctx);
   G.fx.drawAir(ctx);
   ctx.restore();
 }

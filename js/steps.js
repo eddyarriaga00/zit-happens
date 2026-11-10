@@ -36,7 +36,10 @@ export class Treatment {
     this.progress = 0;
     this.done = false;
     this.holding = 0;
-    if (phase === 'rinse') this.foamStart = Math.max(0.01, this.mean(this.foam));
+    if (phase === 'rinse') {
+      this.foamStart = Math.max(0.01, this.mean(this.foam));
+      this.foamSum = this.foamStart * this.foam.length;
+    }
   }
 
   mean(arr) {
@@ -45,7 +48,9 @@ export class Treatment {
     return s / arr.length;
   }
 
+  /** Returns the total amount added (negative if removed). */
   paint(arr, x, y, r, amt) {
+    let delta = 0;
     const c0 = Math.max(0, Math.floor((x - r) / CELL)), c1 = Math.min(this.cols - 1, Math.floor((x + r) / CELL));
     const r0 = Math.max(0, Math.floor((y - r) / CELL)), r1 = Math.min(this.rows - 1, Math.floor((y + r) / CELL));
     for (let row = r0; row <= r1; row++) {
@@ -53,10 +58,13 @@ export class Treatment {
         const cx = (col + 0.5) * CELL, cy = (row + 0.5) * CELL;
         if ((cx - x) * (cx - x) + (cy - y) * (cy - y) < r * r) {
           const i = row * this.cols + col;
-          arr[i] = Math.max(0, Math.min(1, arr[i] + amt));
+          const v = Math.max(0, Math.min(1, arr[i] + amt));
+          delta += v - arr[i];
+          arr[i] = v;
         }
       }
     }
+    return delta;
   }
 
   // ---- input ----
@@ -69,19 +77,26 @@ export class Treatment {
   }
 
   apply(x, y) {
-    const G = this.G;
+    const G = this.G, sup = G.sup;
     const s = G.scale * Math.sqrt(G.spaMult || 1);
     if (this.phase === 'lather') {
-      this.paint(this.foam, x, y, 38 * s, 0.5);
+      if (!sup.ready('soap')) { sup.nag('soap', 'open the cleanser & pump it'); return; }
+      const d = sup.hitDollops(x, y);
+      this.paint(this.foam, x, y, (d ? 70 : 38) * s, d ? 1 : 0.5);
       audio.squish(0.2 + Math.random() * 0.3);
       if (Math.random() < 0.15) audio.bloop();
     } else if (this.phase === 'rinse') {
-      this.paint(this.foam, x, y, 42 * s, -1);
+      const c = sup.useCloth('wipes');
+      if (!c) return;
+      sup.hand = { x, y };
+      const removed = -this.paint(this.foam, x, y, 42 * s, -1);
+      c.dirt = Math.min(1, c.dirt + removed / (this.foamSum * 0.4 + 1));   // ~3 wipes per face
       G.fx.wipe(x, y, 42 * s, 1);
-      G.fx.addTrail(x, y, 40);
       audio.wipe(0.8);
     } else if (this.phase === 'soothe') {
-      this.paint(this.gel, x, y, 38 * s, 0.6);
+      if (!sup.ready('gel')) { sup.nag('gel', 'open the gel & squeeze some out'); return; }
+      const d = sup.hitDollops(x, y);
+      this.paint(this.gel, x, y, (d ? 70 : 38) * s, d ? 1 : 0.6);
       audio.squish(0.1);
     } else return;
     this.tick++;
@@ -98,7 +113,8 @@ export class Treatment {
     else if (this.phase === 'rinse') this.progress = (1 - this.mean(this.foam) / this.foamStart) / GOALS.rinse;
     else if (this.phase === 'soothe') this.progress = this.mean(this.gel) / GOALS.soothe;
     else if (this.phase === 'steam') {
-      if (this.holding > 0) {
+      if (this.holding > 0 && !G.sup.ready('steamer')) G.sup.nag('steamer', 'switch the steamer on');
+      if (this.holding > 0 && G.sup.ready('steamer')) {
         this.progress += dt / 3.2 * (G.spaMult || 1);
         audio.wipe(0.1);
         if (Math.random() < dt * 4) buzz('light');
