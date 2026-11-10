@@ -140,3 +140,42 @@ export const REWARDS = [
 export const rewardFor = (n) => REWARDS[n - 1] || C(150);
 /** The level you must clear to unlock each tool (0 = yours from the start). */
 export const TOOL_LEVEL = { finger: 0, pad: 0, extractor: 1, needle: 2, tweezers: 3, spray: 4, patch: 5 };
+
+// ---- awards: earned from lifetime stats, each pays coins once.
+// s = the save data plus starTotal and upgradeTotal.
+const A = (id, name, desc, test, coins) => ({ id, name, desc, test, coins });
+export const AWARDS = [
+  A('pop1', 'First Pop', 'Pop your first pimple', (s) => s.totalPops >= 1, 30),
+  A('pop50', 'Popper', 'Pop 50 pimples', (s) => s.totalPops >= 50, 100),
+  A('pop200', 'Pop Star', 'Pop 200 pimples', (s) => s.totalPops >= 200, 250),
+  A('pop500', 'Pop Legend', 'Pop 500 pimples', (s) => s.totalPops >= 500, 500),
+  A('perf10', 'Steady Hands', '10 Perfect pops', (s) => s.perfects >= 10, 60),
+  A('perf100', 'Surgeon', '100 Perfect pops', (s) => s.perfects >= 100, 250),
+  A('perf300', 'Untouchable', '300 Perfect pops', (s) => s.perfects >= 300, 500),
+  A('combo5', 'On a Roll', 'A combo of 5 Perfects', (s) => s.bestCombo >= 5, 80),
+  A('combo10', 'Unstoppable', 'A combo of 10 Perfects', (s) => s.bestCombo >= 10, 200),
+  A('gentle1', 'Gentle Touch', 'Finish a patient with no bleeding', (s) => s.flawless >= 1, 80),
+  A('gentle10', 'Painless', '10 patients with no bleeding', (s) => s.flawless >= 10, 250),
+  A('boss1', 'Giant Slayer', 'Drain a boss pimple', (s) => s.bossPops >= 1, 150),
+  A('lvl5', 'Getting Busy', 'Clear 5 patients', (s) => s.level > 5, 100),
+  A('lvl10', 'Chapter One', 'Finish Chapter 1', (s) => s.level > 10, 200),
+  A('lvl20', 'Chapter Two', 'Finish Chapter 2', (s) => s.level > 20, 300),
+  A('lvl30', 'Clinic Hero', 'Finish Chapter 3', (s) => s.level > 30, 500),
+  A('star30', 'Star Collector', 'Earn 30 stars', (s) => s.starTotal >= 30, 150),
+  A('star60', 'Shining', 'Earn 60 stars', (s) => s.starTotal >= 60, 300),
+  A('star90', 'Perfectionist', 'Earn all 90 stars', (s) => s.starTotal >= 90, 600),
+  A('ear5', 'Ear Whisperer', 'Clean 5 ears', (s) => s.earsCleaned >= 5, 100),
+  A('wax50', 'Wax Museum', 'Pull out 50 lumps of wax', (s) => s.earWax >= 50, 150),
+  A('zen50', 'Zen Master', '50 pops in Zen mode', (s) => s.zenPops >= 50, 100),
+  A('glam1', 'Glam Squad', 'Finish a makeup look', (s) => s.makeupDone >= 1, 60),
+  A('glam5', 'Makeup Artist', 'Finish 5 makeup looks', (s) => s.makeupDone >= 5, 200),
+  A('trim1', 'First Trim', 'Finish a haircut', (s) => s.haircutDone >= 1, 60),
+  A('trim5', 'Stylist', 'Finish 5 haircuts', (s) => s.haircutDone >= 5, 200),
+  A('day3', 'Regular', 'Play 3 days in a row', (s) => s.streak >= 3, 100),
+  A('day7', 'Devoted', 'Play 7 days in a row', (s) => s.streak >= 7, 300),
+  A('shop6', 'Kitted Out', 'Own 6 upgrade levels', (s) => s.upgradeTotal >= 6, 150),
+  A('shop18', 'Top of the Line', 'Max out every upgrade', (s) => s.upgradeTotal >= 18, 600),
+];
+// your title, from how many awards you hold
+export const RANKS = ['Trainee', 'Assistant', 'Esthetician', 'Specialist', 'Expert', 'Master', 'Legend'];
+export const rankFor = (count) => RANKS[Math.min(RANKS.length - 1, Math.floor(count / 4))];

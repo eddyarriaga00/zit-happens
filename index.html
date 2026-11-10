@@ -34,6 +34,16 @@
   <div id="toast" class="hidden"></div>
   <button id="btn-finish" class="pill hidden">All done ✨ Finish</button>
 
+  <!-- Makeup palette -->
+  <div id="makeup-bar" class="hidden">
+    <div id="mk-shades"></div>
+    <div class="mk-products">
+      <button data-mk="lips" class="active">Lipstick</button>
+      <button data-mk="blush">Blush</button>
+      <button data-mk="shadow">Eyeshadow</button>
+    </div>
+  </div>
+
   <!-- Tool bar -->
   <div id="tools" class="hidden">
     <button class="tool active" data-tool="finger"><span class="ico">🤏</span><span>Fingers</span></button>
@@ -57,10 +67,14 @@
       </div>
       <button id="btn-play" class="big">Pimples <small id="play-level">Level 1</small></button>
       <button id="btn-ear" class="big ear">Ear Wax <small id="ear-level">Level 1</small></button>
+      <div class="row">
+        <button id="btn-makeup" class="big mode">Makeup <small>quick glam</small></button>
+        <button id="btn-haircut" class="big mode">Haircut <small>trim the fringe</small></button>
+      </div>
       <button id="btn-zen" class="big alt">Zen Mode <small>endless &amp; chill</small></button>
       <div class="row">
         <button id="btn-shop" class="small">Shop</button>
-        <button id="btn-stats" class="small">Stats</button>
+        <button id="btn-stats" class="small">Awards</button>
         <button id="btn-howto" class="small">How to</button>
         <button id="btn-settings" class="small">Settings</button>
       </div>
@@ -106,6 +120,10 @@
         <li><b>Peel-off mask:</b> every other patient finishes with a charcoal mask: scoop it on, spread it, fan it dry with your finger, then peel it off.</li>
         <li><b>Aftercare:</b> <b>Spray</b> disinfects popped spots and calms the redness. <b>Patch</b> sticks a little heart, star or dot on a popped spot. Both give bonus points, more if you spray first.</li>
         <li>Cysts are big and stubborn. Blackheads are quick. Golden ones are lucky.</li>
+        <li><b>Milia:</b> tiny hard white pearls (from level 6). They won't squeeze until you nick them with the Needle.</li>
+        <li><b>When to let go:</b> the core pops out last, then clear fluid wells up. That's your cue. Keep squeezing and it bleeds.</li>
+        <li><b>Makeup &amp; Haircut:</b> quick side modes. Swipe lipstick, blush and eyeshadow onto the right spots, or snip each lock of fringe at the dashed line.</li>
+        <li><b>Awards:</b> 30 awards for milestones, each paying coins and raising your rank.</li>
         <li><b>Rewards:</b> clearing a patient for the first time always unlocks something: a new tool, a patch shape, a free upgrade, a pus style or coins.</li>
         <li><b>Stars &amp; coins:</b> every patient has 3 stars: one for clearing the face, two for their own goals. Coins buy upgrades and pus styles in the Shop.</li>
         <li><b>Full treatment:</b> each patient gets 5 steps: lather and rinse the face, steam it to open the pores, pop, wipe up, then spread soothing gel. You can switch the extra steps off in Settings.</li>
@@ -118,9 +136,9 @@
 
   <!-- Stats -->
   <section id="stats" class="screen hidden">
-    <div class="card">
-      <h2>Stats</h2>
-      <div id="stats-grid" class="stats-grid"></div>
+    <div class="card tall">
+      <h2>Stats &amp; Awards</h2>
+      <div class="scroll"><div id="stats-grid" class="stats-grid"></div><div id="awards-list"></div></div>
       <button class="big back">Back</button>
     </div>
   </section>

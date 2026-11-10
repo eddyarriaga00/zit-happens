@@ -36,6 +36,11 @@ export const TYPES = {
     head: '#f1c9b8', headRim: '#d98f80', pusColor: '#f3e2a0', stages: 1, popPts: 150,
     wormW: 0.3, lenPerMl: 40, squirt: 4, hair: true,
   },
+  milia: {       // a hard little pearl under the skin: has to be nicked with the needle first
+    name: 'Milia', r: [6, 8], fill: [0.7, 0.9], pus: [0.15, 0.2], drain: 1,
+    head: '#fffdf5', headRim: '#efe6cf', pusColor: '#fbf6e6', stages: 1, popPts: 130,
+    wormW: 0.9, lenPerMl: 26, squirt: 1, hard: true,
+  },
   stray: {
     name: 'Stray hair', r: [4, 5], fill: [1, 1], pus: [0.1, 0.1], drain: 1,
     head: '#000000', headRim: '#000000', pusColor: '#f3e2a0', stages: 1, popPts: 40,
@@ -200,6 +205,10 @@ export class Pimple {
         this.state = 'pressing';
         // pressure builds slowly at first, then rushes
         this.pressure = Math.min(1, this.pressure + dt / this.fillTime * (0.6 + this.pressure * 0.9) * this.rate());
+        if (T.hard && !this.lanced && this.pressure > 0.3) {
+          this.pressure = 0.3;
+          if (!this.hinted) { this.hinted = true; game.fx.text(this.x, this.y - this.r * 3, 'too hard: needle it first', '#ffe7a8', 15); }
+        }
         audio.squish(this.pressure);
         if (this.pressure - this.lastTick > 0.2) { this.lastTick = this.pressure; buzz('light'); }
         if (this.pressure >= 1) this.pop(game);
@@ -238,6 +247,13 @@ export class Pimple {
             this.emptyT = 0;
             buzz('medium');
             audio.schlorp();
+            // the finale: the hard core pops out last
+            if (this.type !== 'black') {
+              game.fx.squirt(this.x, this.y, this.worm ? this.worm.angle : 0, 1, { color: '#f6efd8', speed: 110, spread: 0.3, size: Math.max(3, this.r * 0.34), lift: 170 });
+              game.fx.text(this.x, this.y - this.r * 2.2 - 44, 'core out! +30', '#fff3b0', 15);
+              game.score += 30;
+              audio.pluck();
+            }
           }
         }
       }
@@ -398,7 +414,7 @@ export class Pimple {
     if (this.state === 'idle') swell *= 1 + Math.sin(this.time * 3 + this.seed) * 0.03;
 
     const r = r0 * swell * appear;
-    const inflame = this.state === 'done' ? (1 - this.heal) * 0.5 : 0.45 + this.pressure * 0.35;
+    const inflame = (this.state === 'done' ? (1 - this.heal) * 0.5 : 0.45 + this.pressure * 0.35) * (T.hard ? 0.3 : 1);
 
     // 1. inflamed halo
     // irregular, blotchy redness rather than a neat circle
@@ -453,6 +469,10 @@ export class Pimple {
       ctx.arc(cx, cy, rad, 0, Math.PI * 2);
       ctx.fill();
     };
+    // squeezed skin goes pale around the bump
+    if (this.held != null && this.pressure > 0.15) {
+      disc(x, y, bumpR * 2.0, [[0, 'rgba(255,246,236,0)'], [0.55, `rgba(255,246,236,${0.24 * this.pressure})`], [1, 'rgba(255,246,236,0)']]);
+    }
     // shadow cast to the lower right
     disc(x + bumpR * 0.22, y + bumpR * 0.3, bumpR * 1.15, [[0, 'rgba(70,22,16,0.34)'], [1, 'rgba(70,22,16,0)']], bumpR * 0.3);
     // swollen, angry skin
@@ -477,6 +497,14 @@ export class Pimple {
         ctx.beginPath();
         ctx.arc(x, y, r0 * (0.45 + Math.min(this.emptyT - tuning.nice, 2) * 0.2), 0, Math.PI * 2);
         ctx.fill();
+      }
+      // once it's empty, clear fluid wells up: that's the sign to stop
+      if (this.state === 'empty' && !this.bled) {
+        const sr = r0 * (0.2 + Math.min(this.emptyT, 1) * 0.3);
+        ctx.fillStyle = 'rgba(255,196,170,0.6)';
+        ctx.beginPath(); ctx.arc(x, y, sr, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath(); ctx.arc(x - sr * 0.3, y - sr * 0.35, sr * 0.28, 0, Math.PI * 2); ctx.fill();
       }
     } else if (T.hair) {
       this.drawHair(ctx, x, y, r);
@@ -507,6 +535,14 @@ export class Pimple {
       ctx.beginPath();
       ctx.ellipse(x - hr * 0.35, y - hr * 0.4, hr * 0.2, hr * 0.11, -0.6, 0, Math.PI * 2);
       ctx.fill();
+      // just before it goes, a bead of pus pushes through
+      if (this.type !== 'black' && this.pressure > 0.72) {
+        const k = (this.pressure - 0.72) / 0.28, br = Math.max(1.5, hr * 0.5 * k);
+        ctx.fillStyle = T.pusColor;
+        ctx.beginPath(); ctx.arc(x + hr * 0.1, y - hr * 0.05, br, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.beginPath(); ctx.arc(x + hr * 0.1 - br * 0.3, y - hr * 0.05 - br * 0.35, br * 0.3, 0, Math.PI * 2); ctx.fill();
+      }
       if (this.lanced) {
         ctx.fillStyle = '#a3182a';
         ctx.beginPath();

@@ -407,8 +407,15 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     if (k < 0.82) return { x: X(j() * 0.5), y: Y(mouthY - 0.085 + j() * 0.03), a: Math.PI / 2 + j() * 0.8 };
     return { x: X(j() * 0.5), y: Y(0.86 + j() * 0.1), a: Math.PI / 2 + j() };
   };
+  const lipsPath = new Path2D();
+  lipsPath.addPath(upper); lipsPath.addPath(lower);
+  const inLips = (px, py) => x.isPointInPath(lipsPath, px * dpr, py * dpr);
+  const lipsBox = [cx - mw, my - hh * 0.06, cx + mw, my + hh * 0.105];
+  const cheeks = [-1, 1].map((d) => ({ x: X(d * 0.56), y: Y(0.3), rx: hw * 0.27, ry: hh * 0.16 }));
+  const lids = eyes.map((e) => ({ x: e.x, y: e.y - ery * 1.75, rx: erx * 1.15, ry: ery * 0.95 }));
   const onSkin = (px, py) => inHead(px, py) && (py - cy) / hh >= edgeV((px - cx) / hw);   // face, not hair
-  const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint, lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
+  const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint,
+    lipsPath, inLips, lipsBox, cheeks, lids, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
   return { canvas: c, geo };
 }
 

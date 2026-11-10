@@ -1,7 +1,8 @@
 import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
-import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL } from './levels.js';
+import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL, AWARDS, rankFor } from './levels.js';
 import { lookFor, portraitURL } from './faces.js';
 import { renderFaceScene, drawLids } from './facescene.js';
+import { Makeup, Haircut, LIP_SHADES } from './salon.js';
 import { FX } from './fx.js';
 import { Ear } from './ear.js';
 import { Treatment } from './steps.js';
@@ -59,6 +60,26 @@ function grantReward(n) {
 for (let n = 1; n < save.level; n++) grantReward(n);
 store.save(save);
 
+// ---- awards: checked whenever something is finished; each pays out once
+function checkAwards() {
+  const s = {
+    ...save,
+    starTotal: Object.values(save.stars).reduce((a, b) => a + b, 0),
+    upgradeTotal: Object.values(save.upgrades).reduce((a, b) => a + b, 0),
+  };
+  const earned = [];
+  for (const a of AWARDS) {
+    if (save.awards[a.id] || !a.test(s)) continue;
+    save.awards[a.id] = true;
+    save.coins += a.coins;
+    earned.push(a);
+  }
+  if (earned.length) store.save(save);
+  return earned;
+}
+const awardsHtml = (list) => list.map((a) => `<div class="reward award"><b>🏆 Award: ${a.name}</b><span>${a.desc} · +${a.coins} coins</span></div>`).join('');
+const awardCount = () => Object.keys(save.awards).length;
+
 const applyPus = () => setPusStyle((PUS_STYLES.find((p) => p.id === save.pus) || PUS_STYLES[0]).color);
 
 const G = {
@@ -83,6 +104,7 @@ const G = {
   // callbacks used by pimples
   onPop, onDrain, onFinish, onEarPull,
   ear: null,
+  salon: null,           // the Makeup or Haircut mini-mode in play
   sup: null,             // the supplies on the tray (bottles, wipes, pads, bin)
   treat: null,           // spa steps (lather, rinse, steam, soothe) when enabled
   plan: null,
@@ -187,6 +209,7 @@ function levelPlan(level) {
   let types = [];
   for (const [t, c] of Object.entries(def.mix)) for (let i = 0; i < c; i++) types.push(t);
   types = types.map((t) => (t === 'white' && Math.random() < 0.04 * up('lucky') ? 'gold' : t));
+  if (level >= 6) types = types.map((t) => (t === 'white' && Math.random() < 0.18 ? 'milia' : t));   // hard little pearls: needle first
   types.sort(() => Math.random() - 0.5);
   types.sort((a, b) => (b === 'boss') - (a === 'boss'));   // the big one gets first pick of space
   // too many to fit at once: the rest break out as space frees up
@@ -219,7 +242,7 @@ function randomPlan(level) {
 function newScene(seed, def = null) {
   G.def = def;
   G.tone = def && def.mix ? SKIN_TONES[def.skin] : null;
-  G.zone = G.mode === 'level' && def ? def.zone : G.mode === 'zen' ? ALL_ZONES[Math.floor(Math.random() * ALL_ZONES.length)] : null;
+  G.zone = (G.mode === 'level' || G.mode === 'makeup' || G.mode === 'haircut') && def ? def.zone : G.mode === 'zen' ? ALL_ZONES[Math.floor(Math.random() * ALL_ZONES.length)] : null;
   G.look = lookFor(def || { name: `zen${seed}` });
   G.popTime = 0;
   G.maxCombo = 0;
@@ -237,6 +260,7 @@ function newScene(seed, def = null) {
   G.spawnQueue = [];
   G.time = 0;
   G.ear = null;
+  G.salon = null;
   G.finishing = false;
   G.say = null;
   G.treat = null;
@@ -394,7 +418,7 @@ function endEar() {
   save.bestScore = Math.max(save.bestScore, score);
   save.earsCleaned++;
   const earCoins = earnCoins(score, stars);
-  $('res-goals').innerHTML = `<div class="coins-won">+${earCoins} 🪙</div>`;
+  $('res-goals').innerHTML = `<div class="coins-won">+${earCoins} 🪙</div>${awardsHtml(checkAwards())}`;
   save.earStars[G.level] = Math.max(save.earStars[G.level] || 0, stars);
   store.save(save);
   $('res-title').textContent = ['', 'Hear that?', 'Clean ears!', 'Crystal clear!'][stars];
@@ -409,6 +433,61 @@ function endEar() {
   audio.fanfare();
   buzz('medium');
   setTimeout(() => showScreen('results'), 400);
+}
+
+// ---- Makeup and Haircut: quick side modes on a random client's face
+function startSalon(kind) {
+  G.mode = kind;
+  G.score = 0;
+  G.combo = 0;
+  G.stats = freshStats();
+  G.paused = false;
+  const client = { ...LEVELS[Math.floor(Math.random() * LEVELS.length)], zone: 'forehead' };
+  newScene(Math.floor(Math.random() * 1e9), client);
+  if (kind === 'haircut') { G.look = { ...G.look, style: 'long' }; paintSkin(); }   // needs a fringe to trim
+  G.salon = kind === 'makeup' ? new Makeup(G, Math.min(LIP_SHADES.length, 3 + save.makeupDone)) : new Haircut(G);
+  showScreen(null);
+  $('hud').classList.remove('hidden');
+  $('btn-finish').classList.add('hidden');
+  if (kind === 'makeup') renderMakeupBar();
+  toast(kind === 'makeup' ? 'Pick a product and a shade, then swipe it on 💄' : 'Swipe across each lock to snip it at the dashed line ✂️', 3400);
+}
+
+function renderMakeupBar() {
+  const m = G.salon;
+  document.querySelectorAll('#makeup-bar [data-mk]').forEach((b) => b.classList.toggle('active', b.dataset.mk === m.product));
+  const wrap = $('mk-shades');
+  wrap.innerHTML = '';
+  for (const c of m.shades[m.product]) {
+    const b = document.createElement('button');
+    b.className = 'shade' + (m.color[m.product] === c ? ' active' : '');
+    b.style.background = c;
+    b.onclick = () => { audio.unlock(); audio.click(); m.setColor(c); renderMakeupBar(); };
+    wrap.appendChild(b);
+  }
+}
+
+function endSalon() {
+  if (G.ended || !G.salon) return;
+  G.ended = true;
+  $('btn-finish').classList.add('hidden');
+  const kind = G.mode, sc = G.salon.score();
+  const stars = sc >= 90 ? 3 : sc >= 70 ? 2 : 1;
+  const coins = earnCoins(sc * 6, stars);
+  let unlock = '';
+  if (kind === 'makeup') {
+    save.makeupDone++;
+    if (2 + save.makeupDone < LIP_SHADES.length) unlock = '<div class="reward"><b>🎁 New lipstick shade unlocked</b><span>Try it on your next client</span></div>';
+  } else save.haircutDone++;
+  store.save(save);
+  $('btn-next').firstChild.textContent = 'Another client';
+  $('res-title').textContent = (kind === 'makeup' ? ['', 'A bit smudged', 'Looking lovely', 'Flawless glam!'] : ['', 'It\'ll grow back', 'Neat trim', 'Salon perfect!'])[stars];
+  [...$('res-stars').children].forEach((el, i) => el.classList.toggle('on', i < stars));
+  $('res-grid').innerHTML = [stat(`${sc}%`, kind === 'makeup' ? 'coverage' : 'precision'), stat(`+${coins} 🪙`, 'coins earned')].join('');
+  $('res-goals').innerHTML = unlock + awardsHtml(checkAwards());
+  audio.fanfare();
+  buzz('medium');
+  setTimeout(() => showScreen('results'), 500);
 }
 
 function startDemo() {
@@ -448,6 +527,7 @@ function onFinish(p, rating) {
   if (rating === 'perfect') {
     G.combo++;
     G.maxCombo = Math.max(G.maxCombo, G.combo);
+    save.bestCombo = Math.max(save.bestCombo, G.combo);
     say('good');
     G.stats.perfects++;
     const pts = Math.round(150 * mult());
@@ -468,6 +548,7 @@ function onFinish(p, rating) {
     G.fx.text(p.x, y, 'OUCH! −50', '#ff6b78', 24);
   }
   save.totalPops++;
+  if (p.type === 'boss') save.bossPops++;
   save.totalPus += p.pusDrained;
   if (rating === 'perfect') save.perfects++;
   if (rating === 'ouch') save.ouches++;
@@ -511,7 +592,9 @@ function endLevel() {
   save.bestScore = Math.max(save.bestScore, score);
   save.levelsCleared++;
   save.stars[G.level] = Math.max(save.stars[G.level] || 0, stars);
+  if (s.ouches === 0) save.flawless++;
   const reward = grantReward(G.level);
+  const newAwards = checkAwards();
   store.save(save);
 
   $('btn-next').firstChild.textContent = 'Next patient';
@@ -524,7 +607,7 @@ function endLevel() {
     stat(`+${coins} 🪙`, 'coins earned'),
   ].join('');
   $('res-goals').innerHTML = `<div class="before-after"><figure><img class="portrait small" alt="" src="${portraitURL(def, { mood: 'worried', zone: def.zone }, 120)}"><figcaption>before</figcaption></figure><span>→</span><figure><img class="portrait small" alt="" src="${portraitURL(def, { mood: 'happy', clear: true }, 120)}"><figcaption>after</figcaption></figure></div>
-  ${reward ? `<div class="reward"><b>🎁 New: ${reward.name}</b><span>${reward.desc}</span></div>` : ''}
+  ${reward ? `<div class="reward"><b>🎁 New: ${reward.name}</b><span>${reward.desc}</span></div>` : ''}${awardsHtml(newAwards)}
   <ul class="goals">
     <li class="met"><span>★</span>Clear every pimple</li>
     ${def.goals.map((g, i) => `<li class="${met[i] ? 'met' : 'missed'}"><span>${met[i] ? '★' : '☆'}</span>${goalLabel(g)}</li>`).join('')}
@@ -562,6 +645,11 @@ canvas.addEventListener('pointerdown', (e) => {
   if (G.mode === 'demo' || G.paused || G.ended) return;
   try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   const x = e.clientX, y = e.clientY;
+  if (G.salon) {
+    pointers.set(e.pointerId, { kind: 'salon', x, y });
+    G.salon.down(e.pointerId, x, y);
+    return;
+  }
   const hit = G.sup.down(x, y, e.pointerId);   // a bottle, pack, jar, the bin, or a close-up
   if (hit === 'grab') {
     // pulled out a fresh wipe/pad: this finger carries on wiping with it
@@ -768,6 +856,7 @@ canvas.addEventListener('pointermove', (e) => {
   const x = e.clientX, y = e.clientY;
   if (ptr.kind === 'pinch') { ptr.x = x; ptr.y = y; updatePinch(ptr.pin); return; }
   if (ptr.kind === 'tweeze') { ptr.p.fx = x; ptr.p.fy = y; }
+  if (ptr.kind === 'salon') G.salon?.move(e.pointerId, x, y, ptr.x, ptr.y);
   if (ptr.kind === 'treat') G.treat?.move(ptr.x, ptr.y, x, y);
   if (ptr.kind === 'ear') G.ear?.move(e.pointerId, x, y);
   if (ptr.kind === 'wipe') {
@@ -784,6 +873,7 @@ function endPointer(e) {
   const ptr = pointers.get(e.pointerId);
   if (!ptr) return;
   pointers.delete(e.pointerId);
+  if (ptr.kind === 'salon') G.salon?.up(e.pointerId);
   if (ptr.kind === 'treat') G.treat?.up();
   if ((ptr.kind === 'treat' || (ptr.kind === 'wipe' && ptr.big)) && G.sup.dropAt(ptr.x, ptr.y)) { /* dropped it in the bin */ }
   if (ptr.kind === 'treat' || ptr.kind === 'wipe') G.sup.hand = null;
@@ -905,6 +995,7 @@ function update(dt) {
 
   for (const p of G.pimples) p.update(dt, G);
   if (G.ear) G.ear.update(dt);
+  if (G.salon) G.salon.update(dt);
   // the patient blinks now and then, and screws their eyes shut when it hurts
   G.wince = Math.max(0, G.wince - dt);
   sayCool = Math.max(0, sayCool - dt);
@@ -941,6 +1032,7 @@ function render() {
   for (const p of G.pimples) if (p.state !== 'done') p.draw(ctx, G.time);
   for (const p of G.pimples) p.drawRing(ctx, G.time);
   if (G.ear) G.ear.drawChunks(ctx);
+  if (G.salon) G.salon.draw(ctx);
   if (G.treat) G.treat.draw(ctx);
   G.sup.draw(ctx);
   toolfx.draw(ctx, pointers);
@@ -964,6 +1056,15 @@ function timeLeft() {
 
 function updateHud() {
   if (G.mode === 'demo') return;
+  if (G.salon) {
+    setText('hud-title', G.mode === 'makeup' ? 'Makeup' : 'Haircut');
+    setText('hud-sub', `${Math.round(G.salon.progress * 100)}% done`);
+    setText('hud-score', `${G.salon.score()}%`);
+    setText('hud-combo', '');
+    const ready = G.salon.ready && !G.ended;
+    if (ready && $('btn-finish').classList.contains('hidden')) { $('btn-finish').textContent = 'Done ✨'; $('btn-finish').classList.remove('hidden'); }
+    return;
+  }
   setText('hud-score', Math.round(G.score).toLocaleString());
   setText('hud-combo', G.combo >= 2 ? `combo ×${mult().toFixed(2).replace(/\.?0+$/, '')}` : '');
   if (G.mode === 'level') {
@@ -1009,7 +1110,7 @@ function showScreen(name) {
   if (name === 'menu') {
     $('play-level').textContent = `Level ${save.level} · ${levelDef(save.level).name}`;
     $('menu-coins').textContent = `🪙 ${save.coins.toLocaleString()}`;
-    $('streak').textContent = save.streak > 1 ? `🔥 ${save.streak}-day streak` : '';
+    $('streak').textContent = `${rankFor(awardCount())} · 🏆 ${awardCount()}/${AWARDS.length}${save.streak > 1 ? ` · 🔥 ${save.streak} days` : ''}`;
     $('ear-level').textContent = `Level ${save.earLevel}`;
   }
 }
@@ -1019,6 +1120,9 @@ function refreshTools() {
   document.querySelectorAll('#tools .tool').forEach((b) => b.classList.toggle('locked', !toolUnlocked(b.dataset.tool)));
   if (!toolUnlocked(G.tool)) document.querySelector('#tools [data-tool="finger"]').click();
   $('tools').classList.toggle('hidden', !show);
+  const mk = currentScreen === null && G.mode === 'makeup';
+  $('makeup-bar').classList.toggle('hidden', !mk);
+  document.body.classList.toggle('mk', mk);
 }
 
 // ---- level map, patient card, shop
@@ -1136,7 +1240,11 @@ function renderStats() {
     stat(save.zenPops.toLocaleString(), 'zen pops'),
     stat(save.earWax.toLocaleString(), 'ear wax pulled'),
     stat(save.earsCleaned.toLocaleString(), 'ears cleaned'),
+    stat(save.makeupDone.toLocaleString(), 'makeup looks'),
+    stat(save.haircutDone.toLocaleString(), 'haircuts'),
   ].join('');
+  $('awards-list').innerHTML = `<h3>Awards ${awardCount()} / ${AWARDS.length} · ${rankFor(awardCount())}</h3>`
+    + AWARDS.map((a) => `<div class="award-row ${save.awards[a.id] ? 'got' : ''}"><span>${save.awards[a.id] ? '🏆' : '🔒'}</span><div><b>${a.name}</b><small>${a.desc} · ${a.coins} coins</small></div></div>`).join('');
 }
 
 function renderSettings() {
@@ -1181,17 +1289,23 @@ on('btn-shop', () => showShop());
 on('btn-intro-start', () => startLevel(introLevel));
 on('btn-intro-back', () => showLevels());
 on('btn-zen', () => startZen());
+on('btn-makeup', () => startSalon('makeup'));
+on('btn-haircut', () => startSalon('haircut'));
+document.querySelectorAll('#makeup-bar [data-mk]').forEach((b) => b.addEventListener('click', () => {
+  audio.unlock(); audio.click();
+  if (G.salon && G.salon.setProduct) { G.salon.setProduct(b.dataset.mk); renderMakeupBar(); }
+}));
 on('btn-ear', () => startEar(save.earLevel));
 on('btn-stats', () => { renderStats(); showScreen('stats'); });
 on('btn-howto', () => { screenReturn = currentScreen; showScreen('howto'); });
 on('btn-settings', () => { renderSettings(); showScreen('settings'); });
 on('btn-pause', () => pause());
 on('btn-resume', () => { G.paused = false; showScreen(null); });
-on('btn-restart', () => (G.mode === 'zen' ? startZen() : G.mode === 'ear' ? startEar(G.level) : startLevel(G.level)));
+on('btn-restart', () => (G.salon ? startSalon(G.mode) : G.mode === 'zen' ? startZen() : G.mode === 'ear' ? startEar(G.level) : startLevel(G.level)));
 on('btn-quit', () => goMenu());
-on('btn-next', () => (G.mode === 'ear' ? startEar(save.earLevel) : openIntro(G.level + 1)));
+on('btn-next', () => (G.salon ? startSalon(G.mode) : G.mode === 'ear' ? startEar(save.earLevel) : openIntro(G.level + 1)));
 on('btn-res-menu', () => goMenu());
-on('btn-finish', () => (G.mode === 'ear' ? endEar : afterWipe)());
+on('btn-finish', () => (G.salon ? endSalon : G.mode === 'ear' ? endEar : afterWipe)());
 document.querySelectorAll('.back').forEach((b) => b.addEventListener('click', () => {
   audio.click();
   showScreen(currentScreen === 'howto' ? screenReturn : 'menu');
@@ -1248,7 +1362,12 @@ if (!localStorage.getItem('zit-seen-howto')) {
   showScreen('howto');
 }
 requestAnimationFrame(frame);
-if (dailyNote) setTimeout(() => toast(dailyNote, 3200), 700);
+{
+  const got = checkAwards();
+  $('streak').textContent = `${rankFor(awardCount())} · 🏆 ${awardCount()}/${AWARDS.length}${save.streak > 1 ? ` · 🔥 ${save.streak} days` : ''}`;
+  if (got.length) dailyNote = `${got.length} award${got.length > 1 ? 's' : ''} earned 🏆 ${dailyNote ? '· ' + dailyNote : ''}`;
+}
+if (dailyNote) setTimeout(() => toast(dailyNote, 3600), 700);
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});

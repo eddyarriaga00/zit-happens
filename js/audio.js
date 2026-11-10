@@ -224,6 +224,15 @@ export function spritz() {
   noise(t, 0.1, { type: 'bandpass', freq: 1400, q: 3, gain: 0.1 });
 }
 
+/** Scissors. */
+export function snip() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  noise(t, 0.035, { type: 'highpass', freq: 5000, q: 0.7, gain: 0.3 });
+  tone(t + 0.02, 0.03, { freq: 3200, freqEnd: 1800, gain: 0.12, type: 'triangle' });
+  noise(t + 0.035, 0.03, { type: 'highpass', freq: 6000, q: 0.7, gain: 0.2 });
+}
+
 export function click() {
   if (!ready()) return;
   tone(ctx.currentTime, 0.04, { freq: 900, gain: 0.08, type: 'sine' });

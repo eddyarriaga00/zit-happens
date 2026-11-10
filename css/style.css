@@ -421,3 +421,31 @@ button.big.alt small { opacity: 0.75; }
 /* blur behind in-game chips is costly over a live canvas on phones, and they are nearly opaque anyway */
 .icon-btn, .hud-center, .hud-score, #tools, #toast { backdrop-filter: none; -webkit-backdrop-filter: none; }
 .tool { -webkit-user-select: none; user-select: none; }
+
+/* ---------- side modes, awards ---------- */
+.logo h1 { font-size: 42px; }
+.logo-zit { width: 72px; height: 72px; }
+.logo { margin-bottom: 4px; }
+#menu .row .big { flex: 1; padding: 11px 6px; font-size: 17px; min-width: 0; }
+button.big.mode { background: #ff7fb8; }
+#makeup-bar {
+  position: fixed; left: 50%; bottom: calc(var(--safe-bottom) + 10px); transform: translateX(-50%);
+  width: min(360px, calc(100% - 20px));
+  background: rgba(255, 245, 250, 0.94); border-radius: 22px; padding: 8px;
+  display: flex; flex-direction: column; gap: 8px; z-index: 5;
+  box-shadow: 0 6px 18px rgba(214, 40, 120, 0.25);
+}
+#mk-shades { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.shade { width: 36px; height: 36px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); }
+.shade.active { box-shadow: 0 0 0 3px var(--accent); }
+.mk-products { display: flex; gap: 6px; }
+.mk-products button { flex: 1; padding: 11px 4px; border-radius: 14px; background: var(--tile); color: var(--ink); font-weight: 800; font-size: 14px; }
+.mk-products button.active { background: var(--accent); color: #fff; }
+.mk .pill { bottom: calc(var(--safe-bottom) + 140px); }
+.reward.award { background: linear-gradient(135deg, #ffe9a8, #ffd0e4); }
+#awards-list h3 { margin: 16px 0 8px; font-size: 15px; color: var(--muted); }
+.award-row { display: flex; gap: 10px; align-items: center; background: var(--tile); border-radius: 14px; padding: 9px 12px; margin-top: 6px; opacity: 0.55; }
+.award-row.got { opacity: 1; background: linear-gradient(135deg, #fff1b8, #ffd9ea); }
+.award-row span { font-size: 20px; }
+.award-row b { display: block; font-size: 14.5px; }
+.award-row small { color: var(--muted); font-size: 12px; }

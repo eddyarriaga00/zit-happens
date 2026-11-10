@@ -15,6 +15,12 @@ const DEFAULTS = {
   earsCleaned: 0,
   earStars: {},
   coins: 0,
+  awards: {},       // id -> true
+  bestCombo: 0,
+  flawless: 0,      // patients finished without bleeding
+  bossPops: 0,
+  makeupDone: 0,
+  haircutDone: 0,
   lastDay: '',      // YYYY-MM-DD of the last day played
   streak: 0,
   rewards: {},      // level -> true once its reward has been collected
