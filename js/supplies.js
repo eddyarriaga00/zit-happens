@@ -8,7 +8,6 @@
 
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
-import { drawBow } from './fx.js';
 
 const PUMPS = 3;
 // How each container opens: drag direction and the instruction shown in the close-up.
@@ -429,7 +428,8 @@ export class Supplies {
     rr(ctx, -12, -8, 7, 30, 4); ctx.fill();
     ctx.fillStyle = '#ffffff';
     rr(ctx, -11, 2, 22, 16, 4); ctx.fill();
-    drawBow(ctx, 0, 8, 0.62, '#ff4f9a');
+    ctx.fillStyle = '#ff4f9a';
+    ctx.beginPath(); ctx.arc(0, 10, 4, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#e9f4fb';
     rr(ctx, -6, -22, 12, 9, 2); ctx.fill();
     // pump head: twists out and pops up when unlocked, dips when pressed
@@ -452,7 +452,6 @@ export class Supplies {
     rr(ctx, -17, -30, 34, 6, 2); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     rr(ctx, -9, -20, 6, 28, 3); ctx.fill();
-    drawBow(ctx, 2, -6, 0.7, '#ff6fae');
     ctx.fillStyle = '#eafff7';
     rr(ctx, -5, 14, 10, 5, 2); ctx.fill();            // nozzle
     ctx.fillStyle = '#ffffff';
@@ -469,7 +468,6 @@ export class Supplies {
   draw_wipes(ctx, it, p) {
     ctx.fillStyle = '#ff9ec4';
     rr(ctx, -30, -18, 60, 40, 9); ctx.fill();
-    drawBow(ctx, 0, 14, 0.6, '#ffffff');
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     rr(ctx, -30, -18, 60, 9, 5); ctx.fill();
     ctx.fillStyle = '#d8438a';
@@ -505,12 +503,13 @@ export class Supplies {
       ctx.beginPath(); ctx.ellipse(0, 20 - i * 9, 17, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
     ctx.fillStyle = '#f0b8c8';
-    if (p >= 1) { rr(ctx, 12, 20, 26, 8, 4); ctx.fill(); drawBow(ctx, 25, 17, 0.55, '#ff4f9a'); return; }   // lid set down beside it
+    if (p >= 1) { rr(ctx, 12, 20, 26, 8, 4); ctx.fill(); return; }   // lid set down beside it
     ctx.save();
     ctx.translate(12 * p, -34 * p);
     ctx.rotate(0.45 * p);
     rr(ctx, -24, -26, 48, 11, 5); ctx.fill();
-    drawBow(ctx, 0, -29, 0.8, '#ff4f9a');
+    ctx.fillStyle = '#e0709a';
+    ctx.beginPath(); ctx.arc(0, -29, 5, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
@@ -529,7 +528,6 @@ export class Supplies {
     ctx.fillStyle = '#f6bfd6';
     rr(ctx, -23, -5, 46, 8, 4); ctx.fill();
     ctx.restore();
-    drawBow(ctx, 0, 6, 0.55, '#ffffff');
   }
 
   draw_steamer(ctx, it) {
@@ -539,7 +537,6 @@ export class Supplies {
     rr(ctx, -12, -28, 24, 22, 8); ctx.fill();       // nozzle
     ctx.fillStyle = '#b8b0c2';
     rr(ctx, -8, -31, 16, 6, 3); ctx.fill();
-    drawBow(ctx, -14, -6, 0.5, '#ff5fa2', -0.3);
     // power light
     ctx.fillStyle = it.on ? '#5dff8f' : '#ff5a6a';
     ctx.beginPath(); ctx.arc(0, 10, 6, 0, Math.PI * 2); ctx.fill();

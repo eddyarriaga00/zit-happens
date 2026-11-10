@@ -1,11 +1,12 @@
 import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
-import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES } from './levels.js';
+import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL } from './levels.js';
+import { lookFor, portraitURL } from './faces.js';
 import { FX } from './fx.js';
 import { Ear } from './ear.js';
 import { Treatment } from './steps.js';
 import { Supplies } from './supplies.js';
 import { ToolFX } from './tools.js';
-import { SKIN_TONES, renderSkin } from './skin.js';
+import { SKIN_TONES, renderSkin, zoneBlocked, ZONE_NAMES } from './skin.js';
 import * as audio from './audio.js';
 import { buzz, setHapticsEnabled } from './haptics.js';
 import * as store from './storage.js';
@@ -22,6 +23,28 @@ setHapticsEnabled(save.settings.haptics);
 
 const up = (id) => save.upgrades[id] || 0;       // shop upgrade level
 const tone = () => G.tone || SKIN_TONES[save.settings.skin] || SKIN_TONES[1];
+// (re)paint the close-up skin for the current patient, body area and screen size
+function paintSkin() { G.skin = renderSkin(G.W, G.H, G.dpr, tone(), G.seed, G.zone, G.look); }
+
+// ---- a reward for every level: tools first, then patches, upgrades, coins, pus styles
+const toolUnlocked = (id) => save.level > (TOOL_LEVEL[id] || 0);
+function grantReward(n) {
+  if (save.rewards[n]) return null;
+  save.rewards[n] = true;
+  const r = rewardFor(n);
+  let note = r.desc;
+  if (r.kind === 'coins') save.coins += r.n;
+  else if (r.kind === 'upgrade') {
+    const u = UPGRADES.find((x) => x.id === r.id);
+    if (up(r.id) < u.costs.length) save.upgrades[r.id] = up(r.id) + 1;
+    else { save.coins += 300; note = 'Already maxed, so here are 300 coins instead'; }
+  } else if (r.kind === 'pus' && !save.pusOwned.includes(r.id)) save.pusOwned.push(r.id);
+  return { ...r, desc: note };
+}
+// players from before rewards existed get the ones they already earned
+for (let n = 1; n < save.level; n++) grantReward(n);
+store.save(save);
+
 const applyPus = () => setPusStyle((PUS_STYLES.find((p) => p.id === save.pus) || PUS_STYLES[0]).color);
 
 const G = {
@@ -50,7 +73,9 @@ const G = {
   treat: null,           // spa steps (lather, rinse, steam, soothe) when enabled
   plan: null,
   onStepDone,
-  spawnNow: (type) => placePimple(type),
+  spawnNow: (type) => placePimple(type) || G.spawnQueue.push({ t: G.time + 1, type }),   // no room yet: retry
+  zone: null,            // which body area this close-up is
+  look: null,            // the patient's hair, brows, stubble...
   tool: 'finger',        // finger | extractor | needle | tweezers | pad | spray | patch
 };
 
@@ -74,7 +99,7 @@ function resize() {
   G.scale = Math.max(1.05, Math.min(2, Math.min(W, H) / 390 * 1.3)); // pimple size; bigger = easier to hit
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
-  if (changed) G.skin = renderSkin(W, H, dpr, tone(), G.seed);
+  if (changed) paintSkin();
   for (const p of G.pimples) {
     p.x = Math.min(Math.max(p.x, p.r * 2), W - p.r * 2);
     p.y = Math.min(Math.max(p.y, playTop() + p.r * 2), playBottom() - p.r * 2);
@@ -95,10 +120,10 @@ function placePimple(type) {
     const x = margin + Math.random() * (G.W - margin * 2);
     const y = playTop() + margin + Math.random() * (playBottom() - playTop() - margin * 2);
     // keep the bottom corners free for the pad jar and the bin
-    let ok = !(y > playBottom() - 100 && (x < 100 || x > G.W - 104));
+    let ok = !(y > playBottom() - 100 && (x < 100 || x > G.W - 104)) && !(G.zone && zoneBlocked(G.zone, x, y, G.W, G.H));
     for (const o of G.pimples) {
       if (o.state === 'done') continue;
-      const need = (o.r + rMax) * 2.4 + 28;
+      const need = (o.r + rMax) * 2.0 + 22;
       if (Math.hypot(o.x - x, o.y - y) < need) { ok = false; break; }
     }
     if (ok) {
@@ -158,6 +183,8 @@ function randomPlan(level) {
 function newScene(seed, def = null) {
   G.def = def;
   G.tone = def && def.mix ? SKIN_TONES[def.skin] : null;
+  G.zone = G.mode === 'level' && def ? def.zone : G.mode === 'zen' ? ALL_ZONES[Math.floor(Math.random() * ALL_ZONES.length)] : null;
+  G.look = lookFor(def || { name: `zen${seed}` });
   G.popTime = 0;
   G.maxCombo = 0;
   // let-go timing: Steady Hands upgrade widens it, sensitive skin narrows it
@@ -168,7 +195,7 @@ function newScene(seed, def = null) {
   G.seed = seed;
   G.pimples = [];
   G.fx.reset();
-  G.skin = renderSkin(G.W, G.H, G.dpr, tone(), seed);
+  paintSkin();
   G.allDone = false;
   G.ended = false;
   G.spawnQueue = [];
@@ -204,7 +231,7 @@ function startLevel(n) {
   else toast(toolHint(n), 2800);
 }
 
-const toolHint = (n) => (n === 1 ? 'Hold a pimple — or pinch it with 2 fingers 🤏' : n === 2 ? 'Blackheads: try the Loop tool' : n === 3 ? 'Cysts are deep — Needle them first' : n === 4 ? 'Ingrown hairs: pull with Tweezers' : `Patient #${n}`);
+const toolHint = (n) => (n === 1 ? 'Hold a pimple — or pinch it with 2 fingers 🤏' : n === 2 ? 'Blackheads: try the Loop tool' : n === 3 ? 'Cysts are deep — Needle them first' : n === 4 ? 'Ingrown hairs: pull with Tweezers' : n === 5 ? 'New tool: Spray disinfects popped spots' : n === 6 ? 'New tool: stick a Patch on popped spots' : `Patient #${n}`);
 
 function queueBreakouts() {
   G.plan.later.forEach((t, i) => G.spawnQueue.push({ t: G.time + 3 + i * 2.5 + Math.random(), type: t, breakout: true }));
@@ -266,7 +293,7 @@ function startZen() {
   G.stats = freshStats();
   G.paused = false;
   newScene(Math.floor(Math.random() * 1e9));
-  for (let i = 0; i < 6; i++) G.spawnQueue.push({ t: 0.2 + i * 0.15, type: rollType(5, { cyst: 0 }) });
+  for (let i = 0; i < 6; i++) G.spawnQueue.push({ t: 0.2 + i * 0.15, type: rollType(Math.min(6, save.level), { cyst: 0 }) });
   G.zenTimer = 0;
   showScreen(null);
   $('hud').classList.remove('hidden');
@@ -429,6 +456,7 @@ function endLevel() {
   save.bestScore = Math.max(save.bestScore, score);
   save.levelsCleared++;
   save.stars[G.level] = Math.max(save.stars[G.level] || 0, stars);
+  const reward = grantReward(G.level);
   store.save(save);
 
   $('btn-next').firstChild.textContent = 'Next patient';
@@ -440,7 +468,9 @@ function endLevel() {
     stat(`${Math.round(clean * 100)}%`, `clean (+${cleanBonus})`),
     stat(`+${coins} 🪙`, 'coins earned'),
   ].join('');
-  $('res-goals').innerHTML = `<ul class="goals">
+  $('res-goals').innerHTML = `<img class="portrait small" alt="" src="${portraitURL(def, { mood: 'happy', clear: true }, 120)}">
+  ${reward ? `<div class="reward"><b>🎁 New: ${reward.name}</b><span>${reward.desc}</span></div>` : ''}
+  <ul class="goals">
     <li class="met"><span>★</span>Clear every pimple</li>
     ${def.goals.map((g, i) => `<li class="${met[i] ? 'met' : 'missed'}"><span>${met[i] ? '★' : '☆'}</span>${goalLabel(g)}</li>`).join('')}
   </ul>`;
@@ -578,7 +608,7 @@ function patchAt(x, y) {
   if (!best) return;
   if (best.state !== 'done') return hint(best, 'pop it first');
   if (best.patch) return hint(best, 'already patched');
-  const shapes = ['bow', 'heart', 'bow', 'star', 'dot'];
+  const shapes = ['dot', ...(save.level > 6 ? ['heart'] : []), ...(save.level > 7 ? ['star'] : [])];
   best.patch = { shape: shapes[Math.floor(Math.random() * shapes.length)], rot: (Math.random() - 0.5) * 0.7, born: best.time };
   const pts = best.sanitized ? 50 : 30;
   G.score += pts;
@@ -759,7 +789,7 @@ function update(dt) {
     G.zenTimer += dt;
     if (active < 6 && G.zenTimer > 1.4 && !G.spawnQueue.length) {
       G.zenTimer = 0;
-      placePimple(rollType(6, { cyst: G.pimples.filter((p) => p.type === 'cyst' && p.state !== 'done').length }));
+      placePimple(rollType(Math.min(6, save.level), { cyst: G.pimples.filter((p) => p.type === 'cyst' && p.state !== 'done').length }));
     }
     // fully healed pimples fade away in zen
     G.pimples = G.pimples.filter((p) => !(p.state === 'done' && p.heal >= 1));
@@ -868,6 +898,8 @@ function showScreen(name) {
 
 function refreshTools() {
   const show = currentScreen === null && (G.mode === 'level' || G.mode === 'zen') && !(G.treat && G.treat.active);
+  document.querySelectorAll('#tools .tool').forEach((b) => b.classList.toggle('locked', !toolUnlocked(b.dataset.tool)));
+  if (!toolUnlocked(G.tool)) document.querySelector('#tools [data-tool="finger"]').click();
   $('tools').classList.toggle('hidden', !show);
 }
 
@@ -901,13 +933,15 @@ function openIntro(n) {
   const def = levelDef(n);
   const t = SKIN_TONES[def.skin] || SKIN_TONES[1];
   const best = Math.min(3, save.stars[n] || 0);
-  const tags = [def.sensitive ? 'Sensitive skin' : '', def.mix && def.mix.boss ? 'Boss pimple' : '', timeGoal(def) ? 'Timed' : '', def.endless ? 'Endless' : ''].filter(Boolean);
+  const reward = save.rewards[n] ? null : rewardFor(n);
+  const tags = [ZONE_NAMES[def.zone] || '', def.sensitive ? 'Sensitive skin' : '', def.mix && def.mix.boss ? 'Boss pimple' : '', timeGoal(def) ? 'Timed' : '', def.endless ? 'Endless' : ''].filter(Boolean);
   $('intro-body').innerHTML = `
     <div class="patient">
-      <div class="avatar" style="background: radial-gradient(circle at 35% 30%, ${t.base}, ${t.shade})"><span>${def.name[0]}</span></div>
+      <img class="portrait" alt="" src="${portraitURL(def, { mood: 'worried', zone: def.zone, ring: true }, 150)}">
       <div><div class="p-name">${def.name}, ${def.age}</div><div class="p-level">Level ${n} ${'★'.repeat(best)}${'☆'.repeat(3 - best)}</div></div>
     </div>
     <p class="blurb">“${def.blurb}”</p>
+    ${reward ? `<div class="reward"><b>🎁 Reward: ${reward.name}</b><span>${reward.desc}</span></div>` : ''}
     ${tags.length ? `<div class="tags">${tags.map((x) => `<span>${x}</span>`).join('')}</div>` : ''}
     <ul class="goals">
       <li><span>★</span>Clear every pimple</li>
@@ -1001,7 +1035,7 @@ function renderSettings() {
     b.onclick = () => {
       save.settings.skin = i;
       store.save(save);
-      G.skin = renderSkin(G.W, G.H, G.dpr, t, G.seed);
+      paintSkin();
       renderSettings();
     };
     wrap.appendChild(b);

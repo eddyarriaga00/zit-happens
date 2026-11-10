@@ -213,8 +213,7 @@ export class FX {
 
     for (const s of this.sparkles) {
       const a = 1 - s.t / s.life;
-      if (s.bow) { ctx.globalAlpha = a; drawBow(ctx, s.x, s.y, 0.4 + 0.45 * a, '#ff5fa2', s.rot + s.t * 2); ctx.globalAlpha = 1; }
-      else drawStar(ctx, s.x, s.y, 5 * a + 1, `rgba(255,230,140,${a})`);
+      drawStar(ctx, s.x, s.y, 5 * a + 1, `rgba(255,230,140,${a})`);
     }
 
     // floating text
@@ -237,36 +236,6 @@ export class FX {
   }
 }
 
-/** A ribbon bow, about 24 units wide at scale 1. */
-export function drawBow(ctx, x, y, s = 1, color = '#ff5fa2', rot = 0) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(rot);
-  ctx.scale(s, s);
-  ctx.fillStyle = color;
-  // tails
-  ctx.beginPath();
-  ctx.moveTo(-1.5, 1); ctx.lineTo(-7.5, 12); ctx.lineTo(-3.5, 10); ctx.lineTo(0, 3);
-  ctx.lineTo(3.5, 10); ctx.lineTo(7.5, 12); ctx.lineTo(1.5, 1);
-  ctx.closePath(); ctx.fill();
-  // loops
-  for (const d of [-1, 1]) {
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.bezierCurveTo(d * 4, -10, d * 15, -9, d * 13, 0);
-    ctx.bezierCurveTo(d * 15, 8, d * 4, 8, 0, 0);
-    ctx.fill();
-  }
-  ctx.fillStyle = 'rgba(255,255,255,0.4)';
-  for (const d of [-1, 1]) { ctx.beginPath(); ctx.ellipse(d * 8, -3, 3.2, 1.6, d * 0.4, 0, Math.PI * 2); ctx.fill(); }
-  // knot
-  ctx.fillStyle = 'rgba(150,20,80,0.35)';
-  ctx.beginPath(); ctx.arc(0, 0.5, 3.6, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = color;
-  ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
-}
-
 export function drawStar(ctx, x, y, r, color) {
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -285,44 +254,23 @@ export function drawStar(ctx, x, y, r, color) {
  */
 export function drawWorm(ctx, pts, n, w, color, tipColor, plugLen = 0) {
   if (n < 2) return;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  const path = () => {
+  // thickness wobbles along its length and tapers at the tip, like the real thing
+  const rad = (i) => w * 0.5 * (0.84 + 0.18 * Math.sin(i * 0.31) + 0.07 * Math.sin(i * 1.3)) * (i > n - 5 ? 0.5 + 0.1 * (n - i) : 1);
+  const pass = (from, dx, dy, k, style) => {
+    ctx.fillStyle = style;
     ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < n; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    for (let i = from; i < n; i += 2) {
+      const p = pts[i], r = rad(i) * k;
+      ctx.moveTo(p.x + dx + r, p.y + dy);
+      ctx.arc(p.x + dx, p.y + dy, r, 0, Math.PI * 2);
+    }
+    ctx.fill();
   };
-  // shadow
-  ctx.save();
-  ctx.translate(1.5, 2.5);
-  ctx.strokeStyle = 'rgba(70,25,10,0.25)';
-  ctx.lineWidth = w;
-  path(); ctx.stroke();
-  ctx.restore();
-  // body edge (darker) then body
-  ctx.strokeStyle = shade(color);
-  ctx.lineWidth = w;
-  path(); ctx.stroke();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = w * 0.78;
-  path(); ctx.stroke();
-  // dark plug at the tip
-  if (plugLen > 0 && tipColor) {
-    const start = Math.max(0, n - plugLen);
-    ctx.strokeStyle = tipColor;
-    ctx.lineWidth = w * 0.95;
-    ctx.beginPath();
-    ctx.moveTo(pts[start].x, pts[start].y);
-    for (let i = start + 1; i < n; i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.stroke();
-  }
-  // glossy highlight
-  ctx.save();
-  ctx.translate(-w * 0.15, -w * 0.18);
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-  ctx.lineWidth = Math.max(1, w * 0.22);
-  path(); ctx.stroke();
-  ctx.restore();
+  pass(0, 1.5, 2.5, 1.06, 'rgba(70,25,10,0.22)');          // shadow
+  pass(0, 0, 0, 1, shade(color));                           // darker edge
+  pass(0, -w * 0.04, -w * 0.05, 0.86, color);               // body
+  if (plugLen > 0 && tipColor) pass(Math.max(0, n - plugLen), 0, 0, 0.97, tipColor);   // dark plug at the tip
+  pass(0, -w * 0.16, -w * 0.2, 0.28, 'rgba(255,255,255,0.42)');   // wet gloss
 }
 
 const shadeCache = new Map();

@@ -15,6 +15,7 @@ const DEFAULTS = {
   earsCleaned: 0,
   earStars: {},
   coins: 0,
+  rewards: {},      // level -> true once its reward has been collected
   upgrades: {},     // id -> level bought
   pus: 'classic',
   pusOwned: ['classic'],

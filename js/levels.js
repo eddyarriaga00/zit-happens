@@ -55,11 +55,18 @@ export const LEVELS = [
   P('Dr. Squeeze', 50, 'Even doctors need a doctor.', 1, { boss: 2, cyst: 2, white: 4, black: 3, hair: 2 }, ['noOuch', ['perfect', 10]], { later: 3 }),
 ];
 
+// Which part of the body each patient's breakout is on (the close-up scene).
+const ZONES = ('forehead nose cheek chin forehead back cheek chin cheek back '
+  + 'chin forehead nose cheek forehead back cheek shoulder chin back '
+  + 'forehead nose shoulder chin cheek back chin shoulder forehead nose').split(' ');
+LEVELS.forEach((l, i) => { l.zone = ZONES[i]; });
+export const ALL_ZONES = ['forehead', 'nose', 'cheek', 'chin', 'back', 'shoulder'];
+
 /** Definition for any level number; past the hand-made ones it's an endless walk-in. */
 export function levelDef(n) {
   return LEVELS[n - 1] || {
     name: `Walk-in #${n - LEVELS.length}`, age: 16 + (n * 7) % 40, blurb: 'Surprise me, doc.',
-    skin: n % 5, mix: null, goals: ['noOuch', ['clean', 92]], endless: true,
+    skin: n % 5, mix: null, goals: ['noOuch', ['clean', 92]], endless: true, zone: ALL_ZONES[n % 6],
   };
 }
 
@@ -105,3 +112,31 @@ export const PUS_STYLES = [
   { id: 'slime', name: 'Slime', color: '#a8e06a', swatch: '#a8e06a', cost: 300 },
   { id: 'glitter', name: 'Glitter', color: '#ffd84d', swatch: '#ffd84d', cost: 600 },
 ];
+
+// ---- what you earn for clearing each level (index 0 = level 1). One per level.
+//   tool: unlocks a tool · patch: a new patch shape · upgrade: a free upgrade level
+//   pus: a pus style · coins: a bag of coins
+const T = (id, name, desc) => ({ kind: 'tool', id, name, desc });
+const U = (id, name) => ({ kind: 'upgrade', id, name: `${name} upgrade`, desc: 'A free upgrade level' });
+const C = (n) => ({ kind: 'coins', n, name: `${n} coins`, desc: 'A bonus from a grateful patient' });
+export const REWARDS = [
+  T('extractor', 'Loop tool', 'Pops blackheads in a flash, with less mess'),
+  T('needle', 'Needle', 'Opens deep cysts so they squeeze out fast'),
+  T('tweezers', 'Tweezers', 'Pull out ingrown hairs'),
+  T('spray', 'Antiseptic spray', 'Disinfects popped spots for bonus points'),
+  T('patch', 'Pimple patches', 'Stick one on a popped spot for bonus points'),
+  { kind: 'patch', id: 'heart', name: 'Heart patches', desc: 'A new patch shape' },
+  { kind: 'patch', id: 'star', name: 'Star patches', desc: 'A new patch shape' },
+  C(200), U('pad', 'Mega Pad'),
+  { kind: 'pus', id: 'berry', name: 'Strawberry pus', desc: 'A new pus style (pick it in the Shop)' },
+  U('steady', 'Steady Hands'), U('loop', 'Power Loop'), U('spa', 'Spa Pro'), C(250), U('lucky', 'Lucky Charm'),
+  U('magnet', 'Coin Magnet'), U('pad', 'Mega Pad'), C(300), U('steady', 'Steady Hands'),
+  { kind: 'pus', id: 'slime', name: 'Slime pus', desc: 'A new pus style (pick it in the Shop)' },
+  U('loop', 'Power Loop'), U('spa', 'Spa Pro'), C(400), U('lucky', 'Lucky Charm'), U('magnet', 'Coin Magnet'),
+  U('pad', 'Mega Pad'), C(500), U('steady', 'Steady Hands'), U('loop', 'Power Loop'),
+  { kind: 'pus', id: 'glitter', name: 'Glitter pus', desc: 'A new pus style (pick it in the Shop)' },
+];
+/** Reward for clearing level n (endless levels pay coins). */
+export const rewardFor = (n) => REWARDS[n - 1] || C(150);
+/** The level you must clear to unlock each tool (0 = yours from the start). */
+export const TOOL_LEVEL = { finger: 0, pad: 0, extractor: 1, needle: 2, tweezers: 3, spray: 4, patch: 5 };

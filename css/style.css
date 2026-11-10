@@ -393,7 +393,7 @@ button:disabled { opacity: 0.45; }
   pointer-events: none;
 }
 
-/* ---------- pink & bows ---------- */
+/* ---------- pink theme ---------- */
 #hud, #toast { color: #fff; }
 #hud-sub { color: rgba(255, 255, 255, 0.9); }
 #hud-combo { color: #fff3a8; }
@@ -402,28 +402,13 @@ button:disabled { opacity: 0.45; }
 #menu button.small, #menu button.big.alt { background: rgba(255, 255, 255, 0.78); }
 #tools { box-shadow: 0 6px 18px rgba(214, 40, 120, 0.25); }
 .card { border: 3px solid rgba(255, 79, 154, 0.25); }
-.card h2::after, .lv-top span:first-child::after { content: ' 🎀'; }
-button.big { position: relative; }
-#menu button.big::before, #menu button.big::after {
-  content: '🎀';
-  position: absolute;
-  top: 50%;
-  font-size: 22px;
-}
-#menu button.big::before { left: 16px; transform: translateY(-50%) rotate(-14deg); }
-#menu button.big::after { right: 16px; transform: translateY(-50%) rotate(14deg); }
-.logo-zit::after {
-  content: '🎀';
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%) rotate(-8deg);
-  font-size: 44px;
-  filter: drop-shadow(0 3px 0 rgba(214, 40, 120, 0.4));
-}
-.lv.current::after { content: '🎀'; position: absolute; margin-top: -58px; font-size: 18px; }
-.stars::before, .stars::after { content: '🎀'; font-size: 26px; align-self: center; }
-.avatar { position: relative; }
-.avatar::after { content: '🎀'; position: absolute; top: -8px; right: -6px; font-size: 24px; transform: rotate(18deg); }
 button.big.alt { color: var(--ink); }
 button.big.alt small { opacity: 0.75; }
+
+/* ---------- patient portraits, rewards, locked tools ---------- */
+.portrait { width: 112px; height: 112px; border-radius: 26px; flex: none; box-shadow: 0 4px 12px rgba(214, 40, 120, 0.25); border: 3px solid #fff; }
+.portrait.small { width: 84px; height: 84px; display: block; margin: 0 auto 8px; border-radius: 50%; }
+.reward { background: linear-gradient(135deg, #fff1b8, #ffd9ea); border-radius: 14px; padding: 10px 12px; margin: 8px 0; display: flex; flex-direction: column; gap: 2px; }
+.reward b { font-size: 15px; }
+.reward span { font-size: 12.5px; color: var(--muted); }
+.tool.locked { display: none; }

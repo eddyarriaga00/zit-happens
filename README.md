@@ -19,7 +19,8 @@ Then open http://localhost:8765.
 - `js/tools.js` – how tools look in your hand (needle, tweezers, spray mist)
 - `js/steps.js` – spa steps (lather, rinse, steam, soothe)
 - `js/fx.js` – droplets, splats, wipe
-- `js/skin.js` – skin texture and tones
+- `js/skin.js` – skin texture, tones, and the body-area scenes (forehead, nose, cheek, chin, back, shoulder)
+- `js/faces.js` – 2D patient portraits and each patient's look
 - `js/audio.js` / `js/haptics.js` – synthesized sound, haptics
 - `sw.js` – offline cache (bump `VERSION` when files are added or renamed)
 - `tools/make_icons.py` – redraws the app icons

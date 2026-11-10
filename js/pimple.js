@@ -1,6 +1,6 @@
 // Pimple types, their squeeze/drain state machine, and drawing.
 
-import { drawWorm, drawStar, drawBow } from './fx.js';
+import { drawWorm, drawStar } from './fx.js';
 import { rgba } from './skin.js';
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
@@ -13,7 +13,7 @@ export const tuning = { perfect: 0.3, nice: 0.7 };
 export const TYPES = {
   white: {
     name: 'Whitehead', r: [11, 16], fill: [0.9, 1.3], pus: [0.8, 1.3], drain: 0.95,
-    head: '#fbf1cf', headRim: '#eedb95', pusColor: '#f3e2a0', stages: 1, popPts: 100,
+    head: '#f6efd6', headRim: '#e3d3a0', pusColor: '#efe6c4', stages: 1, popPts: 100,
     wormW: 0.55, lenPerMl: 70, squirt: 14,
   },
   black: {
@@ -377,15 +377,20 @@ export class Pimple {
     const inflame = this.state === 'done' ? (1 - this.heal) * 0.5 : 0.45 + this.pressure * 0.35;
 
     // 1. inflamed halo
-    const haloR = r0 * (2.4 + (this.type === 'cyst' ? 0.6 : 0)) * appear;
-    const halo = ctx.createRadialGradient(x, y, 0, x, y, haloR);
-    halo.addColorStop(0, `rgba(214,58,58,${0.5 * inflame})`);
-    halo.addColorStop(0.5, `rgba(214,70,70,${0.25 * inflame})`);
-    halo.addColorStop(1, 'rgba(214,70,70,0)');
-    ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.arc(x, y, haloR, 0, Math.PI * 2);
-    ctx.fill();
+    // irregular, blotchy redness rather than a neat circle
+    const haloR = r0 * (2.3 + (this.type === 'cyst' || this.type === 'boss' ? 0.5 : 0)) * appear;
+    for (let i = 0; i < 4; i++) {
+      const a = this.seed + i * 1.9, off = i ? haloR * 0.3 : 0;
+      const hx = x + Math.cos(a) * off, hy = y + Math.sin(a) * off, hr2 = haloR * (i ? 0.72 : 1);
+      const halo = ctx.createRadialGradient(hx, hy, 0, hx, hy, hr2);
+      halo.addColorStop(0, `rgba(196,52,48,${(i ? 0.2 : 0.4) * inflame})`);
+      halo.addColorStop(0.55, `rgba(205,70,62,${(i ? 0.09 : 0.19) * inflame})`);
+      halo.addColorStop(1, 'rgba(205,70,62,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(hx, hy, hr2, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     if (this.state === 'done') {
       // healing mark
@@ -414,19 +419,27 @@ export class Pimple {
       ctx.translate(-x, -y);
     }
 
-    // 2. the bump (fake 3D with offset highlight + shadow)
+    // 2. the bump: built from light and shadow on the skin, not a painted disc
     const bumpR = r * 1.25;
-    ctx.fillStyle = 'rgba(90,20,20,0.18)';
+    const disc = (cx, cy, rad, stops, inner = 0) => {
+      const g = ctx.createRadialGradient(cx, cy, inner, cx, cy, rad);
+      for (const [o, c] of stops) g.addColorStop(o, c);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    // shadow cast to the lower right
+    disc(x + bumpR * 0.22, y + bumpR * 0.3, bumpR * 1.15, [[0, 'rgba(70,22,16,0.34)'], [1, 'rgba(70,22,16,0)']], bumpR * 0.3);
+    // swollen, angry skin
+    const pr = this.pressure;
+    disc(x, y, bumpR, [[0, `rgba(204,${Math.round(74 - pr * 26)},${Math.round(66 - pr * 22)},0.8)`], [0.62, 'rgba(206,80,70,0.5)'], [1, 'rgba(206,80,70,0)']], bumpR * 0.1);
+    // light falling across the dome
+    disc(x - bumpR * 0.22, y - bumpR * 0.26, bumpR * 0.85, [[0, 'rgba(255,232,220,0.5)'], [1, 'rgba(255,232,220,0)']]);
+    // tight, shiny skin
+    ctx.fillStyle = `rgba(255,255,255,${0.25 + pr * 0.3})`;
     ctx.beginPath();
-    ctx.arc(x + bumpR * 0.12, y + bumpR * 0.18, bumpR, 0, Math.PI * 2);
-    ctx.fill();
-    const bump = ctx.createRadialGradient(x - bumpR * 0.35, y - bumpR * 0.4, bumpR * 0.05, x, y, bumpR);
-    bump.addColorStop(0, 'rgba(255,215,205,0.95)');
-    bump.addColorStop(0.45, `rgba(232,${Math.round(120 - this.pressure * 40)},${Math.round(115 - this.pressure * 40)},0.95)`);
-    bump.addColorStop(1, 'rgba(205,85,85,0)');
-    ctx.fillStyle = bump;
-    ctx.beginPath();
-    ctx.arc(x, y, bumpR, 0, Math.PI * 2);
+    ctx.ellipse(x - bumpR * 0.36, y - bumpR * 0.42, bumpR * 0.2, bumpR * 0.1, -0.7, 0, Math.PI * 2);
     ctx.fill();
 
     // 3. head / opening
@@ -455,18 +468,20 @@ export class Pimple {
         hg.addColorStop(0.6, T.head);
         hg.addColorStop(1, T.headRim);
       } else {
-        hg.addColorStop(0, '#ffffff');
-        hg.addColorStop(0.45, T.head);
-        hg.addColorStop(1, T.headRim);
+        // pus seen through thin, stretched skin: soft edge, no outline
+        hg.addColorStop(0, '#fffdf0');
+        hg.addColorStop(0.5, T.head);
+        hg.addColorStop(0.82, T.headRim);
+        hg.addColorStop(1, rgba(T.headRim, 0));
       }
       ctx.fillStyle = hg;
       ctx.beginPath();
       ctx.arc(x, y, hr, 0, Math.PI * 2);
       ctx.fill();
       // glint
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.beginPath();
-      ctx.ellipse(x - hr * 0.35, y - hr * 0.4, hr * 0.28, hr * 0.18, -0.6, 0, Math.PI * 2);
+      ctx.ellipse(x - hr * 0.35, y - hr * 0.4, hr * 0.2, hr * 0.11, -0.6, 0, Math.PI * 2);
       ctx.fill();
       if (this.lanced) {
         ctx.fillStyle = '#a3182a';
@@ -514,12 +529,6 @@ export class Pimple {
     ctx.rotate(pt.rot);
     ctx.scale(1.5 - 0.5 * k, 1.5 - 0.5 * k);     // slaps down onto the skin
     ctx.globalAlpha = 0.4 + 0.6 * k;
-    if (pt.shape === 'bow') {
-      drawBow(ctx, 1.5, 2.5, R / 9, 'rgba(120,20,60,0.25)');
-      drawBow(ctx, 0, 0, R / 9, '#ff5fa2');
-      ctx.restore();
-      return;
-    }
     const shape = () => {
       ctx.beginPath();
       if (pt.shape === 'heart') {
