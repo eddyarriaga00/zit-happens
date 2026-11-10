@@ -14,6 +14,10 @@ const DEFAULTS = {
   earWax: 0,
   earsCleaned: 0,
   earStars: {},
+  coins: 0,
+  upgrades: {},     // id -> level bought
+  pus: 'classic',
+  pusOwned: ['classic'],
   stars: {},        // level -> best stars
   settings: { sound: true, haptics: true, skin: 1, steps: true },
 };

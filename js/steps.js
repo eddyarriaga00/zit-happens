@@ -70,7 +70,7 @@ export class Treatment {
 
   apply(x, y) {
     const G = this.G;
-    const s = G.scale;
+    const s = G.scale * Math.sqrt(G.spaMult || 1);
     if (this.phase === 'lather') {
       this.paint(this.foam, x, y, 38 * s, 0.5);
       audio.squish(0.2 + Math.random() * 0.3);
@@ -99,7 +99,7 @@ export class Treatment {
     else if (this.phase === 'soothe') this.progress = this.mean(this.gel) / GOALS.soothe;
     else if (this.phase === 'steam') {
       if (this.holding > 0) {
-        this.progress += dt / 3.2;
+        this.progress += dt / 3.2 * (G.spaMult || 1);
         audio.wipe(0.1);
         if (Math.random() < dt * 4) buzz('light');
         for (let k = 0; k < 2; k++) {

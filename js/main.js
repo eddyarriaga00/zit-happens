@@ -1,4 +1,5 @@
-import { Pimple, TYPES } from './pimple.js';
+import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
+import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES } from './levels.js';
 import { FX } from './fx.js';
 import { Ear } from './ear.js';
 import { Treatment } from './steps.js';
@@ -15,6 +16,10 @@ const $ = (id) => document.getElementById(id);
 let save = store.load();
 audio.setSoundEnabled(save.settings.sound);
 setHapticsEnabled(save.settings.haptics);
+
+const up = (id) => save.upgrades[id] || 0;       // shop upgrade level
+const tone = () => G.tone || SKIN_TONES[save.settings.skin] || SKIN_TONES[1];
+const applyPus = () => setPusStyle((PUS_STYLES.find((p) => p.id === save.pus) || PUS_STYLES[0]).color);
 
 const G = {
   mode: 'demo',          // 'demo' (behind menu) | 'level' | 'zen'
@@ -65,7 +70,7 @@ function resize() {
   G.scale = Math.max(1.05, Math.min(2, Math.min(W, H) / 390 * 1.3)); // pimple size; bigger = easier to hit
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
-  if (changed) G.skin = renderSkin(W, H, dpr, SKIN_TONES[save.settings.skin] || SKIN_TONES[1], G.seed);
+  if (changed) G.skin = renderSkin(W, H, dpr, tone(), G.seed);
   for (const p of G.pimples) {
     p.x = Math.min(Math.max(p.x, p.r * 2), W - p.r * 2);
     p.y = Math.min(Math.max(p.y, playTop() + p.r * 2), playBottom() - p.r * 2);
@@ -87,7 +92,7 @@ function placePimple(type) {
     const y = playTop() + margin + Math.random() * (playBottom() - playTop() - margin * 2);
     let ok = true;
     for (const o of G.pimples) {
-      if (o.state === 'done' && o.heal > 0.7) continue;
+      if (o.state === 'done') continue;
       const need = (o.r + rMax) * 2.4 + 28;
       if (Math.hypot(o.x - x, o.y - y) < need) { ok = false; break; }
     }
@@ -103,7 +108,7 @@ function placePimple(type) {
 
 function rollType(level, counts) {
   const r = Math.random();
-  if (level >= 2 && r < 0.06) return 'gold';
+  if (level >= 2 && r < 0.06 + 0.03 * up('lucky')) return 'gold';
   if (level >= 4 && Math.random() < 0.14) return 'hair';
   const maxCysts = level >= 3 ? 1 + Math.floor((level - 3) / 3) : 0;
   if (counts.cyst < maxCysts && Math.random() < 0.22) return 'cyst';
@@ -111,8 +116,23 @@ function rollType(level, counts) {
   return 'white';
 }
 
+const MAX_AT_ONCE = 10;
 function levelPlan(level) {
-  const count = Math.min(4 + level, 14);
+  const def = levelDef(level);
+  if (!def.mix) return randomPlan(Math.min(level, 20));
+  let types = [];
+  for (const [t, c] of Object.entries(def.mix)) for (let i = 0; i < c; i++) types.push(t);
+  types = types.map((t) => (t === 'white' && Math.random() < 0.04 * up('lucky') ? 'gold' : t));
+  types.sort(() => Math.random() - 0.5);
+  types.sort((a, b) => (b === 'boss') - (a === 'boss'));   // the big one gets first pick of space
+  // too many to fit at once: the rest break out as space frees up
+  const later = types.splice(MAX_AT_ONCE);
+  for (let i = 0; i < (def.later || 0); i++) later.push(rollType(Math.min(level, 8), { cyst: 99 }));
+  return { types, later };
+}
+
+function randomPlan(level) {
+  const count = Math.min(4 + level, MAX_AT_ONCE);
   const counts = { cyst: 0 };
   const types = [];
   for (let i = 0; i < count; i++) {
@@ -130,11 +150,20 @@ function levelPlan(level) {
   return { types, later };
 }
 
-function newScene(seed) {
+function newScene(seed, def = null) {
+  G.def = def;
+  G.tone = def && def.mix ? SKIN_TONES[def.skin] : null;
+  G.popTime = 0;
+  G.maxCombo = 0;
+  // let-go timing: Steady Hands upgrade widens it, sensitive skin narrows it
+  const k = def && def.sensitive ? 0.6 : 1;
+  tuning.perfect = (0.3 + 0.08 * up('steady')) * k;
+  tuning.nice = (0.7 + 0.08 * up('steady')) * k;
+  G.spaMult = 1 + 0.25 * up('spa');
   G.seed = seed;
   G.pimples = [];
   G.fx.reset();
-  G.skin = renderSkin(G.W, G.H, G.dpr, SKIN_TONES[save.settings.skin] || SKIN_TONES[1], seed);
+  G.skin = renderSkin(G.W, G.H, G.dpr, tone(), seed);
   G.allDone = false;
   G.ended = false;
   G.spawnQueue = [];
@@ -150,7 +179,7 @@ function startLevel(n) {
   G.combo = 0;
   G.stats = freshStats();
   G.paused = false;
-  newScene(n * 7919 + 13);
+  newScene(n * 7919 + 13, levelDef(n));
   const plan = levelPlan(n);
   G.plan = plan;
   if (save.settings.steps) {
@@ -172,7 +201,7 @@ function startLevel(n) {
 const toolHint = (n) => (n === 1 ? 'Hold a pimple — or pinch it with 2 fingers 🤏' : n === 2 ? 'Blackheads: try the Loop tool' : n === 3 ? 'Cysts are deep — Needle them first' : n === 4 ? 'Ingrown hairs: pull with Tweezers' : `Patient #${n}`);
 
 function queueBreakouts() {
-  G.plan.later.forEach((t, i) => G.spawnQueue.push({ t: G.time + 6 + i * 4 + Math.random() * 2, type: t, breakout: true }));
+  G.plan.later.forEach((t, i) => G.spawnQueue.push({ t: G.time + 3 + i * 2.5 + Math.random(), type: t, breakout: true }));
 }
 
 // grime to wash off in the first step
@@ -247,7 +276,7 @@ function startEar(n) {
   G.stats = freshStats();
   G.paused = false;
   newScene(n * 104729 + 7);
-  G.ear = new Ear(G, n, playTop(), playBottom(), SKIN_TONES[save.settings.skin] || SKIN_TONES[1]);
+  G.ear = new Ear(G, n, playTop(), playBottom(), tone());
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
@@ -281,6 +310,8 @@ function endEar() {
   save.earLevel = Math.max(save.earLevel, G.level + 1);
   save.bestScore = Math.max(save.bestScore, score);
   save.earsCleaned++;
+  const earCoins = earnCoins(score, stars);
+  $('res-goals').innerHTML = `<div class="coins-won">+${earCoins} 🪙</div>`;
   save.earStars[G.level] = Math.max(save.earStars[G.level] || 0, stars);
   store.save(save);
   $('res-title').textContent = ['', 'Hear that?', 'Clean ears!', 'Crystal clear!'][stars];
@@ -317,6 +348,7 @@ function onPop(p) {
   G.score += pts;
   G.fx.text(p.x, p.y - p.r * 2.2, p.T.golden ? `LUCKY +${pts}` : `+${pts}`, p.T.golden ? '#ffd84d' : '#fff', p.T.golden ? 26 : 20);
   if (p.T.golden) audio.sparkle();
+  if (save.pus === 'glitter') G.fx.sparkleBurst(p.x, p.y, 8);
 }
 
 function onDrain(p, amt) {
@@ -330,6 +362,7 @@ function onFinish(p, rating) {
   const y = p.y - p.r * 2.6;
   if (rating === 'perfect') {
     G.combo++;
+    G.maxCombo = Math.max(G.maxCombo, G.combo);
     G.stats.perfects++;
     const pts = Math.round(150 * mult());
     G.score += pts;
@@ -378,9 +411,12 @@ function endLevel() {
   const clean = G.treat ? (G.cleanAtWipe ?? 1) : G.fx.cleanliness();
   const cleanBonus = Math.round(clean * 300);
   G.score += cleanBonus;
-  const perfectRatio = s.total ? s.perfects / s.total : 0;
-  const stars = 1 + (clean >= 0.85 ? 1 : 0) + (perfectRatio >= 0.6 && s.ouches === 0 ? 1 : 0);
+  const def = G.def || levelDef(G.level);
+  const result = { ouches: s.ouches, perfects: s.perfects, clean, popTime: G.popTime, maxCombo: G.maxCombo };
+  const met = def.goals.map((g) => goalMet(g, result));
+  const stars = 1 + met.filter(Boolean).length;
   const score = Math.round(G.score);
+  const coins = earnCoins(score, stars);
 
   save.level = Math.max(save.level, G.level + 1);
   save.bestScore = Math.max(save.bestScore, score);
@@ -394,12 +430,23 @@ function endLevel() {
   $('res-grid').innerHTML = [
     stat(score.toLocaleString(), 'score'),
     stat(`${s.perfects}/${s.total}`, 'perfect pops'),
-    stat(`${s.pus.toFixed(1)} ml`, 'pus drained'),
     stat(`${Math.round(clean * 100)}%`, `clean (+${cleanBonus})`),
+    stat(`+${coins} 🪙`, 'coins earned'),
   ].join('');
+  $('res-goals').innerHTML = `<ul class="goals">
+    <li class="met"><span>★</span>Clear every pimple</li>
+    ${def.goals.map((g, i) => `<li class="${met[i] ? 'met' : 'missed'}"><span>${met[i] ? '★' : '☆'}</span>${goalLabel(g)}</li>`).join('')}
+  </ul>`;
   audio.fanfare();
   buzz('medium');
   setTimeout(() => showScreen('results'), 400);
+}
+
+function earnCoins(score, stars) {
+  const coins = Math.round((score / 20 + stars * 20) * (1 + 0.15 * up('magnet')));
+  save.coins += coins;
+  store.save(save);
+  return coins;
 }
 
 function stat(v, label) { return `<div class="stat"><b>${v}</b><span>${label}</span></div>`; }
@@ -468,11 +515,11 @@ function toolDown(id, x, y) {
   if (p && p.T.hair) { hint(p, 'ingrown hair — use tweezers'); return idle(id, x, y); }
   if (tool === 'extractor') {
     if (!p) { pointers.set(id, { kind: 'wipe', x, y }); wipeAt(x, y, 0); return; }
-    if (p.type === 'cyst' && !p.lanced && p.state !== 'popped' && p.state !== 'empty') {
+    if ((p.type === 'cyst' || p.type === 'boss') && !p.lanced && p.state !== 'popped' && p.state !== 'empty') {
       hint(p, 'too deep — needle it first');
       return idle(id, x, y);
     }
-    p.boost = p.type === 'black' ? 5 : 2;
+    p.boost = (p.type === 'black' ? 5 : 2) * (1 + 0.25 * up('loop'));
     p.clean = true;
     p.tool = 'extractor';
     p.press(id);
@@ -585,8 +632,8 @@ function releaseAll() {
 }
 
 function wipeAt(x, y, speed, big = false) {
-  G.fx.addTrail(x, y, big ? 46 : 26);
-  const cleaned = G.fx.wipe(x, y, (big ? 44 : 22) * G.scale, big ? 0.45 : 0.22);
+  G.fx.addTrail(x, y, big ? 46 * (1 + 0.2 * up('pad')) : 26);
+  const cleaned = G.fx.wipe(x, y, (big ? 44 * (1 + 0.2 * up('pad')) : 22) * G.scale, big ? 0.45 : 0.22);
   if (cleaned > 0) {
     audio.wipe(Math.min(1, speed / 40));
     if (Math.random() < 0.3) buzz('light');
@@ -627,6 +674,7 @@ function update(dt) {
     if (G.time >= s.t) {
       G.spawnQueue.splice(i, 1);
       const p = placePimple(s.type);
+      if (!p) { s.t = G.time + 1; G.spawnQueue.push(s); }   // no room yet: try again shortly
       if (p && s.breakout) G.fx.text(p.x, p.y - 40, 'breakout!', '#ffb3c1', 16);
     }
   }
@@ -649,6 +697,7 @@ function update(dt) {
   G.shake *= Math.pow(0.001, dt);
   if (G.shake < 0.2) G.shake = 0;
 
+  if (G.mode === 'level' && !G.allDone && !G.ended && !(G.treat && G.treat.active)) G.popTime += dt;
   updateHud();
 }
 
@@ -677,6 +726,13 @@ let hudCache = {};
 function setText(id, v) {
   if (hudCache[id] !== v) { hudCache[id] = v; $(id).textContent = v; }
 }
+function timeLeft() {
+  const t = timeGoal(G.def);
+  if (!t) return '';
+  const left = Math.ceil(t - G.popTime);
+  return left > 0 ? ` · ⏱${left}s` : ' · ⏱ over';
+}
+
 function updateHud() {
   if (G.mode === 'demo') return;
   setText('hud-score', Math.round(G.score).toLocaleString());
@@ -688,10 +744,10 @@ function updateHud() {
       const t = G.treat, pct = `${Math.round(t.progress * 100)}%`;
       const label = t.phase === 'lather' ? `1/5 Lather ${pct}` : t.phase === 'rinse' ? `1/5 Rinse ${pct}`
         : t.phase === 'steam' ? `2/5 Steam ${pct}` : t.phase === 'soothe' ? `5/5 Soothe ${pct}`
-        : G.allDone ? `4/5 Wipe ${Math.round(G.fx.cleanliness() * 100)}%` : `3/5 Pop · ${left} left`;
+        : G.allDone ? `4/5 Wipe ${Math.round(G.fx.cleanliness() * 100)}%` : `3/5 Pop · ${left} left${timeLeft()}`;
       setText('hud-sub', label);
     } else {
-      setText('hud-sub', G.allDone ? `${Math.round(G.fx.cleanliness() * 100)}% clean` : `${left} left`);
+      setText('hud-sub', G.allDone ? `${Math.round(G.fx.cleanliness() * 100)}% clean` : `${left} left${timeLeft()}`);
     }
   } else if (G.mode === 'ear') {
     setText('hud-title', `Ear ${G.level}`);
@@ -714,7 +770,7 @@ function toast(msg, ms = 1600) {
   toastTimer = setTimeout(() => el.classList.add('hidden'), ms);
 }
 
-const SCREENS = ['menu', 'howto', 'stats', 'settings', 'pause', 'results'];
+const SCREENS = ['menu', 'howto', 'stats', 'settings', 'pause', 'results', 'levels', 'intro', 'shop'];
 let currentScreen = 'menu';
 let screenReturn = 'menu';
 function showScreen(name) {
@@ -722,7 +778,8 @@ function showScreen(name) {
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== name);
   refreshTools();
   if (name === 'menu') {
-    $('play-level').textContent = `Level ${save.level}`;
+    $('play-level').textContent = `Level ${save.level} · ${levelDef(save.level).name}`;
+    $('menu-coins').textContent = `🪙 ${save.coins.toLocaleString()}`;
     $('ear-level').textContent = `Level ${save.earLevel}`;
   }
 }
@@ -730,6 +787,93 @@ function showScreen(name) {
 function refreshTools() {
   const show = currentScreen === null && (G.mode === 'level' || G.mode === 'zen') && !(G.treat && G.treat.active);
   $('tools').classList.toggle('hidden', !show);
+}
+
+// ---- level map, patient card, shop
+function showLevels() {
+  const total = Object.values(save.stars).reduce((a, b) => a + b, 0);
+  let html = `<div class="lv-top"><span>★ ${total} / ${LEVELS.length * 3}</span><span>🪙 ${save.coins.toLocaleString()}</span></div>`;
+  for (const ch of CHAPTERS) {
+    html += `<h3>${ch.name}</h3><div class="lv-grid">`;
+    for (let n = ch.from; n <= ch.to; n++) {
+      const locked = n > save.level, st = save.stars[n] || 0;
+      const cls = ['lv', locked ? 'locked' : '', LEVELS[n - 1].mix.boss ? 'boss' : '', n === save.level ? 'current' : ''].join(' ');
+      html += `<button class="${cls}" data-n="${n}" ${locked ? 'disabled' : ''}><b>${locked ? '🔒' : n}</b><i>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</i></button>`;
+    }
+    html += '</div>';
+  }
+  const open = save.level > LEVELS.length;
+  html += `<h3>Endless clinic</h3><button class="big alt lv-endless" data-n="${Math.max(LEVELS.length + 1, save.level)}" ${open ? '' : 'disabled'}>${open ? `Walk-in patient <small>Level ${save.level}</small>` : 'Finish Chapter 3 to unlock'}</button>`;
+  $('levels-body').innerHTML = html;
+  $('levels-body').querySelectorAll('[data-n]').forEach((b) => b.addEventListener('click', () => {
+    audio.unlock(); audio.click();
+    openIntro(+b.dataset.n);
+  }));
+  showScreen('levels');
+  $('levels-body').querySelector('.current')?.scrollIntoView({ block: 'center' });
+}
+
+let introLevel = 1;
+function openIntro(n) {
+  introLevel = n;
+  const def = levelDef(n);
+  const t = SKIN_TONES[def.skin] || SKIN_TONES[1];
+  const best = Math.min(3, save.stars[n] || 0);
+  const tags = [def.sensitive ? 'Sensitive skin' : '', def.mix && def.mix.boss ? 'Boss pimple' : '', timeGoal(def) ? 'Timed' : '', def.endless ? 'Endless' : ''].filter(Boolean);
+  $('intro-body').innerHTML = `
+    <div class="patient">
+      <div class="avatar" style="background: radial-gradient(circle at 35% 30%, ${t.base}, ${t.shade})"><span>${def.name[0]}</span></div>
+      <div><div class="p-name">${def.name}, ${def.age}</div><div class="p-level">Level ${n} ${'★'.repeat(best)}${'☆'.repeat(3 - best)}</div></div>
+    </div>
+    <p class="blurb">“${def.blurb}”</p>
+    ${tags.length ? `<div class="tags">${tags.map((x) => `<span>${x}</span>`).join('')}</div>` : ''}
+    <ul class="goals">
+      <li><span>★</span>Clear every pimple</li>
+      ${def.goals.map((g) => `<li><span>★</span>${goalLabel(g)}</li>`).join('')}
+    </ul>`;
+  showScreen('intro');
+}
+
+function showShop() {
+  let html = `<div class="lv-top"><span>Shop</span><span>🪙 ${save.coins.toLocaleString()}</span></div>`;
+  for (const u of UPGRADES) {
+    const lv = up(u.id), cost = u.costs[lv];
+    const pips = u.costs.map((_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
+    html += `<div class="shop-item"><div><b>${u.name}</b><small>${u.desc}</small><div class="pips">${pips}</div></div>
+      <button class="buy" data-up="${u.id}" ${cost == null || save.coins < cost ? 'disabled' : ''}>${cost == null ? 'MAX' : `${cost} 🪙`}</button></div>`;
+  }
+  html += '<h3>Pus style</h3><div class="pus-row">';
+  for (const p of PUS_STYLES) {
+    const owned = save.pusOwned.includes(p.id);
+    html += `<button class="pus ${save.pus === p.id ? 'active' : ''}" data-pus="${p.id}" ${!owned && save.coins < p.cost ? 'disabled' : ''}>
+      <i style="background:${p.swatch}"></i><span>${p.name}</span><small>${owned ? (save.pus === p.id ? 'using' : 'owned') : `${p.cost} 🪙`}</small></button>`;
+  }
+  html += '</div>';
+  $('shop-body').innerHTML = html;
+  $('shop-body').querySelectorAll('[data-up]').forEach((b) => b.addEventListener('click', () => {
+    const u = UPGRADES.find((x) => x.id === b.dataset.up), cost = u.costs[up(u.id)];
+    if (cost == null || save.coins < cost) return;
+    save.coins -= cost;
+    save.upgrades[u.id] = up(u.id) + 1;
+    store.save(save);
+    audio.unlock(); audio.sparkle(); buzz('medium');
+    showShop();
+  }));
+  $('shop-body').querySelectorAll('[data-pus]').forEach((b) => b.addEventListener('click', () => {
+    const p = PUS_STYLES.find((x) => x.id === b.dataset.pus);
+    if (!save.pusOwned.includes(p.id)) {
+      if (save.coins < p.cost) return;
+      save.coins -= p.cost;
+      save.pusOwned.push(p.id);
+      audio.unlock(); audio.sparkle();
+    }
+    save.pus = p.id;
+    store.save(save);
+    applyPus();
+    buzz('light');
+    showShop();
+  }));
+  showScreen('shop');
 }
 
 function pause() {
@@ -798,7 +942,10 @@ document.querySelectorAll('#tools .tool').forEach((b) => b.addEventListener('cli
   document.querySelectorAll('#tools .tool').forEach((o) => o.classList.toggle('active', o === b));
 }));
 
-on('btn-play', () => startLevel(save.level));
+on('btn-play', () => showLevels());
+on('btn-shop', () => showShop());
+on('btn-intro-start', () => startLevel(introLevel));
+on('btn-intro-back', () => showLevels());
 on('btn-zen', () => startZen());
 on('btn-ear', () => startEar(save.earLevel));
 on('btn-stats', () => { renderStats(); showScreen('stats'); });
@@ -808,7 +955,7 @@ on('btn-pause', () => pause());
 on('btn-resume', () => { G.paused = false; showScreen(null); });
 on('btn-restart', () => (G.mode === 'zen' ? startZen() : G.mode === 'ear' ? startEar(G.level) : startLevel(G.level)));
 on('btn-quit', () => goMenu());
-on('btn-next', () => (G.mode === 'ear' ? startEar(save.earLevel) : startLevel(save.level)));
+on('btn-next', () => (G.mode === 'ear' ? startEar(save.earLevel) : openIntro(G.level + 1)));
 on('btn-res-menu', () => goMenu());
 on('btn-finish', () => (G.mode === 'ear' ? endEar : afterWipe)());
 document.querySelectorAll('.back').forEach((b) => b.addEventListener('click', () => {
@@ -843,6 +990,7 @@ on('btn-reset', () => {
 });
 
 // ---------------------------------------------------------------- boot
+applyPus();
 resize();
 startDemo();
 showScreen('menu');

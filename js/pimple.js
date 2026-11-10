@@ -6,8 +6,9 @@ import * as audio from './audio.js';
 import { buzz } from './haptics.js';
 
 // Timing for releasing after a pimple is empty
-export const PERFECT_WINDOW = 0.3;  // seconds
-export const NICE_WINDOW = 0.7;     // after this it starts bleeding
+// seconds after a pimple runs dry: let go within `perfect` for a Perfect; past `nice` it bleeds.
+// main.js adjusts these per level (sensitive skin, Steady Hands upgrade).
+export const tuning = { perfect: 0.3, nice: 0.7 };
 
 export const TYPES = {
   white: {
@@ -34,6 +35,11 @@ export const TYPES = {
     name: 'Ingrown hair', r: [10, 13], fill: [1, 1], pus: [0.2, 0.3], drain: 1,
     head: '#f1c9b8', headRim: '#d98f80', pusColor: '#f3e2a0', stages: 1, popPts: 150,
     wormW: 0.3, lenPerMl: 40, squirt: 4, hair: true,
+  },
+  boss: {
+    name: 'The Big One', r: [33, 37], fill: [1.5, 1.8], pus: [1.6, 2.0], drain: 0.9,
+    head: '#f2e3a6', headRim: '#d9c16b', pusColor: '#e6d27c', stages: 5, popPts: 200,
+    wormW: 0.3, lenPerMl: 55, squirt: 30,
   },
 };
 
@@ -160,7 +166,7 @@ export class Pimple {
   finish(game) {
     let rating;
     if (this.bled) rating = 'ouch';
-    else if (this.emptyT <= PERFECT_WINDOW) rating = 'perfect';
+    else if (this.emptyT <= tuning.perfect) rating = 'perfect';
     else rating = 'nice';
     this.rating = rating;
     this.state = 'done';
@@ -229,7 +235,7 @@ export class Pimple {
     } else if (this.state === 'empty') {
       if (this.held != null) {
         this.emptyT += dt;
-        if (this.emptyT > NICE_WINDOW) {
+        if (this.emptyT > tuning.nice) {
           if (!this.bled) {
             this.bled = true;
             audio.ouch();
@@ -429,7 +435,7 @@ export class Pimple {
       if (this.bled) {
         ctx.fillStyle = 'rgba(179,18,31,0.85)';
         ctx.beginPath();
-        ctx.arc(x, y, r0 * (0.45 + Math.min(this.emptyT - NICE_WINDOW, 2) * 0.2), 0, Math.PI * 2);
+        ctx.arc(x, y, r0 * (0.45 + Math.min(this.emptyT - tuning.nice, 2) * 0.2), 0, Math.PI * 2);
         ctx.fill();
       }
     } else if (T.hair) {
@@ -437,7 +443,7 @@ export class Pimple {
     } else {
       let hr;
       if (this.type === 'black') hr = r0 * 0.55;
-      else if (this.type === 'cyst') hr = r0 * (0.18 + this.pressure * 0.32);
+      else if (this.type === 'cyst' || this.type === 'boss') hr = r0 * (0.18 + this.pressure * 0.32);
       else hr = r0 * (0.42 + this.pressure * 0.28);
       hr *= appear;
       const hg = ctx.createRadialGradient(x - hr * 0.35, y - hr * 0.4, hr * 0.1, x, y, hr);
@@ -532,7 +538,7 @@ export class Pimple {
       color = this.T.pusColor;
     } else {
       frac = 1;
-      color = this.bled ? '#e0283a' : (this.emptyT <= PERFECT_WINDOW ? '#7dff9a' : '#c6f27a');
+      color = this.bled ? '#e0283a' : (this.emptyT <= tuning.perfect ? '#7dff9a' : '#c6f27a');
     }
     ctx.strokeStyle = color;
     ctx.beginPath();
@@ -568,3 +574,12 @@ export class Pimple {
 }
 
 export function pusColorRgba(type, a) { return rgba(TYPES[type].pusColor, a); }
+
+// Shop cosmetic: recolor the pus. Pass null for each type's natural color.
+const NATURAL = {};
+export function setPusStyle(color) {
+  for (const [k, T] of Object.entries(TYPES)) {
+    if (!(k in NATURAL)) NATURAL[k] = T.pusColor;
+    T.pusColor = color && !T.golden ? color : NATURAL[k];
+  }
+}

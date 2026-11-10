@@ -45,6 +45,7 @@
 
   <!-- Main menu -->
   <section id="menu" class="screen">
+    <div id="menu-coins" class="coins-badge">🪙 0</div>
     <div class="menu-inner">
       <div class="logo">
         <div class="logo-zit"><span></span></div>
@@ -55,10 +56,37 @@
       <button id="btn-ear" class="big ear">Ear Wax <small id="ear-level">Level 1</small></button>
       <button id="btn-zen" class="big alt">Zen Mode <small>endless &amp; chill</small></button>
       <div class="row">
+        <button id="btn-shop" class="small">Shop</button>
         <button id="btn-stats" class="small">Stats</button>
         <button id="btn-howto" class="small">How to</button>
         <button id="btn-settings" class="small">Settings</button>
       </div>
+    </div>
+  </section>
+
+  <!-- Level map -->
+  <section id="levels" class="screen hidden">
+    <div class="card tall">
+      <h2>Patients</h2>
+      <div id="levels-body" class="scroll"></div>
+      <button class="big alt back">Back</button>
+    </div>
+  </section>
+
+  <!-- Patient card -->
+  <section id="intro" class="screen hidden">
+    <div class="card">
+      <div id="intro-body"></div>
+      <button id="btn-intro-start" class="big">Start treatment</button>
+      <button id="btn-intro-back" class="big alt">Back</button>
+    </div>
+  </section>
+
+  <!-- Shop -->
+  <section id="shop" class="screen hidden">
+    <div class="card tall">
+      <div id="shop-body" class="scroll"></div>
+      <button class="big alt back">Back</button>
     </div>
   </section>
 
@@ -72,6 +100,7 @@
         <li><b>Let go</b> right when it's empty for a <em>Perfect</em>. Squeeze too long and it bleeds.</li>
         <li><b>Swipe</b> anywhere else to wipe up the mess.</li>
         <li>Cysts are big and stubborn. Blackheads are quick. Golden ones are lucky.</li>
+        <li><b>Stars &amp; coins:</b> every patient has 3 stars: one for clearing the face, two for their own goals. Coins buy upgrades and pus styles in the Shop.</li>
         <li><b>Full treatment:</b> each patient gets 5 steps: lather and rinse the face, steam it to open the pores, pop, wipe up, then spread soothing gel. You can switch the extra steps off in Settings.</li>
         <li><b>Tools:</b> the <b>Loop</b> pops blackheads in a flash with less mess. The <b>Needle</b> opens deep cysts so they squeeze fast. <b>Tweezers</b> pull out ingrown hairs: grab and drag. The <b>Wipe</b> pad cleans big areas.</li>
         <li><b>Ear Wax:</b> hold a chunk (wiggle it!) until it loosens, then drag it out of the ear. Never poke the eardrum.</li>
@@ -119,6 +148,7 @@
       <h2 id="res-title">Squeaky clean!</h2>
       <div id="res-stars" class="stars"><span>★</span><span>★</span><span>★</span></div>
       <div id="res-grid" class="stats-grid"></div>
+      <div id="res-goals"></div>
       <button id="btn-next" class="big">Next patient</button>
       <button id="btn-res-menu" class="big alt">Main menu</button>
     </div>
