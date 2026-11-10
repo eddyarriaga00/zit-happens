@@ -98,19 +98,19 @@ export const timeGoal = (def) => {
 
 // ---- shop
 export const UPGRADES = [
-  { id: 'steady', name: 'Steady Hands', desc: 'More time to let go for a Perfect', costs: [150, 350, 700] },
-  { id: 'loop', name: 'Power Loop', desc: 'The Loop tool extracts faster', costs: [120, 300, 600] },
-  { id: 'pad', name: 'Mega Pad', desc: 'The Wipe pad covers more', costs: [100, 250, 500] },
-  { id: 'spa', name: 'Spa Pro', desc: 'Faster washing, steaming and gel', costs: [120, 300, 600] },
-  { id: 'lucky', name: 'Lucky Charm', desc: 'More golden pimples', costs: [200, 450, 900] },
-  { id: 'magnet', name: 'Coin Magnet', desc: '+15% coins from every patient', costs: [250, 500, 1000] },
+  { id: 'steady', name: 'Steady Hands', desc: 'More time to let go for a Perfect', costs: [40, 80, 120] },
+  { id: 'loop', name: 'Power Loop', desc: 'The Loop tool extracts faster', costs: [40, 80, 120] },
+  { id: 'pad', name: 'Mega Pad', desc: 'The Wipe pad covers more', costs: [40, 80, 120] },
+  { id: 'spa', name: 'Spa Pro', desc: 'Faster washing, steaming and gel', costs: [40, 80, 120] },
+  { id: 'lucky', name: 'Lucky Charm', desc: 'More golden pimples', costs: [40, 80, 120] },
+  { id: 'magnet', name: 'Coin Magnet', desc: '+15% coins from every patient', costs: [40, 80, 120] },
 ];
 
 export const PUS_STYLES = [
   { id: 'classic', name: 'Classic', color: null, swatch: '#f3e2a0', cost: 0 },
-  { id: 'berry', name: 'Strawberry', color: '#ff9ec4', swatch: '#ff9ec4', cost: 300 },
-  { id: 'slime', name: 'Slime', color: '#a8e06a', swatch: '#a8e06a', cost: 300 },
-  { id: 'glitter', name: 'Glitter', color: '#ffd84d', swatch: '#ffd84d', cost: 600 },
+  { id: 'berry', name: 'Strawberry', color: '#ff9ec4', swatch: '#ff9ec4', cost: 60 },
+  { id: 'slime', name: 'Slime', color: '#a8e06a', swatch: '#a8e06a', cost: 60 },
+  { id: 'glitter', name: 'Glitter', color: '#ffd84d', swatch: '#ffd84d', cost: 100 },
 ];
 
 // ---- what you earn for clearing each level (index 0 = level 1). One per level.
@@ -120,13 +120,7 @@ const T = (id, name, desc) => ({ kind: 'tool', id, name, desc });
 const U = (id, name) => ({ kind: 'upgrade', id, name: `${name} upgrade`, desc: 'A free upgrade level' });
 const C = (n) => ({ kind: 'coins', n, name: `${n} coins`, desc: 'A bonus from a grateful patient' });
 export const REWARDS = [
-  T('extractor', 'Loop tool', 'Pops blackheads in a flash, with less mess'),
-  T('needle', 'Needle', 'Opens deep cysts so they squeeze out fast'),
-  T('tweezers', 'Tweezers', 'Pull out ingrown hairs'),
-  T('spray', 'Antiseptic spray', 'Disinfects popped spots for bonus points'),
-  T('patch', 'Pimple patches', 'Stick one on a popped spot for bonus points'),
-  { kind: 'patch', id: 'heart', name: 'Heart patches', desc: 'A new patch shape' },
-  { kind: 'patch', id: 'star', name: 'Star patches', desc: 'A new patch shape' },
+  C(100), U('pad', 'Mega Pad'), C(120), U('steady', 'Steady Hands'), C(150), U('loop', 'Power Loop'), C(150),
   C(200), U('pad', 'Mega Pad'),
   { kind: 'pus', id: 'berry', name: 'Strawberry pus', desc: 'A new pus style (pick it in the Shop)' },
   U('steady', 'Steady Hands'), U('loop', 'Power Loop'), U('spa', 'Spa Pro'), C(250), U('lucky', 'Lucky Charm'),
@@ -139,7 +133,7 @@ export const REWARDS = [
 /** Reward for clearing level n (endless levels pay coins). */
 export const rewardFor = (n) => REWARDS[n - 1] || C(150);
 /** The level you must clear to unlock each tool (0 = yours from the start). */
-export const TOOL_LEVEL = { finger: 0, pad: 0, extractor: 1, needle: 2, tweezers: 3, spray: 4, patch: 5 };
+export const TOOL_LEVEL = { finger: 0, pad: 0, extractor: 0, needle: 0, tweezers: 0, spray: 0, patch: 0 };
 
 // ---- awards: earned from lifetime stats, each pays coins once.
 // s = the save data plus starTotal and upgradeTotal.
@@ -175,7 +169,36 @@ export const AWARDS = [
   A('day7', 'Devoted', 'Play 7 days in a row', (s) => s.streak >= 7, 300),
   A('shop6', 'Kitted Out', 'Own 6 upgrade levels', (s) => s.upgradeTotal >= 6, 150),
   A('shop18', 'Top of the Line', 'Max out every upgrade', (s) => s.upgradeTotal >= 18, 600),
+  // by what you popped
+  A('pop1000', 'Popaholic', 'Pop 1,000 pimples', (s) => s.totalPops >= 1000, 800),
+  A('black50', 'Blackhead Hunter', 'Clear 50 blackheads', (s) => (s.byType.black || 0) >= 50, 150),
+  A('cyst20', 'Deep Diver', 'Drain 20 cysts', (s) => (s.byType.cyst || 0) >= 20, 200),
+  A('gold5', 'Lucky Strike', 'Pop 5 golden pimples', (s) => (s.byType.gold || 0) >= 5, 150),
+  A('milia10', 'Pearl Diver', 'Pop 10 milia', (s) => (s.byType.milia || 0) >= 10, 150),
+  A('hair20', 'Plucky', 'Pull 20 ingrown hairs', (s) => (s.byType.hair || 0) >= 20, 150),
+  A('stray30', 'Brow Boss', 'Pluck 30 stray hairs', (s) => (s.byType.stray || 0) >= 30, 150),
+  A('boss5', 'Boss Buster', 'Drain 5 boss pimples', (s) => s.bossPops >= 5, 300),
+  A('pus100', 'By the Bucket', 'Drain 100 ml of pus', (s) => s.totalPus >= 100, 150),
+  A('pus500', 'Swimming In It', 'Drain 500 ml of pus', (s) => s.totalPus >= 500, 400),
+  A('oops1', 'Oops', 'Make a patient bleed (it happens)', (s) => s.ouches >= 1, 20),
+  // care and treatment
+  A('patch25', 'Sticker Fan', 'Stick on 25 patches', (s) => s.patches >= 25, 120),
+  A('spray25', 'Germ Buster', 'Disinfect 25 spots', (s) => s.sprays >= 25, 120),
+  A('mask5', 'Peel Queen', 'Peel off 5 charcoal masks', (s) => s.masks >= 5, 150),
+  A('spa10', 'Spa Day', 'Give 10 full treatments', (s) => s.spaDays >= 10, 200),
+  A('spa30', 'Five Star Clinic', 'Give 30 full treatments', (s) => s.spaDays >= 30, 500),
+  // mastery
+  A('three10', 'Triple Threat', '3 stars on 10 patients', (s) => s.threeStars >= 10, 250),
+  A('three30', 'Flawless Record', '3 stars on all 30 patients', (s) => s.threeStars >= 30, 800),
+  A('score5k', 'High Scorer', 'Score 5,000 on one patient', (s) => s.bestScore >= 5000, 200),
+  A('combo15', 'In the Zone', 'A combo of 15 Perfects', (s) => s.bestCombo >= 15, 300),
+  A('zen200', 'Inner Peace', '200 pops in Zen mode', (s) => s.zenPops >= 200, 250),
+  A('ear15', 'All Ears', 'Clean 15 ears', (s) => s.earsCleaned >= 15, 250),
+  A('glam10', 'Beauty Guru', 'Finish 10 makeup looks', (s) => s.makeupDone >= 10, 300),
+  A('trim10', 'Master Stylist', 'Finish 10 haircuts', (s) => s.haircutDone >= 10, 300),
+  A('day14', 'Two Weeks Strong', 'Play 14 days in a row', (s) => s.streak >= 14, 500),
+  A('rich5k', 'Loaded', 'Hold 5,000 coins at once', (s) => s.coins >= 5000, 100),
 ];
-// your title, from how many awards you hold
+// your title, from how many awards you hold (a new one every 8)
 export const RANKS = ['Trainee', 'Assistant', 'Esthetician', 'Specialist', 'Expert', 'Master', 'Legend'];
-export const rankFor = (count) => RANKS[Math.min(RANKS.length - 1, Math.floor(count / 4))];
+export const rankFor = (count) => RANKS[Math.min(RANKS.length - 1, Math.floor(count / 8))];

@@ -16,6 +16,11 @@ const DEFAULTS = {
   earStars: {},
   coins: 0,
   awards: {},       // id -> true
+  byType: {},       // pimple type -> how many finished
+  patches: 0,
+  sprays: 0,
+  masks: 0,
+  spaDays: 0,       // full treatments given
   bestCombo: 0,
   flawless: 0,      // patients finished without bleeding
   bossPops: 0,

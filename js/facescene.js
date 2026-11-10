@@ -66,6 +66,12 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   wall.addColorStop(0, '#f4e9ee'); wall.addColorStop(1, '#dcc5d3');
   x.fillStyle = wall; x.fillRect(0, 0, w, h);
   soft(w * 0.2, h * 0.2, w * 0.5, h * 0.3, 'rgba(255,255,255,0.5)');
+  // an out-of-focus room: window light, a shelf, a few soft glints
+  x.fillStyle = 'rgba(255,255,255,0.35)';
+  x.beginPath(); x.roundRect(w * 0.02, h * 0.1, w * 0.2, h * 0.34, 14); x.fill();
+  x.fillStyle = 'rgba(150,110,130,0.18)';
+  x.fillRect(w * 0.7, h * 0.3, w * 0.32, h * 0.012);
+  for (let i = 0; i < 9; i++) soft(R() * w, R() * h * 0.6, 10 + R() * 26, 10 + R() * 26, `rgba(255,${200 + Math.floor(R() * 55)},${215 + Math.floor(R() * 40)},0.22)`);
 
   // ---- hair behind the head
   if (style === 'long' || style === 'curly') {
@@ -85,6 +91,19 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     x.beginPath(); x.ellipse(cx, Y(-0.3), hw * k, hh * (style === 'buzz' ? 0.76 : 0.8), 0, Math.PI, Math.PI * 2); x.fill();
     soft(X(-0.15), Y(-0.98), hw * 0.8, hh * 0.09, 'rgba(255,255,255,0.14)');     // light on the crown
     x.fillRect(cx - hw * k, Y(-0.31), hw * 2 * k, hh * (style === 'long' || style === 'curly' ? 0.9 : 0.32));
+    if (style !== 'buzz') {
+      // strands combed over the crown from the parting, so the top isn't a flat helmet
+      strands(1100, () => {
+        const u = R() * 2 - 1, part = -0.3;
+        const x1 = X(u * k * 1.02), y1 = Y(-0.3 - Math.sqrt(Math.max(0, 1 - u * u)) * 0.76 + 0.1 + R() * 0.5);
+        return [X(part + (u - part) * 0.3), Y(-1.06 - R() * 0.03), x1, y1, (u - part) * hw * 0.3, hairCol()];
+      }, 0.8);
+      // flyaways breaking the outline
+      strands(46, () => {
+        const a = Math.PI + R() * Math.PI, px = cx + Math.cos(a) * hw * k, py = Y(-0.3) + Math.sin(a) * hh * 0.8;
+        return [px, py, px + Math.cos(a) * (6 + R() * 16) + (R() - 0.5) * 12, py + Math.sin(a) * (6 + R() * 14), (R() - 0.5) * 12, rgba(hair, 0.55)];
+      }, 0.7);
+    }
   }
   if (style === 'balding') {
     x.fillStyle = hair;
@@ -124,6 +143,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     x.fillStyle = tone.bump;
     x.beginPath(); x.ellipse(X(d * 1.0), Y(0.02), hw * 0.13, hh * 0.19, d * 0.12, 0, Math.PI * 2); x.fill();
     soft(X(d * 0.98), Y(0.03), hw * 0.07, hh * 0.11, rgba(tone.pore, 0.45));
+    soft(X(d * 1.02), Y(0.06), hw * 0.1, hh * 0.14, rgba(tone.blush, 0.4));     // ears glow a little red
   }
 
   // ---- the head
@@ -170,6 +190,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   const ridge = x.createLinearGradient(X(-0.09), 0, X(0.09), 0);
   ridge.addColorStop(0, 'rgba(255,255,255,0)'); ridge.addColorStop(0.45, 'rgba(255,255,255,0.2)'); ridge.addColorStop(1, 'rgba(255,255,255,0)');
   x.fillStyle = ridge; x.fillRect(X(-0.09), Y(-0.1), hw * 0.18, hh * 0.4);
+  soft(cx, Y(0.31), hw * 0.15, hh * 0.09, rgba(tone.blush, 0.3));                    // warmth in the nose
   soft(X(-0.02), Y(0.3), hw * 0.1, hh * 0.07, 'rgba(255,255,255,0.3)');             // tip of the nose
   soft(cx, Y(noseY + 0.07), hw * 0.2, hh * 0.04, 'rgba(50,16,12,0.4)');             // under the nose
   soft(cx, Y(mouthY + 0.14), hw * 0.26, hh * 0.05, 'rgba(60,20,15,0.3)');           // under the lip
@@ -440,6 +461,15 @@ export function drawLids(ctx, geo, closed) {
     ctx.moveTo(e.x - rx, yb - 1);
     ctx.quadraticCurveTo(e.x, yb + ry * 0.35 * closed, e.x + rx, yb - 1);
     ctx.stroke();
+    // lashes along the closed edge, and the fold above it
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 9; i++) {
+      const k = i / 8, lx = e.x - rx + rx * 2 * k, ly = yb - 1 + Math.sin(k * Math.PI) * ry * 0.3 * closed;
+      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + (k - 0.5) * 5, ly + 4 * closed); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(70,30,25,0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(e.x - rx * 0.8, e.y - ry * 0.55); ctx.quadraticCurveTo(e.x, e.y - ry * 1.05, e.x + rx * 0.8, e.y - ry * 0.55); ctx.stroke();
     ctx.restore();
   }
 }

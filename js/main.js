@@ -66,6 +66,7 @@ function checkAwards() {
     ...save,
     starTotal: Object.values(save.stars).reduce((a, b) => a + b, 0),
     upgradeTotal: Object.values(save.upgrades).reduce((a, b) => a + b, 0),
+    threeStars: Object.values(save.stars).filter((v) => v >= 3).length,
   };
   const earned = [];
   for (const a of AWARDS) {
@@ -293,7 +294,7 @@ function startLevel(n) {
   else toast(toolHint(n), 2800);
 }
 
-const toolHint = (n) => (n === 1 ? 'Two fingers either side of a pimple, then squeeze 🤏' : n === 2 ? 'Blackheads: try the Loop tool' : n === 3 ? 'Cysts are deep — Needle them first' : n === 4 ? 'Ingrown hairs: pull with Tweezers' : n === 5 ? 'New tool: Spray disinfects popped spots' : n === 6 ? 'New tool: stick a Patch on popped spots' : `Patient #${n}`);
+const toolHint = (n) => (n === 1 ? 'Two fingers either side of a pimple, then squeeze 🤏' : n === 2 ? 'Blackheads: try the Loop tool' : n === 3 ? 'Cysts are deep — Needle them first' : n === 4 ? 'Ingrown hairs: pull with Tweezers' : n === 5 ? 'Spray disinfects popped spots' : n === 6 ? 'Milia are hard: nick them with the Needle first' : `Patient #${n}`);
 
 function queueBreakouts() {
   G.plan.later.forEach((t, i) => G.spawnQueue.push({ t: G.time + 3 + i * 2.5 + Math.random(), type: t, breakout: true }));
@@ -339,6 +340,7 @@ function onStepDone(phase) {
     G.treat.start('peel');
     toast('It\'s set. Peel it off! 🤌', 2600);
   } else if (phase === 'soothe' || phase === 'peel') {
+    if (phase === 'peel') save.masks++;
     toast('Glowing ✨', 1500);
     setTimeout(endLevel, 1000);
   }
@@ -367,7 +369,7 @@ function startZen() {
   G.stats = freshStats();
   G.paused = false;
   newScene(Math.floor(Math.random() * 1e9));
-  for (let i = 0; i < 6; i++) G.spawnQueue.push({ t: 0.2 + i * 0.15, type: rollType(Math.min(6, save.level), { cyst: 0 }) });
+  for (let i = 0; i < 6; i++) G.spawnQueue.push({ t: 0.2 + i * 0.15, type: rollType(6, { cyst: 0 }) });
   G.zenTimer = 0;
   showScreen(null);
   $('hud').classList.remove('hidden');
@@ -548,6 +550,7 @@ function onFinish(p, rating) {
     G.fx.text(p.x, y, 'OUCH! −50', '#ff6b78', 24);
   }
   save.totalPops++;
+  save.byType[p.type] = (save.byType[p.type] || 0) + 1;
   if (p.type === 'boss') save.bossPops++;
   save.totalPus += p.pusDrained;
   if (rating === 'perfect') save.perfects++;
@@ -593,6 +596,7 @@ function endLevel() {
   save.levelsCleared++;
   save.stars[G.level] = Math.max(save.stars[G.level] || 0, stars);
   if (s.ouches === 0) save.flawless++;
+  if (G.treat) save.spaDays++;
   const reward = grantReward(G.level);
   const newAwards = checkAwards();
   store.save(save);
@@ -772,6 +776,7 @@ function spray(x, y) {
   for (const p of G.pimples) {
     if (p.state !== 'done' || p.sanitized || Math.hypot(p.x - x, p.y - y) > 80) continue;
     p.sanitized = true;
+    save.sprays++;
     p.heal = Math.max(p.heal, 0.45);     // calms the redness right down
     G.score += 20;
     G.fx.text(p.x, p.y - p.r * 2 - n * 18, 'disinfected +20', '#bfe9ff', 15);
@@ -789,8 +794,9 @@ function patchAt(x, y) {
   if (!best) return;
   if (best.state !== 'done') return hint(best, 'pop it first');
   if (best.patch) return hint(best, 'already patched');
-  const shapes = ['dot', ...(save.level > 6 ? ['heart'] : []), ...(save.level > 7 ? ['star'] : [])];
+  const shapes = ['dot', 'heart', 'star'];
   best.patch = { shape: shapes[Math.floor(Math.random() * shapes.length)], rot: (Math.random() - 0.5) * 0.7, born: best.time };
+  save.patches++;
   const pts = best.sanitized ? 50 : 30;
   G.score += pts;
   G.fx.text(best.x, best.y - best.r * 2.2, best.sanitized ? `clean & patched +${pts}` : `patched +${pts}`, '#ffd6e6', 16);
@@ -987,7 +993,7 @@ function update(dt) {
     G.zenTimer += dt;
     if (active < 6 && G.zenTimer > 1.4 && !G.spawnQueue.length) {
       G.zenTimer = 0;
-      placePimple(rollType(Math.min(6, save.level), { cyst: G.pimples.filter((p) => p.type === 'cyst' && p.state !== 'done').length }));
+      placePimple(rollType(6, { cyst: G.pimples.filter((p) => p.type === 'cyst' && p.state !== 'done').length }));
     }
     // fully healed pimples fade away in zen
     G.pimples = G.pimples.filter((p) => !(p.state === 'done' && p.heal >= 1));
@@ -1132,13 +1138,13 @@ function showLevels() {
   for (const ch of CHAPTERS) {
     html += `<h3>${ch.name}</h3><div class="lv-grid">`;
     for (let n = ch.from; n <= ch.to; n++) {
-      const locked = n > save.level, st = save.stars[n] || 0;
+      const locked = false, st = save.stars[n] || 0;      // every patient is open from the start
       const cls = ['lv', locked ? 'locked' : '', LEVELS[n - 1].mix.boss ? 'boss' : '', n === save.level ? 'current' : ''].join(' ');
       html += `<button class="${cls}" data-n="${n}" ${locked ? 'disabled' : ''}><b>${locked ? '🔒' : n}</b><i>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</i></button>`;
     }
     html += '</div>';
   }
-  const open = save.level > LEVELS.length;
+  const open = true;
   html += `<h3>Endless clinic</h3><button class="big alt lv-endless" data-n="${Math.max(LEVELS.length + 1, save.level)}" ${open ? '' : 'disabled'}>${open ? `Walk-in patient <small>Level ${save.level}</small>` : 'Finish Chapter 3 to unlock'}</button>`;
   $('levels-body').innerHTML = html;
   $('levels-body').querySelectorAll('[data-n]').forEach((b) => b.addEventListener('click', () => {
