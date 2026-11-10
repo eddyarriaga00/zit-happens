@@ -5,7 +5,8 @@ import * as audio from './audio.js';
 import { buzz } from './haptics.js';
 
 const CELL = 26;
-const GOALS = { lather: 0.8, rinse: 0.96, steam: 1, soothe: 0.85 };
+const GOALS = { lather: 0.8, rinse: 0.96, steam: 1, soothe: 0.85, mask: 0.85, dry: 1, peel: 0.96 };
+const FILM = ['soothe', 'mask', 'dry', 'peel'];   // phases that show a layer over the skin
 
 export class Treatment {
   constructor(G) {
@@ -38,15 +39,20 @@ export class Treatment {
     this.time = 0;
     this.foamStart = 1;
     this.tick = 0;
+    this.fan = 0;           // fanning the mask dry
+    this.peelStart = 1;
+    this.bits = [];         // peeled-off scraps of mask falling away
   }
 
   get active() { return this.phase !== 'pop'; }
 
   start(phase) {
     this.phase = phase;
+    this.fresh = true;
     this.progress = 0;
     this.done = false;
     this.holding = 0;
+    if (phase === 'peel') this.peelStart = Math.max(0.01, this.mean(this.gel));
     if (phase === 'rinse') {
       this.foamStart = Math.max(0.01, this.mean(this.foam));
       this.foamSum = this.foamStart * this.cells;
@@ -80,7 +86,7 @@ export class Treatment {
   }
 
   // ---- input ----
-  down(x, y) { this.holding++; this.apply(x, y); }
+  down(x, y) { this.holding++; this.fresh = false; this.apply(x, y); }
   up() { this.holding = Math.max(0, this.holding - 1); }
   move(x0, y0, x1, y1) {
     const d = Math.hypot(x1 - x0, y1 - y0);
@@ -89,6 +95,7 @@ export class Treatment {
   }
 
   apply(x, y) {
+    if (this.fresh) return;     // a new step needs a new touch: one long drag can't run through several
     const G = this.G, sup = G.sup;
     const s = G.scale * Math.sqrt(G.spaMult || 1);
     if (this.phase === 'lather') {
@@ -110,6 +117,23 @@ export class Treatment {
       const d = sup.hitDollops(x, y);
       this.paint(this.gel, x, y, (d ? 70 : 38) * s, d ? 1 : 0.6);
       audio.squish(0.1);
+    } else if (this.phase === 'mask') {
+      if (!sup.ready('mask')) { sup.nag('mask', 'open the mask & scoop some out'); return; }
+      const d = sup.hitDollops(x, y);
+      this.paint(this.gel, x, y, (d ? 70 : 38) * s, d ? 1 : 0.6);
+      audio.squish(0.15);
+    } else if (this.phase === 'dry') {
+      this.fan += 0.0025;                       // waving a finger over it fans it dry
+      if (this.tick % 5 === 0) audio.wipe(0.2);
+    } else if (this.phase === 'peel') {
+      const removed = -this.paint(this.gel, x, y, 30 * s, -1);
+      if (removed > 0.2) {
+        audio.squish(0.9);
+        if (this.tick % 2 === 0) audio.wipe(1);
+        for (let i = 0; i < (Math.random() < 0.5 ? 1 : 0); i++) {
+          this.bits.push({ x: x + (Math.random() - 0.5) * 40, y: y + (Math.random() - 0.5) * 40, vx: (Math.random() - 0.5) * 80, vy: -60 - Math.random() * 60, rot: Math.random() * 6, w: 14 + Math.random() * 22, t: 0 });
+        }
+      }
     } else return;
     this.tick++;
     if (this.tick % 6 === 0) buzz('light');
@@ -124,6 +148,9 @@ export class Treatment {
     if (this.phase === 'lather') this.progress = this.mean(this.foam) / GOALS.lather;
     else if (this.phase === 'rinse') this.progress = (1 - this.mean(this.foam) / this.foamStart) / GOALS.rinse;
     else if (this.phase === 'soothe') this.progress = this.mean(this.gel) / GOALS.soothe;
+    else if (this.phase === 'mask') this.progress = this.mean(this.gel) / GOALS.mask;
+    else if (this.phase === 'peel') this.progress = (1 - this.mean(this.gel) / this.peelStart) / GOALS.peel;
+    else if (this.phase === 'dry') { this.progress += dt / 6 + this.fan; this.fan = 0; }
     else if (this.phase === 'steam') {
       if (this.holding > 0 && !G.sup.ready('steamer')) G.sup.nag('steamer', 'switch the steamer on');
       if (this.holding > 0 && G.sup.ready('steamer')) {
@@ -155,6 +182,11 @@ export class Treatment {
   }
 
   updatePuffs(dt) {
+    for (let i = this.bits.length - 1; i >= 0; i--) {
+      const b = this.bits[i];
+      b.t += dt; b.vy += 900 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.rot += dt * 5;
+      if (b.t > 0.9) this.bits.splice(i, 1);
+    }
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const p = this.puffs[i];
       p.t += dt;
@@ -187,8 +219,11 @@ export class Treatment {
     }
 
     // soothing gel: glossy mint film
-    if (this.phase === 'soothe') {
-      ctx.fillStyle = 'rgba(140,225,195,0.42)';
+    if (FILM.includes(this.phase)) {
+      // mint gel, or a charcoal mask that goes from wet and glossy to dry and matte
+      const dryK = this.phase === 'dry' ? this.progress : this.phase === 'peel' ? 1 : 0;
+      const v = Math.round(36 + 44 * dryK);
+      ctx.fillStyle = this.phase === 'soothe' ? 'rgba(140,225,195,0.42)' : `rgba(${v},${v},${v + 8},0.95)`;
       ctx.beginPath();
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
@@ -201,7 +236,7 @@ export class Treatment {
         }
       }
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.strokeStyle = `rgba(255,255,255,${this.phase === 'soothe' ? 0.35 : 0.3 * (1 - dryK)})`;
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
       ctx.beginPath();
@@ -216,6 +251,20 @@ export class Treatment {
       }
       ctx.stroke();
     }
+
+    // scraps of peeled mask curling away
+    for (const b of this.bits) {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot);
+      ctx.globalAlpha = Math.max(0, 1 - b.t / 0.9);
+      ctx.fillStyle = 'rgb(74,74,84)';
+      ctx.beginPath(); ctx.ellipse(0, 0, b.w, b.w * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgb(108,108,118)';
+      ctx.beginPath(); ctx.ellipse(b.w * 0.2, -b.w * 0.1, b.w * 0.6, b.w * 0.2, 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
 
     // foam: lots of little bubbles
     if (this.phase === 'lather' || this.phase === 'rinse') {

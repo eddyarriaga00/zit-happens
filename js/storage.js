@@ -15,6 +15,8 @@ const DEFAULTS = {
   earsCleaned: 0,
   earStars: {},
   coins: 0,
+  lastDay: '',      // YYYY-MM-DD of the last day played
+  streak: 0,
   rewards: {},      // level -> true once its reward has been collected
   upgrades: {},     // id -> level bought
   pus: 'classic',

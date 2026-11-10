@@ -36,6 +36,11 @@ export const TYPES = {
     head: '#f1c9b8', headRim: '#d98f80', pusColor: '#f3e2a0', stages: 1, popPts: 150,
     wormW: 0.3, lenPerMl: 40, squirt: 4, hair: true,
   },
+  stray: {
+    name: 'Stray hair', r: [4, 5], fill: [1, 1], pus: [0.1, 0.1], drain: 1,
+    head: '#000000', headRim: '#000000', pusColor: '#f3e2a0', stages: 1, popPts: 40,
+    wormW: 0.3, lenPerMl: 40, squirt: 0, hair: true, stray: true,
+  },
   boss: {
     name: 'The Big One', r: [33, 37], fill: [1.5, 1.8], pus: [1.6, 2.0], drain: 0.9,
     head: '#f2e3a6', headRim: '#d9c16b', pusColor: '#e6d27c', stages: 5, popPts: 200,
@@ -84,7 +89,7 @@ export class Pimple {
     this.clean = false;     // extracted with the loop: less splatter
     this.tool = null;
     // ingrown hairs
-    this.hairLen = rand(70, 120) * scale;
+    this.hairLen = (T.stray ? rand(26, 40) : rand(70, 120)) * scale;
     this.hairOut = 0;       // 0..1 how much has been pulled out
     this.hairAngle = Math.random() * Math.PI * 2;
     this.fx = x; this.fy = y;   // where the tweezers are
@@ -303,7 +308,7 @@ export class Pimple {
       });
     }
     game.fx.wormSplat(pts, 2.2 * this.scale, '#2a1a12', null, 0, true);
-    game.fx.squirt(this.x, this.y, a, 5, { color: this.T.pusColor, speed: 120, spread: 0.8, size: 2, lift: 90 });
+    if (!this.T.stray) game.fx.squirt(this.x, this.y, a, 5, { color: this.T.pusColor, speed: 120, spread: 0.8, size: 2, lift: 90 });
     audio.pluck();
     buzz('heavy');
     this.held = null;
@@ -318,6 +323,16 @@ export class Pimple {
   drawHair(ctx, x, y, r) {
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#2a1a12';
+    if (this.T.stray) {
+      // a loose hair poking out; it lengthens as the tweezers draw it out
+      const L = 9 * this.scale + this.hairOut * this.hairLen, a = this.hairAngle;
+      ctx.lineWidth = 1.7 * this.scale;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + Math.cos(a) * L * 0.5 + 2, y + Math.sin(a) * L * 0.5, x + Math.cos(a) * L, y + Math.sin(a) * L);
+      ctx.stroke();
+      return;
+    }
     if (this.hairOut <= 0) {
       // curled up under the skin
       ctx.globalAlpha = 0.75;
@@ -347,6 +362,14 @@ export class Pimple {
   }
 
   draw(ctx, t) {
+    if (this.T.stray) {      // no bump, just the hair
+      if (this.state !== 'done') {
+        ctx.globalAlpha = this.state === 'spawn' ? this.spawnT : 1;
+        this.drawHair(ctx, this.x, this.y, this.r);
+        ctx.globalAlpha = 1;
+      }
+      return;
+    }
     const T = this.T;
     const r0 = this.r;
     let swell = 1;

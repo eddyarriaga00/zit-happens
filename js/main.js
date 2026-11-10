@@ -131,6 +131,15 @@ const playBottom = () => G.H - G.safeBottom - (G.mode === 'ear' ? 40 : 108);  //
 
 // ---------------------------------------------------------------- spawning
 function placePimple(type) {
+  if (type === 'stray') {
+    if (!G.geo) return {};          // nothing to pluck on a back or shoulder
+    const sp = G.geo.strayPoint();
+    const hairP = new Pimple(type, sp.x, sp.y, G.scale);
+    hairP.hairAngle = sp.a;
+    G.pimples.push(hairP);
+    if (G.stats) G.stats.total++;
+    return hairP;
+  }
   const T = TYPES[type];
   const rMax = T.r[1] * G.scale;
   const margin = rMax * 2.6 + 10;
@@ -182,6 +191,8 @@ function levelPlan(level) {
   types.sort((a, b) => (b === 'boss') - (a === 'boss'));   // the big one gets first pick of space
   // too many to fit at once: the rest break out as space frees up
   const later = types.splice(MAX_AT_ONCE);
+  // a few stray hairs to tidy up with the tweezers (once you own them)
+  if (FACE_ZONES.includes(def.zone) && level >= 4) for (let i = 0; i < 3 + (level % 3); i++) types.push('stray');
   for (let i = 0; i < (def.later || 0); i++) later.push(rollType(Math.min(level, 8), { cyst: 99 }));
   return { types, later };
 }
@@ -226,6 +237,8 @@ function newScene(seed, def = null) {
   G.spawnQueue = [];
   G.time = 0;
   G.ear = null;
+  G.finishing = false;
+  G.say = null;
   G.treat = null;
   G.sup = new Supplies(G);
 }
@@ -277,6 +290,7 @@ function addDirt() {
 const STEP_BONUS = 100;
 function onStepDone(phase) {
   G.score += STEP_BONUS;
+  say('step', true);
   G.fx.text(G.W / 2, G.H * 0.4, `step done! +${STEP_BONUS}`, '#8dffa8', 22);
   G.fx.sparkleBurst(G.W / 2, G.H * 0.4, 12);
   audio.perfect();
@@ -293,7 +307,13 @@ function onStepDone(phase) {
     queueBreakouts();
     refreshTools();
     toast(`Step 3: Pop! ${toolHint(G.level)}`, 3000);
-  } else if (phase === 'soothe') {
+  } else if (phase === 'mask') {
+    G.treat.start('dry');
+    toast('Fan it dry — wave your finger over the mask 💨', 3000);
+  } else if (phase === 'dry') {
+    G.treat.start('peel');
+    toast('It\'s set. Peel it off! 🤌', 2600);
+  } else if (phase === 'soothe' || phase === 'peel') {
     toast('Glowing ✨', 1500);
     setTimeout(endLevel, 1000);
   }
@@ -302,13 +322,16 @@ function onStepDone(phase) {
 // after the popping (and wiping): on to the soothing gel, or straight to results
 function afterWipe() {
   if (!G.treat) return endLevel();
-  if (G.treat.phase === 'soothe' || G.ended) return;
+  if (G.finishing || G.ended) return;
+  G.finishing = true;
   $('btn-finish').classList.add('hidden');
   releaseAll();
   G.cleanAtWipe = G.fx.cleanliness();
-  G.treat.start('soothe');
+  // even-numbered patients get the peel-off charcoal mask, the others the cooling gel
+  const peel = G.level % 2 === 0;
+  G.treat.start(peel ? 'mask' : 'soothe');
   refreshTools();
-  toast('Step 5: Open the gel, squeeze some out, spread it 🌿', 3400);
+  toast(peel ? 'Step 5: Open the charcoal mask, scoop it on, spread it 🖤' : 'Step 5: Open the gel, squeeze some out, spread it 🌿', 3400);
 }
 
 function startZen() {
@@ -402,6 +425,7 @@ function onPop(p) {
   if (G.mode === 'demo') return;
   G.stats.pops++;
   G.wince = Math.max(G.wince, 0.28);
+  if (!p.T.stray) say('pop');
   G.shake = Math.min(10, 3 + p.r * 0.25);
   const pts = Math.round(p.T.popPts * mult());
   G.score += pts;
@@ -422,6 +446,7 @@ function onFinish(p, rating) {
   if (rating === 'perfect') {
     G.combo++;
     G.maxCombo = Math.max(G.maxCombo, G.combo);
+    say('good');
     G.stats.perfects++;
     const pts = Math.round(150 * mult());
     G.score += pts;
@@ -435,6 +460,7 @@ function onFinish(p, rating) {
   } else {
     G.combo = 0;
     G.wince = 1.1;
+    say('ouch', true);
     G.stats.ouches++;
     G.score = Math.max(0, G.score - 50);
     G.fx.text(p.x, y, 'OUCH! −50', '#ff6b78', 24);
@@ -495,7 +521,7 @@ function endLevel() {
     stat(`${Math.round(clean * 100)}%`, `clean (+${cleanBonus})`),
     stat(`+${coins} 🪙`, 'coins earned'),
   ].join('');
-  $('res-goals').innerHTML = `<img class="portrait small" alt="" src="${portraitURL(def, { mood: 'happy', clear: true }, 120)}">
+  $('res-goals').innerHTML = `<div class="before-after"><figure><img class="portrait small" alt="" src="${portraitURL(def, { mood: 'worried', zone: def.zone }, 120)}"><figcaption>before</figcaption></figure><span>→</span><figure><img class="portrait small" alt="" src="${portraitURL(def, { mood: 'happy', clear: true }, 120)}"><figcaption>after</figcaption></figure></div>
   ${reward ? `<div class="reward"><b>🎁 New: ${reward.name}</b><span>${reward.desc}</span></div>` : ''}
   <ul class="goals">
     <li class="met"><span>★</span>Clear every pimple</li>
@@ -538,7 +564,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (hit === 'grab') {
     // pulled out a fresh wipe/pad: this finger carries on wiping with it
     G.sup.hand = { x, y };
-    if (G.treat && G.treat.active) { pointers.set(e.pointerId, { kind: 'treat', x, y }); G.treat.holding++; }
+    if (G.treat && G.treat.active) { pointers.set(e.pointerId, { kind: 'treat', x, y }); G.treat.holding++; G.treat.fresh = false; }
     else pointers.set(e.pointerId, { kind: 'wipe', x, y, big: true });
     return;
   }
@@ -609,6 +635,42 @@ function toolDown(id, x, y) {
   if (p) { p.guide = 2.2; buzz('light'); pointers.set(id, { kind: 'touch', p, x, y }); return; }
   pointers.set(id, { kind: 'wipe', x, y });
   wipeAt(x, y, 0);
+}
+
+// ---- the patient reacts out loud
+const LINES = {
+  pop: ['eek!', 'ooh!', 'ow ow', 'was that it?', 'gross…', 'oof'],
+  good: ['ahh, better', 'that\'s the spot', 'so satisfying', 'do another!', 'yesss'],
+  ouch: ['OW! careful!', 'hey!! gentle!', 'that HURT', 'too hard!'],
+  step: ['so fresh', 'mmm, nice', 'I needed this', 'that tingles'],
+};
+let sayCool = 0;
+function say(kind, always = false) {
+  if (G.mode !== 'level' && G.mode !== 'zen') return;
+  if (!always && (sayCool > 0 || Math.random() > 0.45)) return;
+  const list = LINES[kind];
+  G.say = { text: list[Math.floor(Math.random() * list.length)], t: 1.9 };
+  sayCool = 3;
+}
+function drawSay(ctx) {
+  const sy = G.say;
+  if (!sy || sy.t <= 0) return;
+  const a = Math.min(1, sy.t * 3, (1.9 - sy.t) * 8);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.font = '800 15px ui-rounded, -apple-system, system-ui, sans-serif';
+  const tw = ctx.measureText(sy.text).width, bw = tw + 26, bh = 34;
+  const bx = G.W - bw - 12, by = playTop() - 4 - (1 - a) * 6;
+  ctx.fillStyle = 'rgba(120,30,70,0.25)';
+  ctx.beginPath(); ctx.roundRect(bx + 2, by + 3, bw, bh, 15); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 15); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(bx + 18, by + bh - 2); ctx.lineTo(bx + 10, by + bh + 12); ctx.lineTo(bx + 34, by + bh - 2); ctx.fill();
+  ctx.fillStyle = '#7a2148';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(sy.text, bx + bw / 2, by + bh / 2 + 1);
+  ctx.restore();
 }
 
 // ---- aftercare tools
@@ -837,6 +899,8 @@ function update(dt) {
   if (G.ear) G.ear.update(dt);
   // the patient blinks now and then, and screws their eyes shut when it hurts
   G.wince = Math.max(0, G.wince - dt);
+  sayCool = Math.max(0, sayCool - dt);
+  if (G.say) G.say.t -= dt;
   G.blinkA = Math.max(0, G.blinkA - dt);
   G.blinkT -= dt;
   if (G.blinkT <= 0) { G.blinkT = 2.2 + Math.random() * 3.5; G.blinkA = 0.16; }
@@ -874,6 +938,7 @@ function render() {
   toolfx.draw(ctx, pointers);
   G.fx.drawAir(ctx);
   ctx.restore();
+  drawSay(ctx);
   G.sup.drawCloseup(ctx);
 }
 
@@ -899,7 +964,7 @@ function updateHud() {
     if (G.treat) {
       const t = G.treat, pct = `${Math.round(t.progress * 100)}%`;
       const label = t.phase === 'lather' ? `1/5 Lather ${pct}` : t.phase === 'rinse' ? `1/5 Rinse ${pct}`
-        : t.phase === 'steam' ? `2/5 Steam ${pct}` : t.phase === 'soothe' ? `5/5 Soothe ${pct}`
+        : t.phase === 'steam' ? `2/5 Steam ${pct}` : t.phase === 'soothe' ? `5/5 Soothe ${pct}` : t.phase === 'mask' ? `5/5 Mask ${pct}` : t.phase === 'dry' ? `5/5 Dry ${pct}` : t.phase === 'peel' ? `5/5 Peel ${pct}`
         : G.allDone ? `4/5 Wipe ${Math.round(G.fx.cleanliness() * 100)}%` : `3/5 Pop · ${left} left${timeLeft()}`;
       setText('hud-sub', label);
     } else {
@@ -936,6 +1001,7 @@ function showScreen(name) {
   if (name === 'menu') {
     $('play-level').textContent = `Level ${save.level} · ${levelDef(save.level).name}`;
     $('menu-coins').textContent = `🪙 ${save.coins.toLocaleString()}`;
+    $('streak').textContent = save.streak > 1 ? `🔥 ${save.streak}-day streak` : '';
     $('ear-level').textContent = `Level ${save.earLevel}`;
   }
 }
@@ -1151,6 +1217,20 @@ on('btn-reset', () => {
 
 // ---------------------------------------------------------------- boot
 applyPus();
+// daily bonus: playing on consecutive days builds a streak worth more coins
+let dailyNote = '';
+{
+  const day = (d) => d.toLocaleDateString('en-CA');
+  const today = day(new Date()), yesterday = day(new Date(Date.now() - 864e5));
+  if (save.lastDay !== today) {
+    save.streak = save.lastDay === yesterday ? save.streak + 1 : 1;
+    save.lastDay = today;
+    const bonus = Math.min(250, 50 * save.streak);
+    save.coins += bonus;
+    store.save(save);
+    dailyNote = save.streak > 1 ? `Day ${save.streak} streak! +${bonus} coins 🔥` : `Daily bonus: +${bonus} coins`;
+  }
+}
 resize();
 startDemo();
 showScreen('menu');
@@ -1160,6 +1240,7 @@ if (!localStorage.getItem('zit-seen-howto')) {
   showScreen('howto');
 }
 requestAnimationFrame(frame);
+if (dailyNote) setTimeout(() => toast(dailyNote, 3200), 700);
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});

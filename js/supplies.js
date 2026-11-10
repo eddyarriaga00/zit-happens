@@ -16,6 +16,7 @@ const OPEN = {
   wipes: { dx: 1, dy: 0, text: 'Peel the seal back' },
   soap: { dx: 1, dy: 0, text: 'Twist the pump to unlock' },
   gel: { dx: 0, dy: 1, text: 'Pull the cap off' },
+  mask: { dx: 0, dy: -1, text: 'Lift the lid off' },
 };
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const HIT = 46;
@@ -75,6 +76,7 @@ export class Supplies {
     if (key === 'steam') this.items.push(make('steamer', G.W / 2));
     if (key === 'pads') this.items.push(make('pads', R), make('bin', L));
     if (key === 'soothe') this.items.push(make('gel', R));
+    if (key === 'mask') this.items.push(make('mask', R));
     // a cloth from another step doesn't carry over
     const kind = key === 'rinse' ? 'wipes' : key === 'pads' ? 'pads' : null;
     if (this.cloth && key !== 'none' && this.cloth.kind !== kind) this.cloth = null;
@@ -172,7 +174,7 @@ export class Supplies {
   tap(it) {
     const G = this.G;
     const t = it.type;
-    if (t === 'soap' || t === 'gel') {
+    if (t === 'soap' || t === 'gel' || t === 'mask') {
       if (!it.open) return this.startCloseup(it);
       if (it.pumps >= PUMPS) return;
       it.pumps++;
@@ -183,7 +185,7 @@ export class Supplies {
       this.dollops.push({
         x: it.x, y: it.y - 40,
         ...(() => { const p = G.geo ? G.geo.anyPoint() : { x: 50 + Math.random() * (G.W - 100), y: top + Math.random() * Math.max(60, bottom - top) }; return { tx: p.x, ty: p.y }; })(),
-        t: 0, r: (16 + Math.random() * 8) * G.scale, color: t === 'soap' ? '#ffffff' : '#8fe3c2',
+        t: 0, r: (16 + Math.random() * 8) * G.scale, color: t === 'soap' ? '#ffffff' : t === 'mask' ? '#2e2e38' : '#8fe3c2',
       });
       if (it.pumps === PUMPS) G.fx.text(G.W / 2, G.H * 0.42, t === 'soap' ? 'now rub it in!' : 'now spread it!', '#8dffa8', 20);
     } else if (t === 'wipes' || t === 'pads') {
@@ -257,6 +259,7 @@ export class Supplies {
     const k = this.key;
     if (k === 'lather' && !this.ready('soap')) return 'soap';
     if (k === 'soothe' && !this.ready('gel')) return 'gel';
+    if (k === 'mask' && !this.ready('mask')) return 'mask';
     if (k === 'steam' && !this.ready('steamer')) return 'steamer';
     if (k === 'rinse' || k === 'pads') {
       if (!this.cloth) return k === 'rinse' ? 'wipes' : (this.G.fx.messLeft() > 0.5 ? 'pads' : null);
@@ -461,6 +464,32 @@ export class Supplies {
       ctx.strokeStyle = 'rgba(120,160,150,0.5)';
       ctx.lineWidth = 1;
       for (const x of [-4, 0, 4]) { ctx.beginPath(); ctx.moveTo(x, 16 + p * 16); ctx.lineTo(x, 24 + p * 16); ctx.stroke(); }
+    }
+    this.pips(ctx, it);
+  }
+
+  draw_mask(ctx, it, p) {
+    // squat jar of charcoal mask
+    ctx.fillStyle = '#34343e';
+    rr(ctx, -22, -8, 44, 34, 9); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    rr(ctx, -17, -3, 6, 22, 3); ctx.fill();
+    ctx.fillStyle = '#ff8fc0';
+    rr(ctx, -12, 4, 24, 12, 4); ctx.fill();
+    if (p > 0) {                                   // the goo inside
+      ctx.fillStyle = '#1d1d24';
+      ctx.beginPath(); ctx.ellipse(0, -8, 19, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.beginPath(); ctx.ellipse(-6, -9, 6, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#e9c46a';
+    if (p >= 1) { rr(ctx, 12, 20, 26, 8, 4); ctx.fill(); }
+    else {
+      ctx.save();
+      ctx.translate(12 * p, -34 * p);
+      ctx.rotate(0.45 * p);
+      rr(ctx, -24, -18, 48, 12, 5); ctx.fill();
+      ctx.restore();
     }
     this.pips(ctx, it);
   }

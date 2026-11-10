@@ -412,3 +412,8 @@ button.big.alt small { opacity: 0.75; }
 .reward b { font-size: 15px; }
 .reward span { font-size: 12.5px; color: var(--muted); }
 .tool.locked { display: none; }
+
+.streak { margin: 6px 0 0; color: #fff; font-weight: 800; font-size: 14px; min-height: 17px; }
+.before-after { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 22px; color: var(--accent); font-weight: 900; }
+.before-after figure { margin: 0; text-align: center; }
+.before-after figcaption { font-size: 11px; color: var(--muted); font-weight: 700; margin-top: -4px; }

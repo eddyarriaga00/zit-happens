@@ -368,8 +368,16 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   };
   const zonePoint = (zone) => { const f = ZONE[zone]; if (!f) return anyPoint(); const [px, py] = f(); return { x: px, y: py }; };
   // random source for gameplay should not replay the paint seed
+  // stray hairs: between and under the brows, on the upper lip, on the chin
+  const strayPoint = () => {
+    const k = Math.random(), j = () => (Math.random() - 0.5);
+    if (k < 0.35) return { x: X(j() * 0.2), y: Y(ey - 0.2 + j() * 0.06), a: -Math.PI / 2 + j() };
+    if (k < 0.6) { const d = Math.random() < 0.5 ? -1 : 1; return { x: X(d * (ex + j() * 0.3)), y: Y(ey - 0.11 + j() * 0.03), a: Math.PI / 2 + j() * 0.6 }; }
+    if (k < 0.82) return { x: X(j() * 0.5), y: Y(mouthY - 0.085 + j() * 0.03), a: Math.PI / 2 + j() * 0.8 };
+    return { x: X(j() * 0.5), y: Y(0.86 + j() * 0.1), a: Math.PI / 2 + j() };
+  };
   const onSkin = (px, py) => inHead(px, py) && (py - cy) / hh >= edgeV((px - cx) / hw);   // face, not hair
-  const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
+  const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint, lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
   return { canvas: c, geo };
 }
 
