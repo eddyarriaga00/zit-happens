@@ -169,7 +169,7 @@ button {
 }
 .card h2 { margin: 0 0 4px; text-align: center; font-size: 26px; }
 
-.logo { text-align: center; margin-bottom: 18px; }
+.logo { text-align: center; margin-bottom: 10px; }
 .logo h1 {
   margin: 10px 0 4px;
   font-size: 52px;
@@ -213,6 +213,7 @@ button.big {
 }
 button.big small { font-size: 12px; font-weight: 600; opacity: 0.85; margin-top: 2px; }
 button.big.alt { background: var(--btn-alt); }
+button.big.ear { background: #e9a23b; }
 button:active { transform: scale(0.97); }
 
 .row { display: flex; gap: 10px; }

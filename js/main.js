@@ -1,5 +1,6 @@
 import { Pimple, TYPES } from './pimple.js';
 import { FX } from './fx.js';
+import { Ear } from './ear.js';
 import { SKIN_TONES, renderSkin } from './skin.js';
 import * as audio from './audio.js';
 import { buzz, setHapticsEnabled } from './haptics.js';
@@ -34,7 +35,8 @@ const G = {
   ended: false,
   stats: null,
   // callbacks used by pimples
-  onPop, onDrain, onFinish,
+  onPop, onDrain, onFinish, onEarPull,
+  ear: null,
 };
 
 function freshStats() {
@@ -129,6 +131,7 @@ function newScene(seed) {
   G.ended = false;
   G.spawnQueue = [];
   G.time = 0;
+  G.ear = null;
 }
 
 function startLevel(n) {
@@ -161,6 +164,63 @@ function startZen() {
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
   toast('Zen mode — no rush 🌿', 1800);
+}
+
+function startEar(n) {
+  G.mode = 'ear';
+  G.level = n;
+  G.score = 0;
+  G.combo = 0;
+  G.stats = freshStats();
+  G.paused = false;
+  newScene(n * 104729 + 7);
+  G.ear = new Ear(G, n, playTop(), playBottom());
+  showScreen(null);
+  $('hud').classList.remove('hidden');
+  $('btn-finish').classList.add('hidden');
+  toast(n === 1 ? 'Hold wax to loosen it, then drag it out 👂' : n === 2 ? 'Careful — don\'t poke the eardrum!' : `Ear #${n}`, 2600);
+}
+
+function onEarPull() {
+  save.earWax++;
+  store.save(save);
+  if (G.ear.left > 0 || G.allDone) return;
+  G.allDone = true;
+  if (G.fx.cleanliness() >= 0.985) {
+    setTimeout(endEar, 900);
+  } else {
+    $('btn-finish').classList.remove('hidden');
+    toast('All out! Swipe to wipe up the flakes ✨', 2600);
+  }
+}
+
+function endEar() {
+  if (G.ended || G.mode !== 'ear') return;
+  G.ended = true;
+  $('btn-finish').classList.add('hidden');
+  const e = G.ear;
+  const clean = G.fx.cleanliness();
+  const cleanBonus = Math.round(clean * 300);
+  G.score += cleanBonus;
+  const stars = 1 + (clean >= 0.85 ? 1 : 0) + (e.ouches === 0 ? 1 : 0);
+  const score = Math.round(G.score);
+  save.earLevel = Math.max(save.earLevel, G.level + 1);
+  save.bestScore = Math.max(save.bestScore, score);
+  save.earsCleaned++;
+  save.earStars[G.level] = Math.max(save.earStars[G.level] || 0, stars);
+  store.save(save);
+  $('res-title').textContent = ['', 'Hear that?', 'Clean ears!', 'Crystal clear!'][stars];
+  [...$('res-stars').children].forEach((el, i) => el.classList.toggle('on', i < stars));
+  $('res-grid').innerHTML = [
+    stat(score.toLocaleString(), 'score'),
+    stat(`${e.pulled}/${e.total}`, 'wax pulled'),
+    stat(e.ouches, 'eardrum pokes'),
+    stat(`${Math.round(clean * 100)}%`, `clean (+${cleanBonus})`),
+  ].join('');
+  $('btn-next').firstChild.textContent = 'Next ear';
+  audio.fanfare();
+  buzz('medium');
+  setTimeout(() => showScreen('results'), 400);
 }
 
 function startDemo() {
@@ -253,6 +313,7 @@ function endLevel() {
   save.stars[G.level] = Math.max(save.stars[G.level] || 0, stars);
   store.save(save);
 
+  $('btn-next').firstChild.textContent = 'Next patient';
   $('res-title').textContent = ['', 'Patient survived', 'Lookin\' good!', 'Squeaky clean!'][stars];
   [...$('res-stars').children].forEach((el, i) => el.classList.toggle('on', i < stars));
   $('res-grid').innerHTML = [
@@ -287,6 +348,15 @@ canvas.addEventListener('pointerdown', (e) => {
   if (G.mode === 'demo' || G.paused || G.ended) return;
   try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   const x = e.clientX, y = e.clientY;
+  if (G.mode === 'ear') {
+    if (G.ear.down(e.pointerId, x, y)) {
+      pointers.set(e.pointerId, { kind: 'ear', x, y });
+    } else {
+      pointers.set(e.pointerId, { kind: 'wipe', x, y });
+      wipeAt(x, y, 0);
+    }
+    return;
+  }
   const p = pimpleAt(x, y);
   if (p) {
     p.press(e.pointerId);
@@ -301,6 +371,7 @@ canvas.addEventListener('pointermove', (e) => {
   const ptr = pointers.get(e.pointerId);
   if (!ptr) return;
   const x = e.clientX, y = e.clientY;
+  if (ptr.kind === 'ear') G.ear?.move(e.pointerId, x, y);
   if (ptr.kind === 'wipe') {
     const dist = Math.hypot(x - ptr.x, y - ptr.y);
     const steps = Math.max(1, Math.ceil(dist / 8));
@@ -315,6 +386,7 @@ function endPointer(e) {
   const ptr = pointers.get(e.pointerId);
   if (!ptr) return;
   pointers.delete(e.pointerId);
+  if (ptr.kind === 'ear') G.ear?.up(e.pointerId);
   if (ptr.kind === 'pimple' && ptr.p.held === e.pointerId) {
     ptr.p.release(G);
     checkLevelDone();
@@ -329,6 +401,7 @@ function releaseAll() {
     if (ptr.kind === 'pimple' && ptr.p.held === id) ptr.p.release(G);
   }
   pointers.clear();
+  if (G.ear) G.ear.releaseAll();
   audio.oozeStop();
 }
 
@@ -342,7 +415,7 @@ function wipeAt(x, y, speed) {
   if (G.allDone && !G.ended && G.fx.cleanliness() >= 0.985) {
     G.fx.sparkleBurst(x, y, 14);
     audio.sparkle();
-    endLevel();
+    (G.mode === 'ear' ? endEar : endLevel)();
   }
 }
 
@@ -391,6 +464,7 @@ function update(dt) {
   }
 
   for (const p of G.pimples) p.update(dt, G);
+  if (G.ear) G.ear.update(dt);
   G.fx.update(dt);
   G.shake *= Math.pow(0.001, dt);
   if (G.shake < 0.2) G.shake = 0;
@@ -406,11 +480,13 @@ function render() {
 
   ctx.save();
   if (G.shake) ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
+  if (G.ear) G.ear.drawBack(ctx);
   // healed/done pimples first so active ones draw on top
   for (const p of G.pimples) if (p.state === 'done') p.draw(ctx, G.time);
   G.fx.drawSplats(ctx);
   for (const p of G.pimples) if (p.state !== 'done') p.draw(ctx, G.time);
   for (const p of G.pimples) p.drawRing(ctx, G.time);
+  if (G.ear) G.ear.drawChunks(ctx);
   G.fx.drawAir(ctx);
   ctx.restore();
 }
@@ -428,6 +504,9 @@ function updateHud() {
     setText('hud-title', `Level ${G.level}`);
     const left = G.pimples.filter((p) => p.state !== 'done').length + G.spawnQueue.length;
     setText('hud-sub', G.allDone ? `${Math.round(G.fx.cleanliness() * 100)}% clean` : `${left} left`);
+  } else if (G.mode === 'ear') {
+    setText('hud-title', `Ear ${G.level}`);
+    setText('hud-sub', G.allDone ? `${Math.round(G.fx.cleanliness() * 100)}% clean` : `${G.ear.left} left`);
   } else {
     setText('hud-title', 'Zen');
     setText('hud-sub', `${G.stats.pops} popped`);
@@ -454,6 +533,7 @@ function showScreen(name) {
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== name);
   if (name === 'menu') {
     $('play-level').textContent = `Level ${save.level}`;
+    $('ear-level').textContent = `Level ${save.earLevel}`;
   }
 }
 
@@ -481,6 +561,8 @@ function renderStats() {
     stat(starsTotal, 'stars earned'),
     stat(save.bestScore.toLocaleString(), 'best score'),
     stat(save.zenPops.toLocaleString(), 'zen pops'),
+    stat(save.earWax.toLocaleString(), 'ear wax pulled'),
+    stat(save.earsCleaned.toLocaleString(), 'ears cleaned'),
   ].join('');
 }
 
@@ -514,16 +596,17 @@ function on(id, fn) {
 
 on('btn-play', () => startLevel(save.level));
 on('btn-zen', () => startZen());
+on('btn-ear', () => startEar(save.earLevel));
 on('btn-stats', () => { renderStats(); showScreen('stats'); });
 on('btn-howto', () => { screenReturn = currentScreen; showScreen('howto'); });
 on('btn-settings', () => { renderSettings(); showScreen('settings'); });
 on('btn-pause', () => pause());
 on('btn-resume', () => { G.paused = false; showScreen(null); });
-on('btn-restart', () => (G.mode === 'zen' ? startZen() : startLevel(G.level)));
+on('btn-restart', () => (G.mode === 'zen' ? startZen() : G.mode === 'ear' ? startEar(G.level) : startLevel(G.level)));
 on('btn-quit', () => goMenu());
-on('btn-next', () => startLevel(save.level));
+on('btn-next', () => (G.mode === 'ear' ? startEar(save.earLevel) : startLevel(save.level)));
 on('btn-res-menu', () => goMenu());
-on('btn-finish', () => endLevel());
+on('btn-finish', () => (G.mode === 'ear' ? endEar : endLevel)());
 document.querySelectorAll('.back').forEach((b) => b.addEventListener('click', () => {
   audio.click();
   showScreen(currentScreen === 'howto' ? screenReturn : 'menu');

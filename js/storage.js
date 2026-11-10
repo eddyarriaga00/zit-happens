@@ -10,6 +10,10 @@ const DEFAULTS = {
   ouches: 0,
   levelsCleared: 0,
   zenPops: 0,
+  earLevel: 1,
+  earWax: 0,
+  earsCleaned: 0,
+  earStars: {},
   stars: {},        // level -> best stars
   settings: { sound: true, haptics: true, skin: 1 },
 };

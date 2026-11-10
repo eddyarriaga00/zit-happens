@@ -1,7 +1,7 @@
 // Offline support. Serves from cache instantly, then refreshes the cache in the
 // background, so a new deploy shows up on the next launch.
 // Bump VERSION when you add/rename files.
-const VERSION = 'zit-v1';
+const VERSION = 'zit-v2';
 const FILES = [
   './',
   'index.html',
@@ -9,6 +9,7 @@ const FILES = [
   'js/main.js',
   'js/pimple.js',
   'js/fx.js',
+  'js/ear.js',
   'js/skin.js',
   'js/audio.js',
   'js/haptics.js',
