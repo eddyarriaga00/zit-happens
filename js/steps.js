@@ -18,6 +18,17 @@ export class Treatment {
     // per-cell random offsets so bubbles don't sit on a visible grid
     this.jit = new Float32Array(n * 4);
     for (let i = 0; i < this.jit.length; i++) this.jit[i] = Math.random();
+    // on face levels only the cells over skin count (no lathering the wall or the hair)
+    this.mask = new Uint8Array(n);
+    this.cells = 0;        // how many grid cells are over skin
+    for (let row = 0; row < this.rows; row++) {
+      for (let col = 0; col < this.cols; col++) {
+        const on = G.geo ? G.geo.onSkin((col + 0.5) * CELL, (row + 0.5) * CELL) : true;
+        this.mask[row * this.cols + col] = on ? 1 : 0;
+        if (on) this.cells++;
+      }
+    }
+    this.cells = Math.max(1, this.cells);
     this.phase = 'pop';
     this.progress = 0;
     this.holding = 0;
@@ -38,14 +49,14 @@ export class Treatment {
     this.holding = 0;
     if (phase === 'rinse') {
       this.foamStart = Math.max(0.01, this.mean(this.foam));
-      this.foamSum = this.foamStart * this.foam.length;
+      this.foamSum = this.foamStart * this.cells;
     }
   }
 
   mean(arr) {
     let s = 0;
     for (let i = 0; i < arr.length; i++) s += arr[i];
-    return s / arr.length;
+    return s / this.cells;
   }
 
   /** Returns the total amount added (negative if removed). */
@@ -58,6 +69,7 @@ export class Treatment {
         const cx = (col + 0.5) * CELL, cy = (row + 0.5) * CELL;
         if ((cx - x) * (cx - x) + (cy - y) * (cy - y) < r * r) {
           const i = row * this.cols + col;
+          if (!this.mask[i]) continue;
           const v = Math.max(0, Math.min(1, arr[i] + amt));
           delta += v - arr[i];
           arr[i] = v;

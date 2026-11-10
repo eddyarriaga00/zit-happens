@@ -182,7 +182,7 @@ export class Supplies {
       const top = G.safeTop + 130, bottom = G.H - G.safeBottom - 190;
       this.dollops.push({
         x: it.x, y: it.y - 40,
-        tx: 50 + Math.random() * (G.W - 100), ty: top + Math.random() * Math.max(60, bottom - top),
+        ...(() => { const p = G.geo ? G.geo.anyPoint() : { x: 50 + Math.random() * (G.W - 100), y: top + Math.random() * Math.max(60, bottom - top) }; return { tx: p.x, ty: p.y }; })(),
         t: 0, r: (16 + Math.random() * 8) * G.scale, color: t === 'soap' ? '#ffffff' : '#8fe3c2',
       });
       if (it.pumps === PUMPS) G.fx.text(G.W / 2, G.H * 0.42, t === 'soap' ? 'now rub it in!' : 'now spread it!', '#8dffa8', 20);

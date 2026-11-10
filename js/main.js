@@ -1,6 +1,7 @@
 import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
 import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL } from './levels.js';
 import { lookFor, portraitURL } from './faces.js';
+import { renderFaceScene, drawLids } from './facescene.js';
 import { FX } from './fx.js';
 import { Ear } from './ear.js';
 import { Treatment } from './steps.js';
@@ -24,7 +25,20 @@ setHapticsEnabled(save.settings.haptics);
 const up = (id) => save.upgrades[id] || 0;       // shop upgrade level
 const tone = () => G.tone || SKIN_TONES[save.settings.skin] || SKIN_TONES[1];
 // (re)paint the close-up skin for the current patient, body area and screen size
-function paintSkin() { G.skin = renderSkin(G.W, G.H, G.dpr, tone(), G.seed, G.zone, G.look); }
+const FACE_ZONES = ['forehead', 'nose', 'cheek', 'chin'];
+const FACE_SCALE = 0.72;      // pimples are smaller when the whole face is on screen
+function paintSkin() {
+  if (FACE_ZONES.includes(G.zone)) {
+    // the whole face, with the breakout mostly in one area of it
+    const scene = renderFaceScene(G.W, G.H, G.dpr, tone(), G.seed, G.look, playTop(), playBottom());
+    G.skin = scene.canvas;
+    G.geo = scene.geo;
+  } else {
+    G.geo = null;
+    G.skin = renderSkin(G.W, G.H, G.dpr, tone(), G.seed, G.zone, G.look);
+  }
+  G.scale = G.baseScale * (G.geo ? FACE_SCALE : 1);
+}
 
 // ---- a reward for every level: tools first, then patches, upgrades, coins, pus styles
 const toolUnlocked = (id) => save.level > (TOOL_LEVEL[id] || 0);
@@ -75,6 +89,9 @@ const G = {
   onStepDone,
   spawnNow: (type) => placePimple(type) || G.spawnQueue.push({ t: G.time + 1, type }),   // no room yet: retry
   zone: null,            // which body area this close-up is
+  geo: null,             // face levels: where the eyes, lips, hair are
+  baseScale: 1,
+  blinkT: 2, blinkA: 0, wince: 0,
   look: null,            // the patient's hair, brows, stubble...
   tool: 'finger',        // finger | extractor | needle | tweezers | pad | spray | patch
 };
@@ -96,7 +113,8 @@ function resize() {
   G.safeBottom = parseFloat(cs.paddingBottom) || 0;
   const changed = W !== G.W || H !== G.H || dpr !== G.dpr;
   G.W = W; G.H = H; G.dpr = dpr;
-  G.scale = Math.max(1.05, Math.min(2, Math.min(W, H) / 390 * 1.3)); // pimple size; bigger = easier to hit
+  G.baseScale = Math.max(1.05, Math.min(2, Math.min(W, H) / 390 * 1.3)); // pimple size; bigger = easier to hit
+  G.scale = G.baseScale * (G.geo ? FACE_SCALE : 1);
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
   if (changed) paintSkin();
@@ -117,13 +135,20 @@ function placePimple(type) {
   const rMax = T.r[1] * G.scale;
   const margin = rMax * 2.6 + 10;
   for (let tries = 0; tries < 80; tries++) {
-    const x = margin + Math.random() * (G.W - margin * 2);
-    const y = playTop() + margin + Math.random() * (playBottom() - playTop() - margin * 2);
+    let x, y;
+    if (G.geo) {
+      // mostly in the trouble area, the rest scattered over the face
+      const spot = tries < 55 && Math.random() < 0.7 ? G.geo.zonePoint(G.zone) : G.geo.anyPoint();
+      x = spot.x; y = spot.y;
+    } else {
+      x = margin + Math.random() * (G.W - margin * 2);
+      y = playTop() + margin + Math.random() * (playBottom() - playTop() - margin * 2);
+    }
     // keep the bottom corners free for the pad jar and the bin
-    let ok = !(y > playBottom() - 100 && (x < 100 || x > G.W - 104)) && !(G.zone && zoneBlocked(G.zone, x, y, G.W, G.H));
+    let ok = !(y > playBottom() - 100 && (x < 100 || x > G.W - 104)) && !(G.geo ? G.geo.blocked(x, y, rMax * 0.9) : G.zone && zoneBlocked(G.zone, x, y, G.W, G.H));
     for (const o of G.pimples) {
       if (o.state === 'done') continue;
-      const need = (o.r + rMax) * 2.0 + 22;
+      const need = (o.r + rMax) * (G.geo ? 1.7 : 2.0) + (G.geo ? 14 : 22);
       if (Math.hypot(o.x - x, o.y - y) < need) { ok = false; break; }
     }
     if (ok) {
@@ -242,7 +267,7 @@ function addDirt() {
   for (let i = 0; i < 18; i++) {
     const r = (4 + Math.random() * 8) * G.scale;
     G.fx.addSplat({
-      kind: 'drop', x: 20 + Math.random() * (G.W - 40), y: playTop() + Math.random() * (G.H - playTop() - 40),
+      kind: 'drop', ...(G.geo ? G.geo.anyPoint() : { x: 20 + Math.random() * (G.W - 40), y: playTop() + Math.random() * (G.H - playTop() - 40) }),
       rx: r * (1 + Math.random()), ry: r, rot: Math.random() * 3, bx: r * 2,
       color: Math.random() < 0.6 ? '#6f5340' : '#3d3a37', alpha: 0.2 + Math.random() * 0.2, mass: 1,
     });
@@ -376,6 +401,7 @@ const mult = () => Math.min(3, 1 + G.combo * 0.25);
 function onPop(p) {
   if (G.mode === 'demo') return;
   G.stats.pops++;
+  G.wince = Math.max(G.wince, 0.28);
   G.shake = Math.min(10, 3 + p.r * 0.25);
   const pts = Math.round(p.T.popPts * mult());
   G.score += pts;
@@ -408,6 +434,7 @@ function onFinish(p, rating) {
     G.fx.text(p.x, y, 'Nice +50', '#d7f59a', 20);
   } else {
     G.combo = 0;
+    G.wince = 1.1;
     G.stats.ouches++;
     G.score = Math.max(0, G.score - 50);
     G.fx.text(p.x, y, 'OUCH! −50', '#ff6b78', 24);
@@ -797,6 +824,11 @@ function update(dt) {
 
   for (const p of G.pimples) p.update(dt, G);
   if (G.ear) G.ear.update(dt);
+  // the patient blinks now and then, and screws their eyes shut when it hurts
+  G.wince = Math.max(0, G.wince - dt);
+  G.blinkA = Math.max(0, G.blinkA - dt);
+  G.blinkT -= dt;
+  if (G.blinkT <= 0) { G.blinkT = 2.2 + Math.random() * 3.5; G.blinkA = 0.16; }
   G.sup.sync();
   G.sup.update(dt);
   toolfx.update(dt);
@@ -813,6 +845,7 @@ function render() {
   const { dpr, W, H } = G;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (G.skin) ctx.drawImage(G.skin, 0, 0, W, H);
+  if (G.geo) drawLids(ctx, G.geo, G.wince > 0 ? Math.min(1, G.wince * 6) : G.blinkA > 0 ? Math.sin(Math.PI * (1 - G.blinkA / 0.16)) : 0);
   else { ctx.fillStyle = '#eec1a2'; ctx.fillRect(0, 0, W, H); }
 
   ctx.save();
