@@ -825,7 +825,7 @@ function releaseAll() {
 // How clean counts as "done wiping": comfortably past this patient's own clean goal.
 function cleanTarget() {
   const g = G.def && G.def.goals.find((q) => Array.isArray(q) && q[0] === 'clean');
-  return Math.max(0.88, g ? g[1] / 100 + 0.015 : 0);
+  return Math.max(0.95, g ? g[1] / 100 + 0.015 : 0);
 }
 
 function wipeAt(x, y, speed, big = false) {

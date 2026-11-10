@@ -5,7 +5,9 @@ import * as audio from './audio.js';
 import { buzz } from './haptics.js';
 
 const CELL = 26;
-const GOALS = { lather: 0.72, rinse: 0.9, steam: 1, soothe: 0.78, mask: 0.78, dry: 1, peel: 0.9 };
+// How much of the face must be done before a step counts. High, so nothing is left
+// half-covered; the big brush and the missed-spot hints keep it easy.
+const GOALS = { lather: 0.94, rinse: 0.97, steam: 1, soothe: 0.94, mask: 0.94, dry: 1, peel: 0.97 };
 const FILM = ['soothe', 'mask', 'dry', 'peel'];   // phases that show a layer over the skin
 
 export class Treatment {
@@ -178,6 +180,12 @@ export class Treatment {
 
     if (this.progress >= 1 && !this.done) {
       this.done = true;
+      // finish the job properly: no bare patch of skin, no last fleck of foam or mask
+      const fill = (arr, v) => { for (let i = 0; i < arr.length; i++) if (this.mask[i]) arr[i] = v; };
+      if (this.phase === 'lather') fill(this.foam, 1);
+      else if (this.phase === 'rinse') this.foam.fill(0);
+      else if (this.phase === 'soothe' || this.phase === 'mask') fill(this.gel, 1);
+      else if (this.phase === 'peel') this.gel.fill(0);
       G.onStepDone(this.phase);
     }
   }
@@ -250,6 +258,27 @@ export class Treatment {
           ctx.lineTo(x + 10, y - 5);
         }
       }
+      ctx.stroke();
+    }
+
+    // "you missed a spot": bare patches glow once most of the face is done
+    if ((this.phase === 'lather' || this.phase === 'soothe' || this.phase === 'mask') && this.progress > 0.5 && !this.done) {
+      const arr = this.phase === 'lather' ? foam : gel;
+      const p = 0.5 + 0.5 * Math.sin(this.time * 6);
+      ctx.strokeStyle = `rgba(255,79,154,${0.45 + p * 0.45})`;
+      ctx.fillStyle = `rgba(255,255,255,${0.18 + p * 0.2})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const i = row * cols + col;
+          if (!this.mask[i] || arr[i] > 0.3) continue;
+          const x = (col + 0.5) * CELL, y = (row + 0.5) * CELL;
+          ctx.moveTo(x + CELL * 0.42, y);
+          ctx.arc(x, y, CELL * 0.42, 0, Math.PI * 2);
+        }
+      }
+      ctx.fill();
       ctx.stroke();
     }
 
