@@ -37,6 +37,7 @@ const G = {
   // callbacks used by pimples
   onPop, onDrain, onFinish, onEarPull,
   ear: null,
+  tool: 'finger',        // finger | extractor | needle | tweezers | pad
 };
 
 function freshStats() {
@@ -69,7 +70,7 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
 const playTop = () => G.safeTop + 80;
-const playBottom = () => G.H - G.safeBottom - 40;
+const playBottom = () => G.H - G.safeBottom - (G.mode === 'ear' ? 40 : 108);  // leave room for the tool bar
 
 // ---------------------------------------------------------------- spawning
 function placePimple(type) {
@@ -98,6 +99,7 @@ function placePimple(type) {
 function rollType(level, counts) {
   const r = Math.random();
   if (level >= 2 && r < 0.06) return 'gold';
+  if (level >= 4 && Math.random() < 0.14) return 'hair';
   const maxCysts = level >= 3 ? 1 + Math.floor((level - 3) / 3) : 0;
   if (counts.cyst < maxCysts && Math.random() < 0.22) return 'cyst';
   if (level >= 2 && Math.random() < 0.35) return 'black';
@@ -116,6 +118,7 @@ function levelPlan(level) {
   // make sure a new type shows up on the level it is introduced
   if (level === 2 && !types.includes('black')) types[0] = 'black';
   if (level === 3 && !types.includes('cyst')) types[0] = 'cyst';
+  if (level === 4 && !types.includes('hair')) types[0] = 'hair';
   const breakouts = level >= 4 ? Math.min(5, Math.floor((level - 2) / 2)) : 0;
   const later = [];
   for (let i = 0; i < breakouts; i++) later.push(rollType(level, counts));
@@ -148,7 +151,7 @@ function startLevel(n) {
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
-  toast(n === 1 ? 'Press & hold a pimple 👆' : n === 2 ? 'Blackheads are quick!' : n === 3 ? 'Cysts need 3 squeezes' : `Patient #${n}`, 2200);
+  toast(n === 1 ? 'Hold a pimple — or pinch it with 2 fingers 🤏' : n === 2 ? 'Blackheads: try the Loop tool' : n === 3 ? 'Cysts are deep — Needle them first' : n === 4 ? 'Ingrown hairs: pull with Tweezers' : `Patient #${n}`, 2800);
 }
 
 function startZen() {
@@ -357,26 +360,110 @@ canvas.addEventListener('pointerdown', (e) => {
     }
     return;
   }
-  const p = pimpleAt(x, y);
-  if (p) {
-    p.press(e.pointerId);
-    pointers.set(e.pointerId, { kind: 'pimple', p, x, y });
-  } else {
-    pointers.set(e.pointerId, { kind: 'wipe', x, y });
-    wipeAt(x, y, 0);
-  }
+  toolDown(e.pointerId, x, y);
 });
+
+function hint(p, msg) { G.fx.text(p.x, p.y - p.r * 2.4, msg, '#ffe7a8', 15); }
+const idle = (id, x, y) => pointers.set(id, { kind: 'none', x, y });
+
+function toolDown(id, x, y) {
+  const p = pimpleAt(x, y);
+  const tool = G.tool;
+  if (tool === 'pad') {
+    pointers.set(id, { kind: 'wipe', x, y, big: true });
+    wipeAt(x, y, 0, true);
+    return;
+  }
+  if (tool === 'needle') {
+    if (p) hint(p, p.T.hair ? 'use the tweezers' : p.lance(G) ? 'lanced — now squeeze' : 'already open');
+    return idle(id, x, y);
+  }
+  if (tool === 'tweezers') {
+    if (p && p.T.hair) {
+      p.held = id; p.fx = x; p.fy = y;
+      buzz('light');
+      pointers.set(id, { kind: 'tweeze', p, x, y });
+      return;
+    }
+    if (p) hint(p, 'tweezers are for hairs');
+    return idle(id, x, y);
+  }
+  if (p && p.T.hair) { hint(p, 'ingrown hair — use tweezers'); return idle(id, x, y); }
+  if (tool === 'extractor') {
+    if (!p) { pointers.set(id, { kind: 'wipe', x, y }); wipeAt(x, y, 0); return; }
+    if (p.type === 'cyst' && !p.lanced && p.state !== 'popped' && p.state !== 'empty') {
+      hint(p, 'too deep — needle it first');
+      return idle(id, x, y);
+    }
+    p.boost = p.type === 'black' ? 5 : 2;
+    p.clean = true;
+    p.tool = 'extractor';
+    p.press(id);
+    pointers.set(id, { kind: 'pimple', p, x, y });
+    return;
+  }
+  // fingers
+  if (p) { p.press(id); pointers.set(id, { kind: 'pimple', p, x, y }); return; }
+  if (tryPinch(id, x, y)) return;
+  pointers.set(id, { kind: 'wipe', x, y });
+  wipeAt(x, y, 0);
+}
+
+// ---- two-finger squeeze
+function tryPinch(id, x, y) {
+  // a second finger landing beside a pimple that is already being pressed
+  for (const [oid, o] of pointers) {
+    if (o.kind === 'pimple' && !o.p.tool && Math.hypot(o.p.x - x, o.p.y - y) < o.p.r * 2 + 130) {
+      return makePinch(o.p, oid, id, o.x, o.y, x, y, true);
+    }
+  }
+  // two fingers on the skin either side of a pimple
+  for (const [oid, o] of pointers) {
+    if (o.kind !== 'wipe' || o.big) continue;
+    if (Math.hypot(o.x - x, o.y - y) > 300) continue;
+    const p = pimpleAt((o.x + x) / 2, (o.y + y) / 2);
+    if (p && !p.T.hair) return makePinch(p, oid, id, o.x, o.y, x, y, false);
+  }
+  return false;
+}
+
+function makePinch(p, a, b, ax, ay, bx, by, already) {
+  const pin = { p, a, b, d0: Math.max(40, Math.hypot(ax - bx, ay - by)), last: null };
+  if (already) p.held = 'pinch'; else p.press('pinch');
+  pointers.set(a, { kind: 'pinch', pin, x: ax, y: ay });
+  pointers.set(b, { kind: 'pinch', pin, x: bx, y: by });
+  updatePinch(pin);
+  G.fx.text(p.x, p.y - p.r * 2.6, 'squeeze!', '#ffe7a8', 16);
+  return true;
+}
+
+function updatePinch(pin) {
+  const A = pointers.get(pin.a), B = pointers.get(pin.b);
+  if (!A || !B) return;
+  const d = Math.hypot(A.x - B.x, A.y - B.y);
+  // actively pinching inward gives a burst of extra pressure
+  if (pin.last != null && d < pin.last) pin.p.pump = Math.min(1, pin.p.pump + (pin.last - d) * 0.03);
+  pin.last = d;
+  pin.d0 = Math.max(pin.d0, d);
+  const rel = 1 - d / pin.d0;                 // how far the fingers have closed
+  const abs = 1 - (d - 60) / 160;             // how close together they are
+  const amt = Math.max(0, Math.min(1, Math.max(rel, abs)));
+  pin.p.boost = 1.3 + 1.2 * amt;
+  pin.p.pinch = { angle: Math.atan2(B.y - A.y, B.x - A.x), amt: Math.max(0.3, amt) };
+}
 
 canvas.addEventListener('pointermove', (e) => {
   const ptr = pointers.get(e.pointerId);
   if (!ptr) return;
   const x = e.clientX, y = e.clientY;
+  if (ptr.kind === 'pinch') { ptr.x = x; ptr.y = y; updatePinch(ptr.pin); return; }
+  if (ptr.kind === 'tweeze') { ptr.p.fx = x; ptr.p.fy = y; }
   if (ptr.kind === 'ear') G.ear?.move(e.pointerId, x, y);
   if (ptr.kind === 'wipe') {
     const dist = Math.hypot(x - ptr.x, y - ptr.y);
     const steps = Math.max(1, Math.ceil(dist / 8));
     for (let i = 1; i <= steps; i++) {
-      wipeAt(ptr.x + (x - ptr.x) * (i / steps), ptr.y + (y - ptr.y) * (i / steps), dist);
+      wipeAt(ptr.x + (x - ptr.x) * (i / steps), ptr.y + (y - ptr.y) * (i / steps), dist, ptr.big);
     }
   }
   ptr.x = x; ptr.y = y;
@@ -387,6 +474,16 @@ function endPointer(e) {
   if (!ptr) return;
   pointers.delete(e.pointerId);
   if (ptr.kind === 'ear') G.ear?.up(e.pointerId);
+  if (ptr.kind === 'pinch') {
+    const pin = ptr.pin;
+    const other = pin.a === e.pointerId ? pin.b : pin.a;
+    if (pointers.has(other)) idle(other, 0, 0);
+    if (pin.p.held === 'pinch') { pin.p.release(G); checkLevelDone(); }
+  }
+  if (ptr.kind === 'tweeze') {
+    if (ptr.p.held === e.pointerId) ptr.p.held = null;
+    checkLevelDone();
+  }
   if (ptr.kind === 'pimple' && ptr.p.held === e.pointerId) {
     ptr.p.release(G);
     checkLevelDone();
@@ -399,15 +496,17 @@ canvas.addEventListener('lostpointercapture', endPointer);
 function releaseAll() {
   for (const [id, ptr] of pointers) {
     if (ptr.kind === 'pimple' && ptr.p.held === id) ptr.p.release(G);
+    if (ptr.kind === 'pinch' && ptr.pin.p.held === 'pinch') ptr.pin.p.release(G);
+    if (ptr.kind === 'tweeze') ptr.p.held = null;
   }
   pointers.clear();
   if (G.ear) G.ear.releaseAll();
   audio.oozeStop();
 }
 
-function wipeAt(x, y, speed) {
-  G.fx.addTrail(x, y);
-  const cleaned = G.fx.wipe(x, y, 24 * G.scale, 0.22);
+function wipeAt(x, y, speed, big = false) {
+  G.fx.addTrail(x, y, big ? 46 : 26);
+  const cleaned = G.fx.wipe(x, y, (big ? 44 : 22) * G.scale, big ? 0.45 : 0.22);
   if (cleaned > 0) {
     audio.wipe(Math.min(1, speed / 40));
     if (Math.random() < 0.3) buzz('light');
@@ -531,6 +630,7 @@ let screenReturn = 'menu';
 function showScreen(name) {
   currentScreen = name;
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== name);
+  $('tools').classList.toggle('hidden', !(name === null && (G.mode === 'level' || G.mode === 'zen')));
   if (name === 'menu') {
     $('play-level').textContent = `Level ${save.level}`;
     $('ear-level').textContent = `Level ${save.earLevel}`;
@@ -593,6 +693,14 @@ function on(id, fn) {
     fn(e);
   });
 }
+
+document.querySelectorAll('#tools .tool').forEach((b) => b.addEventListener('click', () => {
+  audio.unlock();
+  audio.click();
+  buzz('light');
+  G.tool = b.dataset.tool;
+  document.querySelectorAll('#tools .tool').forEach((o) => o.classList.toggle('active', o === b));
+}));
 
 on('btn-play', () => startLevel(save.level));
 on('btn-zen', () => startZen());

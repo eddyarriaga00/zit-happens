@@ -30,6 +30,11 @@ export const TYPES = {
     head: '#fff1a8', headRim: '#f4c430', pusColor: '#ffd84d', stages: 1, popPts: 400,
     wormW: 0.55, lenPerMl: 70, squirt: 18, golden: true,
   },
+  hair: {
+    name: 'Ingrown hair', r: [10, 13], fill: [1, 1], pus: [0.2, 0.3], drain: 1,
+    head: '#f1c9b8', headRim: '#d98f80', pusColor: '#f3e2a0', stages: 1, popPts: 150,
+    wormW: 0.3, lenPerMl: 40, squirt: 4, hair: true,
+  },
 };
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -65,7 +70,21 @@ export class Pimple {
     this.lastTick = 0;
     this.bloodT = 0;
     this.pusDrained = 0;
+    // squeezing & tools
+    this.boost = 1;         // rate multiplier from two-finger squeeze / tools
+    this.pump = 0;          // short burst from actively pinching inward
+    this.pinch = null;      // { angle, amt } while squeezed between two fingers
+    this.lanced = false;    // opened with the needle
+    this.clean = false;     // extracted with the loop: less splatter
+    this.tool = null;
+    // ingrown hairs
+    this.hairLen = rand(70, 120) * scale;
+    this.hairOut = 0;       // 0..1 how much has been pulled out
+    this.hairAngle = Math.random() * Math.PI * 2;
+    this.fx = x; this.fy = y;   // where the tweezers are
   }
+
+  rate() { return this.boost + this.pump; }
 
   get active() { return this.state !== 'done'; }
   get grabbable() { return this.state !== 'done' && this.state !== 'spawn' || (this.state === 'spawn' && this.spawnT > 0.5); }
@@ -83,6 +102,8 @@ export class Pimple {
 
   release(game) {
     this.held = null;
+    this.boost = 1; this.pump = 0; this.pinch = null; this.tool = null;
+    if (this.T.hair) return;
     if (this.state === 'popped') audio.oozeStop();
     if (this.state === 'empty') this.finish(game);
     else if (this.state === 'pressing' && this.pressure < 0.02) this.state = 'idle';
@@ -116,7 +137,8 @@ export class Pimple {
     this.pressure = 1;
     this.newWorm();
     const a = this.worm.angle;
-    game.fx.squirt(this.x, this.y, a, T.squirt, {
+    const mess = (this.clean ? 0.35 : this.lanced ? 0.6 : 1) * (this.pinch ? 1.4 : 1);
+    game.fx.squirt(this.x, this.y, a, Math.max(2, Math.round(T.squirt * mess)), {
       color: T.pusColor, speed: 160 + this.r * 9, spread: 0.45, size: Math.max(1.6, this.r * 0.2), lift: 120 + this.r * 6,
     });
     if (T.golden) game.fx.sparkleBurst(this.x, this.y, 16);
@@ -155,22 +177,25 @@ export class Pimple {
       if (this.spawnT >= 1) this.state = 'idle';
       return;
     }
+    this.pump *= Math.pow(0.002, dt);
+    if (T.hair) { this.updateHair(dt, game); return; }
 
     if (this.state === 'pressing' || this.state === 'idle') {
       if (this.held != null) {
         this.state = 'pressing';
         // pressure builds slowly at first, then rushes
-        this.pressure = Math.min(1, this.pressure + dt / this.fillTime * (0.6 + this.pressure * 0.9));
+        this.pressure = Math.min(1, this.pressure + dt / this.fillTime * (0.6 + this.pressure * 0.9) * this.rate());
         audio.squish(this.pressure);
         if (this.pressure - this.lastTick > 0.2) { this.lastTick = this.pressure; buzz('light'); }
         if (this.pressure >= 1) this.pop(game);
       } else {
-        this.pressure = Math.max(0, this.pressure - dt * 0.35);
+        this.pressure = Math.max(this.lanced ? Math.min(this.pressure, 0.3) : 0, this.pressure - dt * 0.35);
         this.lastTick = Math.min(this.lastTick, this.pressure);
       }
     } else if (this.state === 'popped') {
       if (this.held != null) {
-        const flow = T.drain * dt * (0.6 + 0.6 * Math.min(1, this.pusLeft / this.stagePus + 0.3));
+        const flow = T.drain * dt * (0.6 + 0.6 * Math.min(1, this.pusLeft / this.stagePus + 0.3)) * (1 + (this.rate() - 1) * 0.4);
+        if (Math.random() < dt * 5 * this.rate()) audio.bloop();
         const amt = Math.min(this.pusLeft, flow);
         this.pusLeft -= amt;
         this.pusDrained += amt;
@@ -197,7 +222,7 @@ export class Pimple {
             this.state = 'empty';
             this.emptyT = 0;
             buzz('medium');
-            audio.plip();
+            audio.schlorp();
           }
         }
       }
@@ -222,6 +247,93 @@ export class Pimple {
     } else if (this.state === 'done') {
       this.heal = Math.min(1, this.heal + dt * 0.12);
     }
+  }
+
+  /** Needle: opens the head so it pops faster and with less mess. */
+  lance(game) {
+    if (this.lanced || this.T.hair || !['spawn', 'idle', 'pressing'].includes(this.state)) return false;
+    if (this.state === 'spawn') this.state = 'idle';
+    this.lanced = true;
+    this.pressure = Math.max(this.pressure, 0.5);
+    this.lastTick = this.pressure;
+    this.fillTime *= 0.55;
+    game.fx.squirt(this.x, this.y, Math.random() * 6.28, 2, {
+      color: this.T.pusColor, speed: 50, spread: 3, size: 1.6, lift: 70,
+    });
+    audio.prick();
+    buzz('medium');
+    return true;
+  }
+
+  updateHair(dt, game) {
+    if (this.state === 'done') { this.heal = Math.min(1, this.heal + dt * 0.12); return; }
+    if (this.held == null) return;
+    const dx = this.fx - this.x, dy = this.fy - this.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 6) this.hairAngle = Math.atan2(dy, dx);
+    const target = Math.min(1, Math.max(0, (d - 4) / this.hairLen));
+    if (target > this.hairOut) {
+      // the hair only slides out so fast, however hard you yank
+      this.hairOut = Math.min(target, this.hairOut + dt * 0.75);
+      this.pressure = this.hairOut * 0.6;
+      audio.squish(0.3 + this.hairOut * 0.7);
+      if (this.hairOut - this.lastTick > 0.12) { this.lastTick = this.hairOut; buzz('light'); }
+      if (this.hairOut >= 1) this.finishHair(game);
+    }
+  }
+
+  finishHair(game) {
+    const a = this.hairAngle, L = this.hairLen;
+    const pts = [];
+    for (let i = 0; i < 26; i++) {
+      const k = i / 25, bend = Math.sin(k * 3 + this.seed) * 10;
+      pts.push({
+        x: this.x + Math.cos(a) * (14 + k * L) - Math.sin(a) * bend,
+        y: this.y + Math.sin(a) * (14 + k * L) + Math.cos(a) * bend,
+      });
+    }
+    game.fx.wormSplat(pts, 2.2 * this.scale, '#2a1a12', null, 0, true);
+    game.fx.squirt(this.x, this.y, a, 5, { color: this.T.pusColor, speed: 120, spread: 0.8, size: 2, lift: 90 });
+    audio.pluck();
+    buzz('heavy');
+    this.held = null;
+    this.pressure = 0;
+    game.onPop(this);
+    this.rating = 'perfect';
+    this.state = 'done';
+    this.heal = 0;
+    game.onFinish(this, 'perfect');
+  }
+
+  drawHair(ctx, x, y, r) {
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#2a1a12';
+    if (this.hairOut <= 0) {
+      // curled up under the skin
+      ctx.globalAlpha = 0.75;
+      ctx.lineWidth = 1.8 * this.scale;
+      ctx.beginPath();
+      for (let i = 0; i <= 20; i++) {
+        const k = i / 20, a = this.seed + k * 7, rr = r * (0.12 + k * 0.5);
+        const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+        if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else {
+      const a = this.hairAngle, L = this.hairOut * this.hairLen;
+      const ex = x + Math.cos(a) * L, ey = y + Math.sin(a) * L;
+      const slack = this.held != null ? 0 : 12;
+      ctx.lineWidth = 2.2 * this.scale;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo((x + ex) / 2 - Math.sin(a) * slack, (y + ey) / 2 + Math.cos(a) * slack, ex, ey);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#5a1f1c';
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(1.5, r * 0.14), 0, Math.PI * 2);
+    ctx.fill();
   }
 
   draw(ctx, t) {
@@ -282,6 +394,17 @@ export class Pimple {
       return;
     }
 
+    // squished between two fingers: narrower along the pinch, bulging across it
+    const pin = this.pinch;
+    ctx.save();
+    if (pin) {
+      ctx.translate(x, y);
+      ctx.rotate(pin.angle);
+      ctx.scale(1 - 0.28 * pin.amt, 1 + 0.16 * pin.amt);
+      ctx.rotate(-pin.angle);
+      ctx.translate(-x, -y);
+    }
+
     // 2. the bump (fake 3D with offset highlight + shadow)
     const bumpR = r * 1.25;
     ctx.fillStyle = 'rgba(90,20,20,0.18)';
@@ -309,8 +432,8 @@ export class Pimple {
         ctx.arc(x, y, r0 * (0.45 + Math.min(this.emptyT - NICE_WINDOW, 2) * 0.2), 0, Math.PI * 2);
         ctx.fill();
       }
-      if (this.worm) drawWorm(ctx, this.worm.pts, this.worm.n, this.worm.w, T.pusColor, T.tipColor,
-        T.plug ? Math.floor(this.worm.total * T.plug) : 0);
+    } else if (T.hair) {
+      this.drawHair(ctx, x, y, r);
     } else {
       let hr;
       if (this.type === 'black') hr = r0 * 0.55;
@@ -336,10 +459,37 @@ export class Pimple {
       ctx.beginPath();
       ctx.ellipse(x - hr * 0.35, y - hr * 0.4, hr * 0.28, hr * 0.18, -0.6, 0, Math.PI * 2);
       ctx.fill();
+      if (this.lanced) {
+        ctx.fillStyle = '#a3182a';
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(1.2, hr * 0.2), 0, Math.PI * 2);
+        ctx.fill();
+      }
       if (T.golden) {
         const s = 0.5 + 0.5 * Math.sin(t * 5 + this.seed);
         drawStar(ctx, x + r * 1.1, y - r * 0.9, 3 + s * 4, `rgba(255,240,160,${0.5 + s * 0.5})`);
         drawStar(ctx, x - r * 1.2, y + r * 0.6, 2 + (1 - s) * 3, `rgba(255,240,160,${0.4 + (1 - s) * 0.5})`);
+      }
+    }
+    ctx.restore();
+
+    if ((this.state === 'popped' || this.state === 'empty') && this.worm) {
+      drawWorm(ctx, this.worm.pts, this.worm.n, this.worm.w, T.pusColor, T.tipColor,
+        T.plug ? Math.floor(this.worm.total * T.plug) : 0);
+    }
+
+    // the loop extractor pressing down around the head
+    if (this.tool === 'extractor' && this.held != null) {
+      const lr = r0 * 0.85 + 4;
+      ctx.lineCap = 'round';
+      for (const [col, w, o] of [['rgba(40,20,20,0.35)', 5, 2], ['#c9ced6', 4, 0], ['#ffffff', 1.2, -1]]) {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        ctx.arc(this.x + o, this.y + o, lr, 0, Math.PI * 2);
+        ctx.moveTo(this.x + o + lr * 0.71, this.y + o + lr * 0.71);
+        ctx.lineTo(this.x + o + lr * 0.71 + 70, this.y + o + lr * 0.71 + 70);
+        ctx.stroke();
       }
     }
   }
@@ -347,6 +497,21 @@ export class Pimple {
   /** Progress ring shown while you're working on a pimple. */
   drawRing(ctx, t) {
     if (this.state === 'done' || this.state === 'spawn') return;
+    if (this.T.hair) {
+      if (this.hairOut <= 0) return;
+      const HR = this.r * 1.9 + 14;
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = 'rgba(40,10,20,0.35)';
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, HR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, HR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * this.hairOut);
+      ctx.stroke();
+      return;
+    }
     const showing = this.held != null || this.state === 'popped' || (this.state === 'pressing' && this.pressure > 0.02);
     if (!showing) return;
     const R = this.r * 1.9 + 14;

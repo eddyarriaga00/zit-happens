@@ -79,6 +79,9 @@ export function pop(size = 1) {
   tone(t, 0.12, { freq: 260 / size + 80, freqEnd: 60, gain: 0.55, type: 'sine' });
   noise(t, 0.09, { type: 'highpass', freq: 1800, q: 0.7, gain: 0.5 });
   noise(t + 0.01, 0.25 + size * 0.1, { type: 'lowpass', freq: 1400, freqEnd: 200, q: 3, gain: 0.45 });
+  // wet splat tail
+  noise(t + 0.04, 0.32, { type: 'bandpass', freq: 700, freqEnd: 160, q: 7, gain: 0.35 });
+  tone(t + 0.05, 0.1, { freq: 150, freqEnd: 420, gain: 0.16 });
 }
 
 /** Wet squelch loop while pus is coming out. */
@@ -98,7 +101,7 @@ export function oozeStart() {
   lfo.connect(lfoGain).connect(f.frequency);
   const g = ctx.createGain();
   g.gain.value = 0.0001;
-  g.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.05);
+  g.gain.exponentialRampToValueAtTime(0.26, ctx.currentTime + 0.05);
   src.connect(f).connect(g).connect(master);
   src.start();
   lfo.start();
@@ -108,6 +111,7 @@ export function oozeStart() {
 export function oozeSet(level) {
   if (!oozeNodes) return;
   oozeNodes.f.frequency.setTargetAtTime(250 + level * 350, ctx.currentTime, 0.05);
+  oozeNodes.lfo.frequency.setTargetAtTime(5 + level * 7, ctx.currentTime, 0.08);
 }
 
 export function oozeStop() {
@@ -119,6 +123,41 @@ export function oozeStop() {
   src.stop(t + 0.2);
   lfo.stop(t + 0.2);
   oozeNodes = null;
+}
+
+/** Little bubbly "bloop" as pus pushes out. */
+export function bloop() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  const f = 170 + Math.random() * 230;
+  tone(t, 0.07, { freq: f, freqEnd: f * 2.3, gain: 0.1 });
+  noise(t, 0.05, { type: 'bandpass', freq: 500 + Math.random() * 500, q: 9, gain: 0.08 });
+}
+
+/** The last wet slurp when a pimple runs dry. */
+export function schlorp() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  noise(t, 0.3, { type: 'bandpass', freq: 950, freqEnd: 170, q: 6, gain: 0.4 });
+  tone(t + 0.02, 0.22, { freq: 330, freqEnd: 85, gain: 0.2 });
+}
+
+/** Needle prick. */
+export function prick() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  tone(t, 0.035, { freq: 2600, freqEnd: 1300, gain: 0.14, type: 'triangle' });
+  noise(t, 0.05, { type: 'highpass', freq: 4200, q: 0.7, gain: 0.12 });
+  noise(t + 0.03, 0.12, { type: 'bandpass', freq: 600, q: 6, gain: 0.12 });
+}
+
+/** A hair finally coming free. */
+export function pluck() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  tone(t, 0.1, { freq: 800, freqEnd: 1900, gain: 0.2, type: 'triangle' });
+  noise(t, 0.05, { type: 'highpass', freq: 3000, q: 0.7, gain: 0.2 });
+  tone(t + 0.03, 0.16, { freq: 150, freqEnd: 70, gain: 0.3 });
 }
 
 export function perfect() {

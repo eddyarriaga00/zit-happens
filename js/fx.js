@@ -53,7 +53,7 @@ export class FX {
     });
   }
 
-  wormSplat(pts, width, color, tipColor, plugLen) {
+  wormSplat(pts, width, color, tipColor, plugLen, hair = false) {
     if (pts.length < 2) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const p of pts) {
@@ -61,7 +61,7 @@ export class FX {
       if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
     }
     this.addSplat({
-      kind: 'worm', pts, w: width, color, tipColor, plugLen,
+      kind: 'worm', hair, pts, w: width, color, tipColor, plugLen,
       box: [minX - width, minY - width, maxX + width, maxY + width],
       mass: pts.length * width * 0.06,
     });
@@ -109,7 +109,7 @@ export class FX {
     return cleaned;
   }
 
-  addTrail(x, y) { this.trail.push({ x, y, t: 0 }); }
+  addTrail(x, y, r = 26) { this.trail.push({ x, y, r, t: 0 }); }
 
   text(x, y, str, color = '#fff', size = 22) {
     this.texts.push({ x, y, str, color, size, t: 0, life: 1.1 });
@@ -169,6 +169,14 @@ export class FX {
         ctx.ellipse(-s.rx * 0.25, -s.ry * 0.3, s.rx * 0.35, s.ry * 0.3, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
+      } else if (s.hair) {
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = s.w;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(s.pts[0].x, s.pts[0].y);
+        for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i].x, s.pts[i].y);
+        ctx.stroke();
       } else {
         drawWorm(ctx, s.pts, s.pts.length, s.w, s.color, s.tipColor, s.plugLen);
       }
@@ -199,7 +207,7 @@ export class FX {
       const a = 1 - p.t / 0.35;
       ctx.fillStyle = `rgba(255,255,255,${0.35 * a})`;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 26 * (0.8 + 0.2 * a), 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, p.r * (0.8 + 0.2 * a), 0, Math.PI * 2);
       ctx.fill();
     }
 

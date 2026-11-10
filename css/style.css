@@ -119,7 +119,7 @@ button {
 .pill {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--safe-bottom) + 20px);
+  bottom: calc(var(--safe-bottom) + 96px);
   transform: translateX(-50%);
   background: var(--accent);
   color: #fff;
@@ -132,6 +132,39 @@ button {
   animation: pill-bounce 1.6s ease-in-out infinite;
 }
 @keyframes pill-bounce { 50% { transform: translate(-50%, -4px); } }
+
+/* ---------- Tool bar ---------- */
+#tools {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 10px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 22px;
+  background: rgba(40, 18, 28, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 5;
+}
+.tool {
+  width: 62px;
+  height: 58px;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.tool svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.tool .ico { font-size: 22px; line-height: 26px; }
+.tool.active { background: var(--accent); color: #fff; box-shadow: 0 4px 12px rgba(255, 111, 145, 0.45); }
 
 /* ---------- Screens ---------- */
 .screen {
