@@ -1,6 +1,6 @@
 // Pimple types, their squeeze/drain state machine, and drawing.
 
-import { drawWorm, drawStar } from './fx.js';
+import { drawWorm, drawStar, drawBow } from './fx.js';
 import { rgba } from './skin.js';
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
@@ -514,6 +514,12 @@ export class Pimple {
     ctx.rotate(pt.rot);
     ctx.scale(1.5 - 0.5 * k, 1.5 - 0.5 * k);     // slaps down onto the skin
     ctx.globalAlpha = 0.4 + 0.6 * k;
+    if (pt.shape === 'bow') {
+      drawBow(ctx, 1.5, 2.5, R / 9, 'rgba(120,20,60,0.25)');
+      drawBow(ctx, 0, 0, R / 9, '#ff5fa2');
+      ctx.restore();
+      return;
+    }
     const shape = () => {
       ctx.beginPath();
       if (pt.shape === 'heart') {

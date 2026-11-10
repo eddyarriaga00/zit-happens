@@ -127,7 +127,7 @@ export class ToolFX {
     ctx.rotate(0.5);
     ctx.fillStyle = 'rgba(40,20,20,0.25)';
     ctx.beginPath(); ctx.roundRect(-11, -4, 26, 42, 8); ctx.fill();
-    ctx.fillStyle = '#bfe9ff';
+    ctx.fillStyle = '#ffc2dc';
     ctx.beginPath(); ctx.roundRect(-13, -8, 26, 42, 8); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.beginPath(); ctx.roundRect(-9, -2, 6, 28, 3); ctx.fill();

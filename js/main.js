@@ -578,8 +578,8 @@ function patchAt(x, y) {
   if (!best) return;
   if (best.state !== 'done') return hint(best, 'pop it first');
   if (best.patch) return hint(best, 'already patched');
-  const shapes = ['dot', 'heart', 'star'];
-  best.patch = { shape: shapes[Math.floor(Math.random() * 3)], rot: (Math.random() - 0.5) * 0.7, born: best.time };
+  const shapes = ['bow', 'heart', 'bow', 'star', 'dot'];
+  best.patch = { shape: shapes[Math.floor(Math.random() * shapes.length)], rot: (Math.random() - 0.5) * 0.7, born: best.time };
   const pts = best.sanitized ? 50 : 30;
   G.score += pts;
   G.fx.text(best.x, best.y - best.r * 2.2, best.sanitized ? `clean & patched +${pts}` : `patched +${pts}`, '#ffd6e6', 16);

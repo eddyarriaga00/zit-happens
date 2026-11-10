@@ -118,7 +118,7 @@ export class FX {
   sparkleBurst(x, y, n = 10) {
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, v = 40 + Math.random() * 110;
-      this.sparkles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 0.6 + Math.random() * 0.5 });
+      this.sparkles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 0.6 + Math.random() * 0.5, bow: Math.random() < 0.45, rot: Math.random() - 0.5 });
     }
   }
 
@@ -213,7 +213,8 @@ export class FX {
 
     for (const s of this.sparkles) {
       const a = 1 - s.t / s.life;
-      drawStar(ctx, s.x, s.y, 5 * a + 1, `rgba(255,230,140,${a})`);
+      if (s.bow) { ctx.globalAlpha = a; drawBow(ctx, s.x, s.y, 0.4 + 0.45 * a, '#ff5fa2', s.rot + s.t * 2); ctx.globalAlpha = 1; }
+      else drawStar(ctx, s.x, s.y, 5 * a + 1, `rgba(255,230,140,${a})`);
     }
 
     // floating text
@@ -234,6 +235,36 @@ export class FX {
     }
     ctx.globalAlpha = 1;
   }
+}
+
+/** A ribbon bow, about 24 units wide at scale 1. */
+export function drawBow(ctx, x, y, s = 1, color = '#ff5fa2', rot = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.scale(s, s);
+  ctx.fillStyle = color;
+  // tails
+  ctx.beginPath();
+  ctx.moveTo(-1.5, 1); ctx.lineTo(-7.5, 12); ctx.lineTo(-3.5, 10); ctx.lineTo(0, 3);
+  ctx.lineTo(3.5, 10); ctx.lineTo(7.5, 12); ctx.lineTo(1.5, 1);
+  ctx.closePath(); ctx.fill();
+  // loops
+  for (const d of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(d * 4, -10, d * 15, -9, d * 13, 0);
+    ctx.bezierCurveTo(d * 15, 8, d * 4, 8, 0, 0);
+    ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  for (const d of [-1, 1]) { ctx.beginPath(); ctx.ellipse(d * 8, -3, 3.2, 1.6, d * 0.4, 0, Math.PI * 2); ctx.fill(); }
+  // knot
+  ctx.fillStyle = 'rgba(150,20,80,0.35)';
+  ctx.beginPath(); ctx.arc(0, 0.5, 3.6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 }
 
 export function drawStar(ctx, x, y, r, color) {

@@ -4,6 +4,7 @@
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
 import { rgba } from './skin.js';
+import { drawBow } from './fx.js';
 
 const WAX = [
   ['#f6d277', '#cf9226'],
@@ -385,15 +386,11 @@ export class Ear {
     ctx.beginPath();
     ctx.arc(X(-0.12), Y(0.78), ew * 0.16, 0, Math.PI * 2);
     ctx.fill();
-    const sx = X(-0.14), sy = Y(0.84), sr = ew * 0.022;
-    ctx.fillStyle = 'rgba(60,20,10,0.3)';
-    ctx.beginPath(); ctx.arc(sx + 1.5, sy + 2, sr, 0, Math.PI * 2); ctx.fill();
-    const sg = ctx.createRadialGradient(sx - sr * 0.3, sy - sr * 0.3, 0.5, sx, sy, sr);
-    sg.addColorStop(0, '#fff6c2');
-    sg.addColorStop(0.5, '#f4c430');
-    sg.addColorStop(1, '#b8860b');
-    ctx.fillStyle = sg;
-    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+    // a bow earring on the lobe, and a bow clip in the hair
+    drawBow(ctx, X(-0.14) + 2, Y(0.84) + 3, ew * 0.0036, 'rgba(90,20,50,0.3)', -0.15);
+    drawBow(ctx, X(-0.14), Y(0.84), ew * 0.0036, '#ff4f9a', -0.15);
+    drawBow(ctx, G.W * 0.8 + 2, G.H * 0.13 + 3, 2.4, 'rgba(0,0,0,0.3)', 0.5);
+    drawBow(ctx, G.W * 0.8, G.H * 0.13, 2.4, '#ff6fae', 0.5);
   }
 
   /** Flaps that sit in front of the canal opening (drawn after the canal). */

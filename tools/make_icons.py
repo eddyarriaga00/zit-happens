@@ -91,6 +91,26 @@ def pixel(u, v, px):
         c = over(c, mix(HEAD, HEAD_RIM, smooth(0.015, 0.036, dz)), disc(dz, 0.034, px))
         c = over(c, (1, 1, 1), 0.9 * disc(math.hypot(u - zx + 0.011, v - zy + 0.013), 0.009, px))
 
+    # a big bow on top of the head
+    bx, by, rot = 0.30, 0.235, -0.38
+    cr, sr = math.cos(rot), math.sin(rot)
+    lx = (u - bx) * cr + (v - by) * sr
+    ly = -(u - bx) * sr + (v - by) * cr
+
+    def bow(k):
+        m = 0.0
+        for d in (-1, 1):
+            w = 0.3 + 0.7 * min(1.0, abs(lx) / (0.11 * k))        # pinched at the knot
+            m = max(m, disc(math.hypot((lx - d * 0.085 * k) / (0.09 * k), ly / (0.07 * k * w)), 1.0, px * 14))
+            m = max(m, disc(math.hypot((lx - d * 0.05 * k) / (0.03 * k), (ly - 0.085 * k) / (0.06 * k)), 1.0, px * 24))
+        return max(m, disc(math.hypot(lx, ly), 0.034 * k, px))
+
+    c = over(c, INK, 0.5 * bow(1.13))
+    c = over(c, hexc("#ff3d8f"), bow(1.0))
+    for d in (-1, 1):
+        c = over(c, (1, 1, 1), 0.45 * disc(math.hypot((lx - d * 0.09) / 0.035, (ly + 0.025) / 0.014), 1.0, px * 30))
+    c = over(c, hexc("#d81b72"), disc(math.hypot(lx, ly), 0.027, px))
+
     # comic "pop!" lines bursting off the zit
     for ang, r0, r1, w in ((-1.05, 0.105, 0.20, 0.017), (-0.45, 0.11, 0.18, 0.015),
                            (-1.65, 0.11, 0.18, 0.015), (0.15, 0.115, 0.165, 0.013)):
