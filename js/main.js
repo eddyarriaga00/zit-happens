@@ -107,7 +107,7 @@ document.body.appendChild(probe);
 
 function resize() {
   const W = window.innerWidth, H = window.innerHeight;
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);   // 2x is plenty and keeps iPhones at 60fps
   const cs = getComputedStyle(probe);
   G.safeTop = parseFloat(cs.paddingTop) || 0;
   G.safeBottom = parseFloat(cs.paddingBottom) || 0;
@@ -225,8 +225,8 @@ function newScene(seed, def = null) {
   G.maxCombo = 0;
   // let-go timing: Steady Hands upgrade widens it, sensitive skin narrows it
   const k = def && def.sensitive ? 0.6 : 1;
-  tuning.perfect = (0.3 + 0.08 * up('steady')) * k;
-  tuning.nice = (0.7 + 0.08 * up('steady')) * k;
+  tuning.perfect = (0.45 + 0.08 * up('steady')) * k;
+  tuning.nice = (1.0 + 0.08 * up('steady')) * k;
   G.spaMult = 1 + 0.25 * up('spa');
   G.seed = seed;
   G.pimples = [];
@@ -327,6 +327,7 @@ function afterWipe() {
   $('btn-finish').classList.add('hidden');
   releaseAll();
   G.cleanAtWipe = G.fx.cleanliness();
+  G.fx.fading = true;        // any last traces melt away as you move on
   // even-numbered patients get the peel-off charcoal mask, the others the cooling gel
   const peel = G.level % 2 === 0;
   G.treat.start(peel ? 'mask' : 'soothe');
@@ -479,7 +480,7 @@ function checkLevelDone() {
   if (G.spawnQueue.length) return;
   if (G.pimples.every((p) => p.state === 'done')) {
     G.allDone = true;
-    if (G.fx.cleanliness() >= 0.985) {
+    if (G.fx.cleanliness() >= cleanTarget()) {
       setTimeout(afterWipe, 900);
     } else {
       $('btn-finish').textContent = G.treat ? 'Next step →' : 'All done ✨ Finish';
@@ -754,9 +755,9 @@ function updatePinch(pin) {
   pin.last = d;
   pin.d0 = Math.max(pin.d0, d);
   const rel = 1 - d / pin.d0;                 // how far the fingers have closed
-  const abs = 1 - (d - 70) / 110;             // how close together they are
+  const abs = 1 - (d - 95) / 115;             // fingertips ~95px apart is a full squeeze on a phone             // how close together they are
   const amt = Math.max(0, Math.min(1, Math.max(rel, abs)));
-  pin.p.boost = 0.15 + 2.3 * amt;      // resting fingers barely do anything: you have to squeeze
+  pin.p.boost = 0.25 + 2.2 * amt;      // resting fingers barely do anything: you have to squeeze
   pin.p.pinch = { angle: Math.atan2(B.y - A.y, B.x - A.x), amt: Math.max(0.3, amt) };
 }
 
@@ -821,6 +822,12 @@ function releaseAll() {
   audio.oozeStop();
 }
 
+// How clean counts as "done wiping": comfortably past this patient's own clean goal.
+function cleanTarget() {
+  const g = G.def && G.def.goals.find((q) => Array.isArray(q) && q[0] === 'clean');
+  return Math.max(0.88, g ? g[1] / 100 + 0.015 : 0);
+}
+
 function wipeAt(x, y, speed, big = false) {
   let cleaned = 0;
   if (big) {
@@ -829,8 +836,8 @@ function wipeAt(x, y, speed, big = false) {
     if (!pad) return;
     G.sup.hand = { x, y };
     const k = 1 + 0.2 * up('pad');
-    cleaned = G.fx.wipe(x, y, 44 * k * G.scale, 0.45);
-    pad.dirt = Math.min(1, pad.dirt + cleaned / Math.max(45 * k, G.fx.messMade * 0.34 * k));   // ~3 pads per face
+    cleaned = G.fx.wipe(x, y, 58 * k, 0.75);       // a thumb-sized swipe, clean in a pass or two
+    pad.dirt = Math.min(1, pad.dirt + cleaned / Math.max(60 * k, G.fx.messMade * 0.5 * k));   // about 2 pads per face   // ~3 pads per face
   } else if (G.mode === 'ear') {
     G.fx.addTrail(x, y, 26);
     cleaned = G.fx.wipe(x, y, 22 * G.scale, 0.22);
@@ -843,7 +850,7 @@ function wipeAt(x, y, speed, big = false) {
     audio.wipe(Math.min(1, speed / 40));
     if (Math.random() < 0.3) buzz('light');
   }
-  if (G.allDone && !G.ended && G.fx.cleanliness() >= (G.treat ? 0.92 : 0.985)) {
+  if (G.allDone && !G.ended && G.fx.cleanliness() >= cleanTarget()) {
     G.fx.sparkleBurst(x, y, 14);
     audio.sparkle();
     (G.mode === 'ear' ? endEar : afterWipe)();

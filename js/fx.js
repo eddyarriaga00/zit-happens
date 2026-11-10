@@ -14,6 +14,7 @@ export class FX {
     this.trail = [];
     this.sparkles = [];
     this.messMade = 0;   // total "mass" of mess ever made this level
+    this.fading = false; // once wiping is finished, the last traces melt away
   }
 
   // ---- droplets ----
@@ -123,6 +124,12 @@ export class FX {
   }
 
   update(dt) {
+    if (this.fading) {
+      for (let i = this.splats.length - 1; i >= 0; i--) {
+        this.splats[i].alpha -= dt * 2.5;
+        if (this.splats[i].alpha <= 0) this.splats.splice(i, 1);
+      }
+    }
     const G = 900;
     for (let i = this.drops.length - 1; i >= 0; i--) {
       const d = this.drops[i];

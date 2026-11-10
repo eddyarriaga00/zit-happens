@@ -5,7 +5,7 @@ import * as audio from './audio.js';
 import { buzz } from './haptics.js';
 
 const CELL = 26;
-const GOALS = { lather: 0.8, rinse: 0.96, steam: 1, soothe: 0.85, mask: 0.85, dry: 1, peel: 0.96 };
+const GOALS = { lather: 0.72, rinse: 0.9, steam: 1, soothe: 0.78, mask: 0.78, dry: 1, peel: 0.9 };
 const FILM = ['soothe', 'mask', 'dry', 'peel'];   // phases that show a layer over the skin
 
 export class Treatment {
@@ -97,7 +97,8 @@ export class Treatment {
   apply(x, y) {
     if (this.fresh) return;     // a new step needs a new touch: one long drag can't run through several
     const G = this.G, sup = G.sup;
-    const s = G.scale * Math.sqrt(G.spaMult || 1);
+    // brush size is for a thumb, whatever size the pimples are drawn at
+    const s = (G.baseScale || 1) * 1.15 * Math.sqrt(G.spaMult || 1);
     if (this.phase === 'lather') {
       if (!sup.ready('soap')) { sup.nag('soap', 'open the cleanser & pump it'); return; }
       const d = sup.hitDollops(x, y);
@@ -109,7 +110,7 @@ export class Treatment {
       if (!c) return;
       sup.hand = { x, y };
       const removed = -this.paint(this.foam, x, y, 42 * s, -1);
-      c.dirt = Math.min(1, c.dirt + removed / (this.foamSum * 0.4 + 1));   // ~3 wipes per face
+      c.dirt = Math.min(1, c.dirt + removed / (this.foamSum * 0.55 + 1));   // about 2 wipes per face
       G.fx.wipe(x, y, 42 * s, 1);
       audio.wipe(0.8);
     } else if (this.phase === 'soothe') {
@@ -126,7 +127,7 @@ export class Treatment {
       this.fan += 0.0025;                       // waving a finger over it fans it dry
       if (this.tick % 5 === 0) audio.wipe(0.2);
     } else if (this.phase === 'peel') {
-      const removed = -this.paint(this.gel, x, y, 30 * s, -1);
+      const removed = -this.paint(this.gel, x, y, 40 * s, -1);
       if (removed > 0.2) {
         audio.squish(0.9);
         if (this.tick % 2 === 0) audio.wipe(1);
@@ -150,7 +151,7 @@ export class Treatment {
     else if (this.phase === 'soothe') this.progress = this.mean(this.gel) / GOALS.soothe;
     else if (this.phase === 'mask') this.progress = this.mean(this.gel) / GOALS.mask;
     else if (this.phase === 'peel') this.progress = (1 - this.mean(this.gel) / this.peelStart) / GOALS.peel;
-    else if (this.phase === 'dry') { this.progress += dt / 6 + this.fan; this.fan = 0; }
+    else if (this.phase === 'dry') { this.progress += dt / 4.5 + this.fan; this.fan = 0; }
     else if (this.phase === 'steam') {
       if (this.holding > 0 && !G.sup.ready('steamer')) G.sup.nag('steamer', 'switch the steamer on');
       if (this.holding > 0 && G.sup.ready('steamer')) {

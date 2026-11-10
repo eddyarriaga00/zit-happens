@@ -417,3 +417,7 @@ button.big.alt small { opacity: 0.75; }
 .before-after { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 22px; color: var(--accent); font-weight: 900; }
 .before-after figure { margin: 0; text-align: center; }
 .before-after figcaption { font-size: 11px; color: var(--muted); font-weight: 700; margin-top: -4px; }
+
+/* blur behind in-game chips is costly over a live canvas on phones, and they are nearly opaque anyway */
+.icon-btn, .hud-center, .hud-score, #tools, #toast { backdrop-filter: none; -webkit-backdrop-filter: none; }
+.tool { -webkit-user-select: none; user-select: none; }

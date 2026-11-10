@@ -105,15 +105,25 @@ export class Supplies {
 
   /** The cloth in hand, if it can still clean. Nags otherwise. */
   useCloth(kind) {
-    const c = this.cloth;
-    const name = kind === 'pads' ? 'cotton pad' : 'wipe';
-    if (!c) {
-      const it = this.item(kind);
-      this.nag(kind, it && !it.open ? `open the ${kind === 'pads' ? 'cotton pads' : 'wipes'}` : `grab a ${name}`);
-      return null;
+    // Wiping never stalls: a full wipe/pad flicks itself into the bin and a fresh one
+    // comes out of the open pack. The pack only has to be opened once.
+    const pack = this.item(kind);
+    if (this.cloth && this.cloth.dirt >= 1) {
+      const bin = this.item('bin');
+      const from = this.hand || { x: this.parkX(), y: this.parkY() };
+      if (bin) this.toss(bin, from.x, from.y); else this.cloth = null;
     }
-    if (c.dirt >= 1) { this.nag('bin', `that ${name} is dirty — bin it`); return null; }
-    return c;
+    if (!this.cloth) {
+      if (!pack || !pack.open) {
+        this.nag(kind, kind === 'pads' ? 'open the cotton pads' : 'open the wipes');
+        return null;
+      }
+      this.cloth = { kind, dirt: 0, pull: 1 };
+      pack.bounce = 1;
+      audio.plip();
+      buzz('light');
+    }
+    return this.cloth;
   }
 
   // ---- input
@@ -138,7 +148,7 @@ export class Supplies {
     if (!c || c.done || c.id !== id) return;
     const g = OPEN[c.it.type];
     const before = c.p;
-    c.p = clamp01(c.p0 + ((x - c.sx) * g.dx + (y - c.sy) * g.dy) / 110);
+    c.p = clamp01(c.p0 + ((x - c.sx) * g.dx + (y - c.sy) * g.dy) / 70);
     if (c.p > before) { audio.squish(c.p); if (Math.floor(c.p * 6) > Math.floor(before * 6)) buzz('light'); }
     if (c.p >= 1) {
       c.done = 0.001;
@@ -237,7 +247,6 @@ export class Supplies {
     if (c) {
       c.t = Math.min(1, c.t + dt * 6);
       if (c.done) { c.done += dt; if (c.done > 0.55) this.closeup = null; }
-      else if (c.id == null) c.p = Math.max(0, c.p - dt * 0.9);   // let go early and it eases shut
     }
     for (const d of this.dollops) d.t = Math.min(1, d.t + dt * 2.6);
     if (this.cloth) this.cloth.pull = Math.min(1, this.cloth.pull + dt * 5);
@@ -262,8 +271,8 @@ export class Supplies {
     if (k === 'mask' && !this.ready('mask')) return 'mask';
     if (k === 'steam' && !this.ready('steamer')) return 'steamer';
     if (k === 'rinse' || k === 'pads') {
-      if (!this.cloth) return k === 'rinse' ? 'wipes' : (this.G.fx.messLeft() > 0.5 ? 'pads' : null);
-      if (this.cloth.dirt >= 1) return 'bin';
+      const pack = this.item(k === 'rinse' ? 'wipes' : 'pads');
+      if (pack && !pack.open && (k === 'rinse' || this.G.fx.messLeft() > 0.5)) return pack.type;
     }
     return null;
   }
