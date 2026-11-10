@@ -197,6 +197,12 @@ export const AWARDS = [
   A('glam10', 'Beauty Guru', 'Finish 10 makeup looks', (s) => s.makeupDone >= 10, 300),
   A('trim10', 'Master Stylist', 'Finish 10 haircuts', (s) => s.haircutDone >= 10, 300),
   A('day14', 'Two Weeks Strong', 'Play 14 days in a row', (s) => s.streak >= 14, 500),
+  A('salon1', 'Open for Business', 'Serve your first salon client', (s) => s.salonClients >= 1, 60),
+  A('salon10', 'Fully Booked', 'Serve 10 salon clients', (s) => s.salonClients >= 10, 250),
+  A('salon30', 'Talk of the Town', 'Serve 30 salon clients', (s) => s.salonClients >= 30, 500),
+  A('happy10', 'Just What I Wanted', 'Give 10 clients exactly what they asked for', (s) => s.salonHappy >= 10, 300),
+  A('salonUp6', 'Growing Business', 'Reach salon level 6', (s) => s.salonLevel >= 6, 200),
+  A('salonMax', 'Legendary Salon', 'Fully upgrade your salon', (s) => s.salonLevel >= 12, 800),
   A('rich5k', 'Loaded', 'Hold 5,000 coins at once', (s) => s.coins >= 5000, 100),
 ];
 // your title, from how many awards you hold (a new one every 8)

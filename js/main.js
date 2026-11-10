@@ -3,6 +3,7 @@ import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS
 import { lookFor, portraitURL } from './faces.js';
 import { renderFaceScene, drawLids } from './facescene.js';
 import { Makeup, Haircut, LIP_SHADES } from './salon.js';
+import { HairService, STATIONS, WALLS, salonLevel, salonTitle } from './hairsalon.js';
 import { FX } from './fx.js';
 import { Ear } from './ear.js';
 import { Treatment } from './steps.js';
@@ -67,6 +68,7 @@ function checkAwards() {
     starTotal: Object.values(save.stars).reduce((a, b) => a + b, 0),
     upgradeTotal: Object.values(save.upgrades).reduce((a, b) => a + b, 0),
     threeStars: Object.values(save.stars).filter((v) => v >= 3).length,
+    salonLevel: salonLevel(save.salon),
   };
   const earned = [];
   for (const a of AWARDS) {
@@ -103,7 +105,7 @@ const G = {
   ended: false,
   stats: null,
   // callbacks used by pimples
-  onPop, onDrain, onFinish, onEarPull,
+  onPop, onDrain, onFinish, onEarPull, onSalonStage,
   ear: null,
   salon: null,           // the Makeup or Haircut mini-mode in play
   sup: null,             // the supplies on the tray (bottles, wipes, pads, bin)
@@ -243,7 +245,7 @@ function randomPlan(level) {
 function newScene(seed, def = null) {
   G.def = def;
   G.tone = def && def.mix ? SKIN_TONES[def.skin] : null;
-  G.zone = (G.mode === 'level' || G.mode === 'makeup' || G.mode === 'haircut') && def ? def.zone : G.mode === 'zen' ? ALL_ZONES[Math.floor(Math.random() * ALL_ZONES.length)] : null;
+  G.zone = (G.mode === 'level' || G.mode === 'makeup' || G.mode === 'haircut' || G.mode === 'hair') && def ? def.zone : G.mode === 'zen' ? ALL_ZONES[Math.floor(Math.random() * ALL_ZONES.length)] : null;
   G.look = lookFor(def || { name: `zen${seed}` });
   G.popTime = 0;
   G.maxCombo = 0;
@@ -447,15 +449,76 @@ function startSalon(kind) {
   const client = { ...LEVELS[Math.floor(Math.random() * LEVELS.length)], zone: 'forehead' };
   newScene(Math.floor(Math.random() * 1e9), client);
   if (kind === 'haircut') { G.look = { ...G.look, style: 'long' }; paintSkin(); }   // needs a fringe to trim
-  G.salon = kind === 'makeup' ? new Makeup(G, Math.min(LIP_SHADES.length, 3 + save.makeupDone)) : new Haircut(G);
+  if (kind === 'hair') {
+    // your salon: its walls follow the Decor level, its stations decide the services
+    G.salonLv = save.salon;
+    const styles = ['long', 'pony', 'bun', 'curly', 'short'];
+    G.look = { ...G.look, wall: WALLS[save.salon.decor] || WALLS[0], style: styles.includes(G.look.style) ? G.look.style : 'long' };
+    paintSkin();
+  }
+  G.salon = kind === 'makeup' ? new Makeup(G, Math.min(LIP_SHADES.length, 3 + save.makeupDone))
+    : kind === 'hair' ? new HairService(G, save.salon, paintSkin) : new Haircut(G);
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
   if (kind === 'makeup') renderMakeupBar();
-  toast(kind === 'makeup' ? 'Pick a product and a shade, then swipe it on 💄' : 'Swipe across each lock to snip it at the dashed line ✂️', 3400);
+  if (kind === 'hair') {
+    G.say = { text: G.salon.request(), t: 5 };
+    toast(G.salon.hint(), 3400);
+  } else toast(kind === 'makeup' ? 'Pick a product and a shade, then swipe it on 💄' : 'Swipe across each lock to snip it at the dashed line ✂️', 3400);
+}
+
+// colour / style choices during a hair visit; the one she asked for wears a star
+function renderHairBar() {
+  const b = G.salon.bar && G.salon.bar();
+  $('makeup-bar').querySelector('.mk-products').classList.add('hidden');
+  const wrap = $('mk-shades');
+  wrap.innerHTML = '';
+  if (!b) return;
+  for (const o of b.options) {
+    const value = b.kind === 'colors' ? o : o[0];
+    const el = document.createElement('button');
+    el.className = (b.kind === 'colors' ? 'shade' : 'style-btn') + (b.value === value ? ' active' : '') + (b.want === value ? ' want' : '');
+    if (b.kind === 'colors') el.style.background = o; else el.textContent = o[1];
+    el.onclick = () => { audio.unlock(); audio.click(); G.salon.choose(value); renderHairBar(); };
+    wrap.appendChild(el);
+  }
+}
+function onSalonStage(sv) {
+  renderHairBar();
+  refreshTools();
+  if (!sv.ready) toast(sv.hint(), 3000);
+  say('step', true);
+}
+
+// the salon hub: your stations, what they do, and what the next level costs
+function showSalon() {
+  const lv = save.salon;
+  let html = `<div class="lv-top"><span>${salonTitle(lv)} · level ${salonLevel(lv)}</span><span>🪙 ${save.coins.toLocaleString()}</span></div>
+    <p class="salon-note">${save.salonClients} client${save.salonClients === 1 ? '' : 's'} served. Upgrade stations to offer more and earn bigger tips.</p>`;
+  for (const st of STATIONS) {
+    const cur = lv[st.id] ?? st.start, max = st.start + st.costs.length, cost = st.costs[cur - st.start];
+    const pips = Array.from({ length: max }, (_, i) => `<i class="${i < cur ? 'on' : ''}"></i>`).join('');
+    html += `<div class="shop-item"><div><b>${st.name}</b><small>${st.desc[cur]}</small><div class="pips">${pips}</div></div>
+      <button class="buy" data-st="${st.id}" ${cost == null || save.coins < cost ? 'disabled' : ''}>${cost == null ? 'MAX' : `${cur === 0 ? 'Buy' : 'Up'} ${cost} 🪙`}</button></div>`;
+  }
+  $('salon-body').innerHTML = html;
+  $('salon-body').querySelectorAll('[data-st]').forEach((b) => b.addEventListener('click', () => {
+    const st = STATIONS.find((q) => q.id === b.dataset.st), cur = save.salon[st.id] ?? st.start, cost = st.costs[cur - st.start];
+    if (cost == null || save.coins < cost) return;
+    save.coins -= cost;
+    save.salon[st.id] = cur + 1;
+    store.save(save);
+    audio.unlock(); audio.sparkle(); buzz('medium');
+    const got = checkAwards();
+    if (got.length) toast(`🏆 ${got.map((a) => a.name).join(', ')}`, 3000);
+    showSalon();
+  }));
+  showScreen('salon');
 }
 
 function renderMakeupBar() {
+  $('makeup-bar').querySelector('.mk-products').classList.remove('hidden');
   const m = G.salon;
   document.querySelectorAll('#makeup-bar [data-mk]').forEach((b) => b.classList.toggle('active', b.dataset.mk === m.product));
   const wrap = $('mk-shades');
@@ -475,17 +538,28 @@ function endSalon() {
   $('btn-finish').classList.add('hidden');
   const kind = G.mode, sc = G.salon.score();
   const stars = sc >= 90 ? 3 : sc >= 70 ? 2 : 1;
-  const coins = earnCoins(sc * 6, stars);
+  let coins = earnCoins(sc * 6, stars);
   let unlock = '';
-  if (kind === 'makeup') {
+  if (kind === 'hair') {
+    // tips grow with your decor, and again if she got exactly what she asked for
+    const happy = G.salon.matched();
+    const tip = Math.round((40 + sc) * (1 + 0.25 * save.salon.decor) * (happy ? 1.5 : 1));
+    save.coins += tip;
+    coins += tip;
+    save.salonClients++;
+    save.haircutDone++;
+    if (happy) save.salonHappy++;
+    unlock = `<div class="reward"><b>${happy ? '💖 Exactly what she asked for!' : 'She\'s happy enough'}</b><span>Tip: +${tip} coins${save.salon.decor ? ` (decor bonus +${save.salon.decor * 25}%)` : ''}</span></div>`;
+  }
+  if (kind === 'hair') { /* counted above */ } else if (kind === 'makeup') {
     save.makeupDone++;
     if (2 + save.makeupDone < LIP_SHADES.length) unlock = '<div class="reward"><b>🎁 New lipstick shade unlocked</b><span>Try it on your next client</span></div>';
   } else save.haircutDone++;
   store.save(save);
   $('btn-next').firstChild.textContent = 'Another client';
-  $('res-title').textContent = (kind === 'makeup' ? ['', 'A bit smudged', 'Looking lovely', 'Flawless glam!'] : ['', 'It\'ll grow back', 'Neat trim', 'Salon perfect!'])[stars];
+  $('res-title').textContent = (kind === 'hair' ? ['', 'A bit uneven', 'Lovely hair!', 'Salon perfect!'] : kind === 'makeup' ? ['', 'A bit smudged', 'Looking lovely', 'Flawless glam!'] : ['', 'It\'ll grow back', 'Neat trim', 'Salon perfect!'])[stars];
   [...$('res-stars').children].forEach((el, i) => el.classList.toggle('on', i < stars));
-  $('res-grid').innerHTML = [stat(`${sc}%`, kind === 'makeup' ? 'coverage' : 'precision'), stat(`+${coins} 🪙`, 'coins earned')].join('');
+  $('res-grid').innerHTML = [stat(`${sc}%`, kind === 'hair' ? 'happiness' : kind === 'makeup' ? 'coverage' : 'precision'), stat(`+${coins} 🪙`, 'coins earned')].join('');
   $('res-goals').innerHTML = unlock + awardsHtml(checkAwards());
   audio.fanfare();
   buzz('medium');
@@ -1063,8 +1137,8 @@ function timeLeft() {
 function updateHud() {
   if (G.mode === 'demo') return;
   if (G.salon) {
-    setText('hud-title', G.mode === 'makeup' ? 'Makeup' : 'Haircut');
-    setText('hud-sub', `${Math.round(G.salon.progress * 100)}% done`);
+    setText('hud-title', G.mode === 'makeup' ? 'Makeup' : G.mode === 'hair' ? 'Hair Salon' : 'Haircut');
+    setText('hud-sub', G.salon.label ? G.salon.label() : `${Math.round(G.salon.progress * 100)}% done`);
     setText('hud-score', `${G.salon.score()}%`);
     setText('hud-combo', '');
     const ready = G.salon.ready && !G.ended;
@@ -1106,7 +1180,7 @@ function toast(msg, ms = 1600) {
   toastTimer = setTimeout(() => el.classList.add('hidden'), ms);
 }
 
-const SCREENS = ['menu', 'howto', 'stats', 'settings', 'pause', 'results', 'levels', 'intro', 'shop'];
+const SCREENS = ['menu', 'howto', 'stats', 'settings', 'pause', 'results', 'levels', 'intro', 'shop', 'salon'];
 let currentScreen = 'menu';
 let screenReturn = 'menu';
 function showScreen(name) {
@@ -1126,7 +1200,7 @@ function refreshTools() {
   document.querySelectorAll('#tools .tool').forEach((b) => b.classList.toggle('locked', !toolUnlocked(b.dataset.tool)));
   if (!toolUnlocked(G.tool)) document.querySelector('#tools [data-tool="finger"]').click();
   $('tools').classList.toggle('hidden', !show);
-  const mk = currentScreen === null && G.mode === 'makeup';
+  const mk = currentScreen === null && (G.mode === 'makeup' || (G.mode === 'hair' && G.salon && !!G.salon.bar()));
   $('makeup-bar').classList.toggle('hidden', !mk);
   document.body.classList.toggle('mk', mk);
 }
@@ -1296,7 +1370,8 @@ on('btn-intro-start', () => startLevel(introLevel));
 on('btn-intro-back', () => showLevels());
 on('btn-zen', () => startZen());
 on('btn-makeup', () => startSalon('makeup'));
-on('btn-haircut', () => startSalon('haircut'));
+on('btn-haircut', () => showSalon());
+on('btn-salon-go', () => startSalon('hair'));
 document.querySelectorAll('#makeup-bar [data-mk]').forEach((b) => b.addEventListener('click', () => {
   audio.unlock(); audio.click();
   if (G.salon && G.salon.setProduct) { G.salon.setProduct(b.dataset.mk); renderMakeupBar(); }
@@ -1310,7 +1385,7 @@ on('btn-resume', () => { G.paused = false; showScreen(null); });
 on('btn-restart', () => (G.salon ? startSalon(G.mode) : G.mode === 'zen' ? startZen() : G.mode === 'ear' ? startEar(G.level) : startLevel(G.level)));
 on('btn-quit', () => goMenu());
 on('btn-next', () => (G.salon ? startSalon(G.mode) : G.mode === 'ear' ? startEar(save.earLevel) : openIntro(G.level + 1)));
-on('btn-res-menu', () => goMenu());
+on('btn-res-menu', () => { const wasHair = G.mode === 'hair'; goMenu(); if (wasHair) showSalon(); });
 on('btn-finish', () => (G.salon ? endSalon : G.mode === 'ear' ? endEar : afterWipe)());
 document.querySelectorAll('.back').forEach((b) => b.addEventListener('click', () => {
   audio.click();

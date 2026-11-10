@@ -449,3 +449,10 @@ button.big.mode { background: #ff7fb8; }
 .award-row span { font-size: 20px; }
 .award-row b { display: block; font-size: 14.5px; }
 .award-row small { color: var(--muted); font-size: 12px; }
+
+/* ---------- hair salon ---------- */
+.salon-note { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+.style-btn { padding: 9px 12px; border-radius: 12px; background: var(--tile); color: var(--ink); font-weight: 800; font-size: 13.5px; position: relative; }
+.style-btn.active { background: var(--accent); color: #fff; }
+.shade { position: relative; }
+.shade.want::after, .style-btn.want::after { content: '★'; position: absolute; top: -9px; right: -5px; color: #ff9f1c; font-size: 16px; text-shadow: 0 1px 0 #fff; }

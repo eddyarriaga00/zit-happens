@@ -124,6 +124,7 @@ export class Haircut {
     this.G = G;
     const g = G.geo;
     this.hair = G.look.hair;
+    this.tol = 14 + 7 * (((G.salonLv && G.salonLv.chair) || 1) - 1);   // how close to the line counts
     this.y0 = g.hairlineY - 8;                 // where the fringe hangs from
     this.target = g.browY - 10;                // the line to cut to: just above the brows
     this.locks = [];
@@ -137,7 +138,7 @@ export class Haircut {
   }
 
   end(l) { return this.y0 + l.len; }
-  ok(l) { return this.end(l) <= this.target + 14; }
+  ok(l) { return this.end(l) <= this.target + this.tol; }
   get progress() { return this.locks.filter((l) => this.ok(l)).length / this.locks.length; }
   get ready() { return this.progress >= 1; }
   /** 100 for every lock cut right on the line; too short hurts more than too long. */
@@ -145,7 +146,8 @@ export class Haircut {
     let s = 0;
     for (const l of this.locks) {
       const d = this.end(l) - this.target;
-      s += Math.max(0, 100 - (d < 0 ? -d * 4 : d * 2.5));
+      const e = Math.max(0, Math.abs(d) - (this.tol - 14));      // better scissors forgive more
+      s += Math.max(0, 100 - (d < 0 ? e * 4 : e * 2.5));
     }
     return Math.round(s / this.locks.length);
   }
@@ -163,7 +165,7 @@ export class Haircut {
       this.snip.t = 0.12;
       audio.snip();
       buzz('light');
-      if (this.end(l) < this.target - 14) this.G.fx.text(l.x, y - 16, 'too short!', '#ff6b78', 15);
+      if (this.end(l) < this.target - this.tol) this.G.fx.text(l.x, y - 16, 'too short!', '#ff6b78', 15);
       else if (this.ok(l)) this.G.fx.text(l.x, y - 16, 'nice', '#8dffa8', 14);
     }
   }

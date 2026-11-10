@@ -21,7 +21,8 @@ Then open http://localhost:8765.
 - `js/fx.js` – droplets, splats, wipe
 - `js/skin.js` – skin texture, tones, and the body-area scenes (forehead, nose, cheek, chin, back, shoulder)
 - `js/facescene.js` – the full realistic face you play on (and blinking)
-- `js/salon.js` – the Makeup and Haircut side modes
+- `js/salon.js` – the Makeup mode and the fringe-cutting used by the salon
+- `js/hairsalon.js` – the Hair Salon: client visits, stations and upgrades
 - `js/faces.js` – 2D patient portraits and each patient's look
 - `js/audio.js` / `js/haptics.js` – synthesized sound, haptics
 - `sw.js` – offline cache (bump `VERSION` when files are added or renamed)

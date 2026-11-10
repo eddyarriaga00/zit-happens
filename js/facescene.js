@@ -63,7 +63,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
 
   // ---- the room behind
   const wall = x.createLinearGradient(0, 0, w, h);
-  wall.addColorStop(0, '#f4e9ee'); wall.addColorStop(1, '#dcc5d3');
+  wall.addColorStop(0, (look.wall && look.wall[0]) || '#f4e9ee'); wall.addColorStop(1, (look.wall && look.wall[1]) || '#dcc5d3');
   x.fillStyle = wall; x.fillRect(0, 0, w, h);
   soft(w * 0.2, h * 0.2, w * 0.5, h * 0.3, 'rgba(255,255,255,0.5)');
   // an out-of-focus room: window light, a shelf, a few soft glints
@@ -428,6 +428,17 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     if (k < 0.82) return { x: X(j() * 0.5), y: Y(mouthY - 0.085 + j() * 0.03), a: Math.PI / 2 + j() * 0.8 };
     return { x: X(j() * 0.5), y: Y(0.86 + j() * 0.1), a: Math.PI / 2 + j() };
   };
+  // everything that is hair: the top of the head above the hairline, the volume around
+  // the skull, and the lengths hanging at the sides
+  const onHair = (px, py) => {
+    if (!hasHair) return false;
+    const u = (px - cx) / hw, v = (py - cy) / hh;
+    if (inHead(px, py)) return v < edgeV(u) - 0.03;
+    if (v < -0.28 && (u / 1.09) ** 2 + ((v + 0.3) / 0.8) ** 2 < 1) return true;
+    if ((style === 'long' || style === 'curly') && Math.abs(u) > 0.9 && Math.abs(u) < (style === 'curly' ? 1.45 : 1.2) && v > -0.4 && v < 1.5) return true;
+    if (style === 'bun' && Math.hypot(u, (v + 1.22) * (hh / hw)) < 0.42) return true;
+    return false;
+  };
   const lipsPath = new Path2D();
   lipsPath.addPath(upper); lipsPath.addPath(lower);
   const inLips = (px, py) => x.isPointInPath(lipsPath, px * dpr, py * dpr);
@@ -436,7 +447,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   const lids = eyes.map((e) => ({ x: e.x, y: e.y - ery * 1.75, rx: erx * 1.15, ry: ery * 0.95 }));
   const onSkin = (px, py) => inHead(px, py) && (py - cy) / hh >= edgeV((px - cx) / hw);   // face, not hair
   const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint,
-    lipsPath, inLips, lipsBox, cheeks, lids, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
+    lipsPath, inLips, lipsBox, cheeks, lids, onHair, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
   return { canvas: c, geo };
 }
 
