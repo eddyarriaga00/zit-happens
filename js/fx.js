@@ -167,13 +167,23 @@ export class FX {
         ctx.save();
         ctx.translate(s.x, s.y);
         ctx.rotate(s.rot);
+        // a blob with a tail and a darker wet edge, not a neat oval
+        const hex = s.color[0] === '#';
+        if (hex) {
+          ctx.fillStyle = shade(s.color);
+          ctx.beginPath();
+          ctx.ellipse(0, 0, s.rx * 1.08, s.ry * 1.12, 0, 0, Math.PI * 2);
+          ctx.ellipse(s.rx * 0.75, s.ry * 0.15, s.rx * 0.5, s.ry * 0.62, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.fillStyle = s.color;
         ctx.beginPath();
         ctx.ellipse(0, 0, s.rx, s.ry, 0, 0, Math.PI * 2);
+        ctx.ellipse(s.rx * 0.72, s.ry * 0.14, s.rx * 0.42, s.ry * 0.52, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.beginPath();
-        ctx.ellipse(-s.rx * 0.25, -s.ry * 0.3, s.rx * 0.35, s.ry * 0.3, 0, 0, Math.PI * 2);
+        ctx.ellipse(-s.rx * 0.25, -s.ry * 0.32, s.rx * 0.28, s.ry * 0.2, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       } else if (s.hair) {

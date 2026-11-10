@@ -44,6 +44,7 @@ export class Treatment {
     this.fan = 0;           // fanning the mask dry
     this.peelStart = 1;
     this.bits = [];         // peeled-off scraps of mask falling away
+    this.beads = [];        // water beads left after rinsing
   }
 
   get active() { return this.phase !== 'pop'; }
@@ -190,7 +191,23 @@ export class Treatment {
     }
   }
 
+  /** Leave the freshly rinsed face beaded with water. */
+  wet() {
+    const G = this.G;
+    this.beads = [];
+    for (let i = 0; i < 46; i++) {
+      const p = G.geo ? G.geo.anyPoint() : { x: Math.random() * G.W, y: G.H * (0.15 + Math.random() * 0.7) };
+      this.beads.push({ x: p.x, y: p.y, r: 1.5 + Math.random() * 3.2, t: 5 + Math.random() * 6, v: 2 + Math.random() * 9 });
+    }
+  }
+
   updatePuffs(dt) {
+    for (let i = this.beads.length - 1; i >= 0; i--) {
+      const b = this.beads[i];
+      b.t -= dt * (this.phase === 'steam' && this.holding ? 0.6 : 1);
+      b.y += b.v * dt * (b.r > 3 ? 1 : 0.2);       // the fat ones trickle down
+      if (b.t <= 0) this.beads.splice(i, 1);
+    }
     for (let i = this.bits.length - 1; i >= 0; i--) {
       const b = this.bits[i];
       b.t += dt; b.vy += 900 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.rot += dt * 5;
@@ -296,43 +313,57 @@ export class Treatment {
     }
     ctx.globalAlpha = 1;
 
-    // foam: lots of little bubbles
+    // water left on the skin after rinsing: beads that catch the light and slowly run
+    for (const b of this.beads) {
+      const a = Math.min(1, b.t / 1.5);
+      ctx.fillStyle = `rgba(255,255,255,${0.16 * a})`;
+      ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r, b.r * 1.25, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(60,30,25,${0.22 * a})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(b.x, b.y + b.r * 0.15, b.r, 0.25, Math.PI - 0.25); ctx.stroke();
+      ctx.fillStyle = `rgba(255,255,255,${0.85 * a})`;
+      ctx.beginPath(); ctx.arc(b.x - b.r * 0.35, b.y - b.r * 0.45, Math.max(0.7, b.r * 0.26), 0, Math.PI * 2); ctx.fill();
+    }
+
+    // lather: a creamy white layer with soft shading and a scatter of glossy bubbles
     if (this.phase === 'lather' || this.phase === 'rinse') {
       const wob = this.time * 2;
-      ctx.fillStyle = 'rgba(255,255,255,0.86)';
-      ctx.beginPath();
-      for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          const i = row * cols + col;
-          const f = foam[i];
-          if (f <= 0.05) continue;
-          for (let k = 0; k < 3; k++) {
-            const jx = jit[i * 4 + k], jy = jit[i * 4 + ((k + 1) & 3)];
-            const x = (col + jx) * CELL, y = (row + jy) * CELL + Math.sin(wob + jx * 20) * 1.2;
-            const r = CELL * (0.25 + 0.4 * jy) * (0.5 + 0.5 * f);
-            ctx.moveTo(x + r, y);
-            ctx.arc(x, y, r, 0, Math.PI * 2);
+      const pass = (dx, dy, k, style) => {
+        ctx.fillStyle = style;
+        ctx.beginPath();
+        for (let row = 0; row < rows; row++) {
+          for (let col = 0; col < cols; col++) {
+            const i = row * cols + col;
+            const f = foam[i];
+            if (f <= 0.05) continue;
+            for (let n = 0; n < 3; n++) {
+              const jx = jit[i * 4 + n], jy = jit[i * 4 + ((n + 1) & 3)];
+              const x = (col + jx) * CELL + dx, y = (row + jy) * CELL + Math.sin(wob + jx * 20) * 1.2 + dy;
+              const r = CELL * (0.3 + 0.42 * jy) * (0.5 + 0.5 * f) * k;
+              ctx.moveTo(x + r, y);
+              ctx.arc(x, y, r, 0, Math.PI * 2);
+            }
           }
         }
-      }
-      ctx.fill();
-      // bubble outlines + shine
-      ctx.strokeStyle = 'rgba(150,190,230,0.45)';
+        ctx.fill();
+      };
+      pass(2, 3.5, 1.04, 'rgba(70,90,120,0.16)');          // soft shadow on the skin
+      pass(0, 0, 1, 'rgba(226,235,246,0.92)');             // cool underside
+      pass(-1.5, -2, 0.86, 'rgba(255,255,255,0.96)');      // lit top
+      // a few distinct bubbles: thin rim, bright glint
       ctx.lineWidth = 1;
-      ctx.beginPath();
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const i = row * cols + col;
-          const f = foam[i];
-          if (f <= 0.3) continue;
-          const jx = jit[i * 4], jy = jit[i * 4 + 1];
-          const x = (col + jx) * CELL, y = (row + jy) * CELL;
-          const r = CELL * (0.25 + 0.4 * jy) * (0.5 + 0.5 * f);
-          ctx.moveTo(x + r, y);
-          ctx.arc(x, y, r, 0, Math.PI * 2);
+          if (foam[i] <= 0.4 || jit[i * 4 + 3] > 0.55) continue;
+          const x = (col + jit[i * 4 + 2]) * CELL, y = (row + jit[i * 4 + 3]) * CELL + Math.sin(wob + i) * 1.2;
+          const r = CELL * (0.12 + 0.2 * jit[i * 4]);
+          ctx.strokeStyle = 'rgba(150,180,215,0.5)';
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.4, Math.max(0.8, r * 0.22), 0, Math.PI * 2); ctx.fill();
         }
       }
-      ctx.stroke();
     }
   }
 }

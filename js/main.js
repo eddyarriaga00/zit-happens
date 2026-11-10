@@ -278,11 +278,11 @@ function queueBreakouts() {
 // grime to wash off in the first step
 function addDirt() {
   for (let i = 0; i < 18; i++) {
-    const r = (4 + Math.random() * 8) * G.scale;
+    const r = (3 + Math.random() * 5) * G.scale;
     G.fx.addSplat({
       kind: 'drop', ...(G.geo ? G.geo.anyPoint() : { x: 20 + Math.random() * (G.W - 40), y: playTop() + Math.random() * (G.H - playTop() - 40) }),
       rx: r * (1 + Math.random()), ry: r, rot: Math.random() * 3, bx: r * 2,
-      color: Math.random() < 0.6 ? '#6f5340' : '#3d3a37', alpha: 0.2 + Math.random() * 0.2, mass: 1,
+      color: Math.random() < 0.6 ? '#6f5340' : '#3d3a37', alpha: 0.14 + Math.random() * 0.16, mass: 1,
     });
   }
 }
@@ -300,6 +300,7 @@ function onStepDone(phase) {
     toast('Now open the wipes, pull one out and wipe the foam off 💦', 3400);
   } else if (phase === 'rinse') {
     G.fx.reset();
+    G.treat.wet();
     G.treat.start('steam');
     toast('Step 2: Switch the steamer on, then press and hold ♨️', 3400);
   } else if (phase === 'steam') {

@@ -30,7 +30,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   const hairLo = tint(hair, 0.72), hairHi = tint(hair, 1.16);
   const style = look.style || 'short';
   const hasHair = style !== 'bald';
-  const hairline = style === 'bald' ? -2 : style === 'balding' ? -2 : style === 'buzz' ? -0.66 : -0.6;
+  const hairline = style === 'bald' ? -2 : style === 'balding' ? -2 : style === 'buzz' ? -0.7 : -0.68;      // a proper forehead
   x.lineCap = 'round';
   x.lineJoin = 'round';
 
@@ -56,6 +56,9 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
       x.stroke();
     }
   };
+  // hair isn't one flat colour: darker at the roots and underneath, lit across the crown
+  const hairFill = x.createLinearGradient(0, Y(-1.15), 0, Y(1.4));
+  hairFill.addColorStop(0, hairLo); hairFill.addColorStop(0.16, hair); hairFill.addColorStop(0.45, hair); hairFill.addColorStop(1, tint(hair, 0.55));
   const hairCol = () => { const k = R(); return k < 0.22 ? hairHi : k < 0.5 ? hair : hairLo; };
 
   // ---- the room behind
@@ -67,19 +70,20 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   // ---- hair behind the head
   if (style === 'long' || style === 'curly') {
     const wide = style === 'curly' ? 1.5 : 1.22;
-    x.fillStyle = hair;
+    x.fillStyle = hairFill;
     x.beginPath(); x.ellipse(cx, Y(0.35), hw * wide, hh * (style === 'curly' ? 1.25 : 1.75), 0, 0, Math.PI * 2); x.fill();
-    strands(260, () => {
+    strands(700, () => {
       const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1;
       return [X(u * 0.7), Y(-0.9), X(u), Y(0.6 + R() * 1.2), d * (style === 'curly' ? 30 * Math.sin(R() * 9) : 18), hairCol()];
-    }, 1.6);
+    }, 0.9);
   }
   if (style === 'pony') { x.fillStyle = hair; x.beginPath(); x.ellipse(X(1.02), Y(0.1), hw * 0.26, hh * 0.9, -0.2, 0, Math.PI * 2); x.fill(); }
   if (style === 'bun') { x.fillStyle = hair; x.beginPath(); x.arc(cx, Y(-1.22), hw * 0.42, 0, Math.PI * 2); x.fill(); }
   if (hasHair && style !== 'balding') {     // volume around the skull
     const k = style === 'buzz' ? 1.02 : 1.09;
-    x.fillStyle = hair;
-    x.beginPath(); x.ellipse(cx, Y(-0.3), hw * k, hh * (style === 'buzz' ? 0.76 : 0.86), 0, Math.PI, Math.PI * 2); x.fill();
+    x.fillStyle = hairFill;
+    x.beginPath(); x.ellipse(cx, Y(-0.3), hw * k, hh * (style === 'buzz' ? 0.76 : 0.8), 0, Math.PI, Math.PI * 2); x.fill();
+    soft(X(-0.15), Y(-0.98), hw * 0.8, hh * 0.09, 'rgba(255,255,255,0.14)');     // light on the crown
     x.fillRect(cx - hw * k, Y(-0.31), hw * 2 * k, hh * (style === 'long' || style === 'curly' ? 0.9 : 0.32));
   }
   if (style === 'balding') {
@@ -101,7 +105,19 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   x.quadraticCurveTo(cx, Y(1.5), X(0.56), Y(1.24));
   x.lineTo(X(0.5), Y(0.55));
   x.closePath(); x.fill();
-  soft(cx, Y(1.02), hw * 0.75, hh * 0.2, 'rgba(50,18,12,0.45)');   // shadow under the chin
+  // open neckline: skin down to a soft V, with the hollow of the throat
+  x.fillStyle = tone.shade;
+  x.beginPath(); x.moveTo(X(-0.58), Y(1.2)); x.quadraticCurveTo(cx, Y(1.78), X(0.58), Y(1.2)); x.closePath(); x.fill();
+  x.strokeStyle = 'rgba(0,0,0,0.14)'; x.lineWidth = 5;
+  x.beginPath(); x.moveTo(X(-0.6), Y(1.2)); x.quadraticCurveTo(cx, Y(1.8), X(0.6), Y(1.2)); x.stroke();
+  for (const d of [-1, 1]) {
+    soft(X(d * 0.3), Y(1.18), hw * 0.07, hh * 0.3, rgba(tone.pore, 0.2));              // neck tendons
+    soft(X(d * 1.1), Y(1.55), hw * 0.5, hh * 0.12, 'rgba(255,255,255,0.14)');           // light on the shoulders
+    x.strokeStyle = rgba(tone.pore, 0.25); x.lineWidth = 3;                             // collarbones
+    x.beginPath(); x.moveTo(X(d * 0.08), Y(1.5)); x.quadraticCurveTo(X(d * 0.3), Y(1.42), X(d * 0.52), Y(1.36)); x.stroke();
+  }
+  soft(cx, Y(1.5), hw * 0.07, hh * 0.05, rgba(tone.pore, 0.35));
+  soft(cx, Y(1.02), hw * 0.75, hh * 0.2, 'rgba(50,18,12,0.5)');   // shadow under the chin
 
   // ---- ears
   for (const d of [-1, 1]) {
@@ -144,6 +160,13 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
       x.beginPath(); x.moveTo(X(d * 0.24), Y(0.36)); x.quadraticCurveTo(X(d * 0.42), Y(0.5), X(d * 0.4), Y(0.68)); x.stroke();
     }
   }
+  for (const d of [-1, 1]) {
+    soft(X(d * 0.86), Y(-0.3), hw * 0.22, hh * 0.32, rgba(tone.shade, 0.4));           // temples
+    soft(X(d * 0.64), Y(0.48), hw * 0.2, hh * 0.17, rgba(tone.shade, 0.34));           // hollow under the cheekbone
+    soft(X(d * 0.5 - 0.05), Y(0.1), hw * 0.13, hh * 0.045, 'rgba(255,255,255,0.2)');   // sheen on the cheekbone
+    soft(X(d * ex), Y(ey - 0.13), hw * 0.26, hh * 0.05, rgba(tone.pore, 0.2));         // shadow under the brow
+  }
+  soft(X(-0.05), Y(-0.36), hw * 0.2, hh * 0.08, 'rgba(255,255,255,0.14)');             // oily centre of the forehead
   const ridge = x.createLinearGradient(X(-0.09), 0, X(0.09), 0);
   ridge.addColorStop(0, 'rgba(255,255,255,0)'); ridge.addColorStop(0.45, 'rgba(255,255,255,0.2)'); ridge.addColorStop(1, 'rgba(255,255,255,0)');
   x.fillStyle = ridge; x.fillRect(X(-0.09), Y(-0.1), hw * 0.18, hh * 0.4);
@@ -177,7 +200,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   // hair growing from the hairline
   if (hasHair && style !== 'balding') {
     const edge = (u) => hairline + 0.05 * Math.abs(u) + 0.02 * Math.sin(u * 9 + seed % 7) + (style === 'buzz' ? 0 : 0.1 * Math.max(0, u * 0.9));
-    x.fillStyle = style === 'buzz' ? rgba(hair, 0.82) : hair;
+    for (let u = -0.9; u <= 0.9; u += 0.15) soft(X(u), Y(edge(u) + 0.035), hw * 0.16, hh * 0.05, 'rgba(40,15,10,0.2)');   // shadow the fringe casts
+    x.fillStyle = style === 'buzz' ? rgba(hair, 0.82) : hairFill;
     x.beginPath(); x.moveTo(X(-1.2), Y(-1.2)); x.lineTo(X(1.2), Y(-1.2));
     x.lineTo(X(1.2), Y(-0.12));
     x.quadraticCurveTo(X(0.9), Y(edge(0.9) + 0.12), X(0.8), Y(edge(0.8)));
@@ -188,10 +212,11 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
       strands(1500, () => { const u = R() * 2 - 1, v = -1 + R() * (edge(u) + 1.02); return [X(u), Y(v), X(u) + 1, Y(v) + 3, 0, rgba(hairLo.startsWith('rgb') ? hair : hair, 0.5)]; }, 1);
     } else {
       // strands sweeping across, plus a few stray baby hairs
-      strands(700, () => {
+      strands(1700, () => {
         const u = R() * 2.1 - 1.05, part = -0.3;
         return [X(part + (u - part) * 0.35), Y(-1.04), X(u), Y(edge(Math.max(-1, Math.min(1, u))) - R() * 0.12), (u - part) * hw * 0.22, hairCol()];
-      }, 1.3);
+      }, 0.8);
+      soft(X(-0.1), Y(-0.86), hw * 0.75, hh * 0.06, 'rgba(255,255,255,0.13)');   // shine band
       strands(90, () => { const u = R() * 1.6 - 0.8; return [X(u), Y(edge(u) - 0.01), X(u) + (R() - 0.3) * 8, Y(edge(u) + 0.02 + R() * 0.04), 2, rgba(hair, 0.45)]; }, 0.8);
     }
   }
@@ -339,6 +364,12 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     x.beginPath(); x.arc(X(u), Y(v), 0.8 + R() * 1.3, 0, Math.PI * 2); x.fill();
   }
 
+  soft(cx, my - hh * 0.062, hw * 0.05, hh * 0.012, 'rgba(255,255,255,0.4)');             // cupid's bow catches the light
+  // the room falls away into soft shadow at the edges
+  const vg = x.createRadialGradient(cx, cy, Math.min(w, h) * 0.45, cx, cy, Math.max(w, h) * 0.8);
+  vg.addColorStop(0, 'rgba(40,10,25,0)'); vg.addColorStop(1, 'rgba(40,10,25,0.3)');
+  x.fillStyle = vg; x.fillRect(0, 0, w, h);
+
   // ---- where things are, for the game
   const ell = (px, py, ox, oy, rx, ry) => ((px - ox) / rx) ** 2 + ((py - oy) / ry) ** 2 < 1;
   const inHead = (px, py) => x.isPointInPath(head, px * dpr, py * dpr);
@@ -354,7 +385,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     return false;
   };
   const ZONE = {
-    forehead: () => [X((R() * 2 - 1) * 0.6), Y(-0.38 + (R() * 2 - 1) * 0.13)],
+    forehead: () => [X((R() * 2 - 1) * 0.6), Y(-0.42 + (R() * 2 - 1) * 0.15)],
     nose: () => [X((R() * 2 - 1) * 0.14), Y(0.12 + (R() * 2 - 1) * 0.2)],
     cheek: () => { const d = R() < 0.5 ? -1 : 1; return [X(d * (0.55 + (R() * 2 - 1) * 0.24)), Y(0.3 + (R() * 2 - 1) * 0.2)]; },
     chin: () => [X((R() * 2 - 1) * 0.4), Y(0.84 + (R() * 2 - 1) * 0.11)],
