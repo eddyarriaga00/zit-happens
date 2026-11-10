@@ -187,6 +187,7 @@ export class Pimple {
       return;
     }
     this.pump *= Math.pow(0.002, dt);
+    this.guide = Math.max(0, (this.guide || 0) - dt);
     if (T.hair) { this.updateHair(dt, game); return; }
 
     if (this.state === 'pressing' || this.state === 'idle') {
@@ -574,10 +575,36 @@ export class Pimple {
       ctx.stroke();
       return;
     }
-    const showing = this.held != null || this.state === 'popped' || (this.state === 'pressing' && this.pressure > 0.02);
+    const showing = (this.guide || 0) > 0 || this.held != null || this.state === 'popped' || (this.state === 'pressing' && this.pressure > 0.02);
     if (!showing) return;
-    const R = this.r * 1.9 + 14;
     const x = this.x, y = this.y;
+    const R = Math.max(54, this.r * 2.6 + 26);       // wide, so it shows around two fingers
+    // "pinch here": a wide dashed circle with a fingertip either side, nudging inward
+    if ((this.guide || 0) > 0 && this.held == null) {
+      const a = Math.min(1, this.guide * 2.5), bob = (0.5 + 0.5 * Math.sin(t * 7)) * 12;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([9, 8]);
+      ctx.strokeStyle = `rgba(255,255,255,${0.9 * a})`;
+      ctx.beginPath(); ctx.arc(x, y, R + 16, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      for (const d of [-1, 1]) {
+        const fx = x + d * (R + 16 - bob);
+        ctx.fillStyle = `rgba(255,255,255,${0.38 * a})`;
+        ctx.strokeStyle = `rgba(255,79,154,${0.9 * a})`;
+        ctx.beginPath(); ctx.arc(fx, y, 19, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(fx - d * 2 + d * 6, y - 7); ctx.lineTo(fx - d * 6, y); ctx.lineTo(fx - d * 2 + d * 6, y + 7); ctx.stroke();
+      }
+      ctx.globalAlpha = a;
+      ctx.font = '900 14px ui-rounded, -apple-system, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(60,20,40,0.75)';
+      ctx.strokeText('pinch with 2 fingers', x, y - R - 30);
+      ctx.fillStyle = '#fff';
+      ctx.fillText('pinch with 2 fingers', x, y - R - 30);
+      ctx.globalAlpha = 1;
+    }
     ctx.lineCap = 'round';
     ctx.lineWidth = 5;
     ctx.strokeStyle = 'rgba(40,10,20,0.35)';

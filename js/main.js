@@ -256,7 +256,7 @@ function startLevel(n) {
   else toast(toolHint(n), 2800);
 }
 
-const toolHint = (n) => (n === 1 ? 'Hold a pimple — or pinch it with 2 fingers 🤏' : n === 2 ? 'Blackheads: try the Loop tool' : n === 3 ? 'Cysts are deep — Needle them first' : n === 4 ? 'Ingrown hairs: pull with Tweezers' : n === 5 ? 'New tool: Spray disinfects popped spots' : n === 6 ? 'New tool: stick a Patch on popped spots' : `Patient #${n}`);
+const toolHint = (n) => (n === 1 ? 'Two fingers either side of a pimple, then squeeze 🤏' : n === 2 ? 'Blackheads: try the Loop tool' : n === 3 ? 'Cysts are deep — Needle them first' : n === 4 ? 'Ingrown hairs: pull with Tweezers' : n === 5 ? 'New tool: Spray disinfects popped spots' : n === 6 ? 'New tool: stick a Patch on popped spots' : `Patient #${n}`);
 
 function queueBreakouts() {
   G.plan.later.forEach((t, i) => G.spawnQueue.push({ t: G.time + 3 + i * 2.5 + Math.random(), type: t, breakout: true }));
@@ -591,8 +591,9 @@ function toolDown(id, x, y) {
   if (p && p.T.hair) { hint(p, 'ingrown hair — use tweezers'); return idle(id, x, y); }
   if (tool === 'extractor') {
     if (!p) { pointers.set(id, { kind: 'wipe', x, y }); wipeAt(x, y, 0); return; }
-    if ((p.type === 'cyst' || p.type === 'boss') && !p.lanced && p.state !== 'popped' && p.state !== 'empty') {
-      hint(p, 'too deep — needle it first');
+    if (p.type !== 'black') {
+      hint(p, 'the Loop is for blackheads — pinch this one');
+      p.guide = 1.8;
       return idle(id, x, y);
     }
     p.boost = (p.type === 'black' ? 5 : 2) * (1 + 0.25 * up('loop'));
@@ -603,8 +604,9 @@ function toolDown(id, x, y) {
     return;
   }
   // fingers
-  if (p) { p.press(id); pointers.set(id, { kind: 'pimple', p, x, y }); return; }
+  // popping takes two fingers: one finger only shows where to pinch
   if (tryPinch(id, x, y)) return;
+  if (p) { p.guide = 2.2; buzz('light'); pointers.set(id, { kind: 'touch', p, x, y }); return; }
   pointers.set(id, { kind: 'wipe', x, y });
   wipeAt(x, y, 0);
 }
@@ -644,31 +646,40 @@ function patchAt(x, y) {
   buzz('medium');
 }
 
-// ---- two-finger squeeze
-function tryPinch(id, x, y) {
-  // a second finger landing beside a pimple that is already being pressed
-  for (const [oid, o] of pointers) {
-    if (o.kind === 'pimple' && !o.p.tool && Math.hypot(o.p.x - x, o.p.y - y) < o.p.r * 2 + 130) {
-      return makePinch(o.p, oid, id, o.x, o.y, x, y, true);
-    }
+// ---- two-finger squeeze: the only way to pop with bare fingers
+const PINCH_REACH = 150;      // how far from the pimple a finger can be and still count
+function nearestPimple(x, y, reach) {
+  let best = null, bestD = Infinity;
+  for (const p of G.pimples) {
+    if (!p.grabbable || p.held != null || p.T.hair) continue;
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d < reach + p.r && d < bestD) { best = p; bestD = d; }
   }
-  // two fingers on the skin either side of a pimple
+  return best;
+}
+
+function tryPinch(id, x, y) {
   for (const [oid, o] of pointers) {
-    if (o.kind !== 'wipe' || o.big) continue;
-    if (Math.hypot(o.x - x, o.y - y) > 300) continue;
-    const p = pimpleAt((o.x + x) / 2, (o.y + y) / 2);
-    if (p && !p.T.hair) return makePinch(p, oid, id, o.x, o.y, x, y, false);
+    if ((o.kind !== 'touch' && o.kind !== 'wipe') || o.big) continue;
+    const d = Math.hypot(o.x - x, o.y - y);
+    if (d > 2 * PINCH_REACH + 40 || d < 20) continue;
+    // the pimple the first finger is on, or else whichever sits between the two fingers
+    let p = o.kind === 'touch' ? o.p : null;
+    if (p && (p.held != null || !p.grabbable || Math.hypot(p.x - x, p.y - y) > PINCH_REACH + p.r)) p = null;
+    if (!p) p = nearestPimple((o.x + x) / 2, (o.y + y) / 2, 56);
+    if (p) return makePinch(p, oid, id, o.x, o.y, x, y);
   }
   return false;
 }
 
-function makePinch(p, a, b, ax, ay, bx, by, already) {
+function makePinch(p, a, b, ax, ay, bx, by) {
   const pin = { p, a, b, d0: Math.max(40, Math.hypot(ax - bx, ay - by)), last: null };
-  if (already) p.held = 'pinch'; else p.press('pinch');
+  p.guide = 0;
+  p.press('pinch');
   pointers.set(a, { kind: 'pinch', pin, x: ax, y: ay });
   pointers.set(b, { kind: 'pinch', pin, x: bx, y: by });
   updatePinch(pin);
-  G.fx.text(p.x, p.y - p.r * 2.6, 'squeeze!', '#ffe7a8', 16);
+  G.fx.text(p.x, p.y - p.r * 2.6 - 24, 'squeeze!', '#ffe7a8', 16);
   return true;
 }
 
@@ -681,9 +692,9 @@ function updatePinch(pin) {
   pin.last = d;
   pin.d0 = Math.max(pin.d0, d);
   const rel = 1 - d / pin.d0;                 // how far the fingers have closed
-  const abs = 1 - (d - 60) / 160;             // how close together they are
+  const abs = 1 - (d - 70) / 110;             // how close together they are
   const amt = Math.max(0, Math.min(1, Math.max(rel, abs)));
-  pin.p.boost = 1.3 + 1.2 * amt;
+  pin.p.boost = 0.15 + 2.3 * amt;      // resting fingers barely do anything: you have to squeeze
   pin.p.pinch = { angle: Math.atan2(B.y - A.y, B.x - A.x), amt: Math.max(0.3, amt) };
 }
 

@@ -9,38 +9,38 @@ import { SKIN_TONES, rgba } from './skin.js';
 // extras: f (softer features, lashes) · beard · stubble · stache · glasses
 const LOOKS = {
   'Mia': ['long', '#5a3825', 'f'],
-  'Jake': ['short', '#c9a45c', ''],
+  'Jade': ['pony', '#c9a45c', 'f'],
   'Priya': ['long', '#1c1412', 'f'],
-  'Leo': ['short', '#3a2618', 'stubble'],
+  'Lea': ['short', '#3a2618', 'f'],
   'Sofia': ['pony', '#8a3b1e', 'f'],
-  'Marcus': ['buzz', '#15100e', ''],
+  'Maya': ['curly', '#15100e', 'f'],
   'Hana': ['bun', '#1a1310', 'f'],
-  'Diego': ['short', '#1d1512', 'beard'],
+  'Dani': ['long', '#1d1512', 'f'],
   'Chloe': ['long', '#e2c078', 'f'],
-  'Big Tony': ['bald', '#2a1d16', 'stubble'],
+  'Big Toni': ['bun', '#2a1d16', 'f'],
   'Aisha': ['curly', '#17110f', 'f'],
-  'Ben': ['short', '#6b4a2e', 'glasses'],
+  'Bea': ['short', '#6b4a2e', 'f glasses'],
   'Yuki': ['bun', '#191210', 'f'],
-  'Omar': ['short', '#17110e', 'beard'],
+  'Olive': ['pony', '#17110e', 'f'],
   'Luna': ['long', '#d6679f', 'f'],
-  'Greg': ['balding', '#6e4b30', 'beard'],
+  'Greta': ['bun', '#6e4b30', 'f'],
   'Zoe': ['curly', '#15100d', 'f'],
-  'Ravi': ['short', '#17110e', ''],
+  'Riya': ['long', '#17110e', 'f'],
   'Nina': ['long', '#a8421c', 'f glasses'],
-  'Grandpa Joe': ['balding', '#cfcfcf', 'glasses stubble'],
+  'Grandma Jo': ['bun', '#cfcfcf', 'f glasses'],
   'Tess': ['pony', '#d8b56a', 'f'],
-  'Andre': ['buzz', '#15100e', 'beard'],
+  'Andrea': ['pony', '#15100e', 'f'],
   'Mei': ['long', '#17110f', 'f'],
-  'Viktor': ['short', '#c8a55e', 'beard'],
+  'Vika': ['short', '#c8a55e', 'f'],
   'Poppy': ['curly', '#c8622a', 'f'],
-  'Sam': ['short', '#5c3d26', 'stubble'],
+  'Sami': ['pony', '#5c3d26', 'f'],
   'Ivy': ['bun', '#5a3a24', 'f glasses'],
-  'Bruno': ['balding', '#8f8f8f', 'stache'],
+  'Bruna': ['curly', '#8f8f8f', 'f'],
   'Kira': ['long', '#7d55c7', 'f'],
-  'Dr. Squeeze': ['short', '#b9b9b9', 'glasses'],
+  'Dr. Squeeze': ['bun', '#b9b9b9', 'f glasses'],
 };
 
-const STYLES = ['short', 'long', 'pony', 'bun', 'curly', 'buzz'];
+const STYLES = ['short', 'long', 'pony', 'bun', 'curly', 'long'];
 const HAIRS = ['#1c1412', '#3a2618', '#5a3825', '#8a3b1e', '#c9a45c', '#17110f'];
 const EYES = ['#5b3a21', '#3f2a18', '#4a6b8a', '#5a7d4f', '#2e2019'];
 const SHIRTS = ['#7fb8e6', '#f2a7c3', '#9ad1b0', '#c7b1ec', '#f4d58a', '#ee9f8c', '#9aa7b8'];
@@ -58,7 +58,7 @@ export function lookFor(def) {
   const L = LOOKS[name];
   const style = L ? L[0] : STYLES[h % STYLES.length];
   const hair = L ? L[1] : HAIRS[(h >>> 3) % HAIRS.length];
-  const ex = L ? L[2] : ['', 'f', 'stubble', 'f', 'glasses', 'beard'][(h >>> 6) % 6];
+  const ex = L ? L[2] : ['f', 'f', 'f glasses', 'f', 'f', 'f glasses'][(h >>> 6) % 6];
   const age = (def && def.age) || 25;
   return {
     name, style, hair, age,
