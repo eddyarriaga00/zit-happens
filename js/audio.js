@@ -216,6 +216,14 @@ export function thud() {
   noise(t, 0.06, { type: 'lowpass', freq: 500, q: 1, gain: 0.15 });
 }
 
+/** Antiseptic spritz. */
+export function spritz() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  noise(t, 0.22, { type: 'highpass', freq: 3200, q: 0.7, gain: 0.28, attack: 0.02 });
+  noise(t, 0.1, { type: 'bandpass', freq: 1400, q: 3, gain: 0.1 });
+}
+
 export function click() {
   if (!ready()) return;
   tone(ctx.currentTime, 0.04, { freq: 900, gain: 0.08, type: 'sine' });

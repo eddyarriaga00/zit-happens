@@ -88,6 +88,9 @@ export class Pimple {
     this.hairOut = 0;       // 0..1 how much has been pulled out
     this.hairAngle = Math.random() * Math.PI * 2;
     this.fx = x; this.fy = y;   // where the tweezers are
+    // aftercare
+    this.sanitized = false; // sprayed with antiseptic
+    this.patch = null;      // { shape, rot, born } pimple patch stuck on top
   }
 
   rate() { return this.boost + this.pump; }
@@ -498,6 +501,44 @@ export class Pimple {
         ctx.stroke();
       }
     }
+  }
+
+  /** The little hydrocolloid sticker put on after popping. */
+  drawPatch(ctx) {
+    const pt = this.patch;
+    if (!pt || this.state !== 'done') return;
+    const k = Math.min(1, (this.time - pt.born) / 0.16);
+    const R = this.r * 0.7 + 11;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(pt.rot);
+    ctx.scale(1.5 - 0.5 * k, 1.5 - 0.5 * k);     // slaps down onto the skin
+    ctx.globalAlpha = 0.4 + 0.6 * k;
+    const shape = () => {
+      ctx.beginPath();
+      if (pt.shape === 'heart') {
+        ctx.moveTo(0, R * 0.9);
+        ctx.bezierCurveTo(-R * 1.5, R * 0.1, -R * 1.0, -R * 1.1, 0, -R * 0.35);
+        ctx.bezierCurveTo(R * 1.0, -R * 1.1, R * 1.5, R * 0.1, 0, R * 0.9);
+      } else if (pt.shape === 'star') {
+        for (let i = 0; i < 10; i++) {
+          const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? R * 0.55 : R * 1.1;
+          ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr);
+        }
+        ctx.closePath();
+      } else ctx.arc(0, 0, R, 0, Math.PI * 2);
+    };
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = 'rgba(60,20,10,0.2)';
+    ctx.save(); ctx.translate(1.5, 2.5); shape(); ctx.fill(); ctx.restore();
+    ctx.fillStyle = pt.shape === 'heart' ? 'rgba(255,150,190,0.9)' : pt.shape === 'star' ? 'rgba(255,222,110,0.92)' : 'rgba(255,246,232,0.82)';
+    shape(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 2;
+    shape(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath(); ctx.ellipse(-R * 0.3, -R * 0.3, R * 0.25, R * 0.13, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
 
   /** Progress ring shown while you're working on a pimple. */

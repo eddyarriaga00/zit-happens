@@ -4,6 +4,7 @@ import { FX } from './fx.js';
 import { Ear } from './ear.js';
 import { Treatment } from './steps.js';
 import { Supplies } from './supplies.js';
+import { ToolFX } from './tools.js';
 import { SKIN_TONES, renderSkin } from './skin.js';
 import * as audio from './audio.js';
 import { buzz, setHapticsEnabled } from './haptics.js';
@@ -13,6 +14,7 @@ import * as store from './storage.js';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const $ = (id) => document.getElementById(id);
+const toolfx = new ToolFX();
 
 let save = store.load();
 audio.setSoundEnabled(save.settings.sound);
@@ -49,7 +51,7 @@ const G = {
   plan: null,
   onStepDone,
   spawnNow: (type) => placePimple(type),
-  tool: 'finger',        // finger | extractor | needle | tweezers | pad
+  tool: 'finger',        // finger | extractor | needle | tweezers | pad | spray | patch
 };
 
 function freshStats() {
@@ -475,7 +477,15 @@ canvas.addEventListener('pointerdown', (e) => {
   if (G.mode === 'demo' || G.paused || G.ended) return;
   try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   const x = e.clientX, y = e.clientY;
-  if (G.sup.down(x, y)) return idle(e.pointerId, x, y);   // tapped a bottle, pack, jar or the bin
+  const hit = G.sup.down(x, y, e.pointerId);   // a bottle, pack, jar, the bin, or a close-up
+  if (hit === 'grab') {
+    // pulled out a fresh wipe/pad: this finger carries on wiping with it
+    G.sup.hand = { x, y };
+    if (G.treat && G.treat.active) { pointers.set(e.pointerId, { kind: 'treat', x, y }); G.treat.holding++; }
+    else pointers.set(e.pointerId, { kind: 'wipe', x, y, big: true });
+    return;
+  }
+  if (hit) return idle(e.pointerId, x, y);
   if (G.treat && G.treat.active) {
     pointers.set(e.pointerId, { kind: 'treat', x, y });
     G.treat.down(x, y);
@@ -504,7 +514,10 @@ function toolDown(id, x, y) {
     wipeAt(x, y, 0, true);
     return;
   }
+  if (tool === 'spray') { spray(x, y); return idle(id, x, y); }
+  if (tool === 'patch') { patchAt(x, y); return idle(id, x, y); }
   if (tool === 'needle') {
+    toolfx.stab(x, y);
     if (p) hint(p, p.T.hair ? 'use the tweezers' : p.lance(G) ? 'lanced — now squeeze' : 'already open');
     return idle(id, x, y);
   }
@@ -537,6 +550,41 @@ function toolDown(id, x, y) {
   if (tryPinch(id, x, y)) return;
   pointers.set(id, { kind: 'wipe', x, y });
   wipeAt(x, y, 0);
+}
+
+// ---- aftercare tools
+function spray(x, y) {
+  toolfx.mist(x, y);
+  audio.spritz();
+  buzz('light');
+  let n = 0;
+  for (const p of G.pimples) {
+    if (p.state !== 'done' || p.sanitized || Math.hypot(p.x - x, p.y - y) > 80) continue;
+    p.sanitized = true;
+    p.heal = Math.max(p.heal, 0.45);     // calms the redness right down
+    G.score += 20;
+    G.fx.text(p.x, p.y - p.r * 2 - n * 18, 'disinfected +20', '#bfe9ff', 15);
+    n++;
+  }
+  if (n) audio.plip();
+}
+
+function patchAt(x, y) {
+  let best = null, bestD = Infinity;
+  for (const p of G.pimples) {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d < p.r * 1.3 + 26 && d < bestD) { best = p; bestD = d; }
+  }
+  if (!best) return;
+  if (best.state !== 'done') return hint(best, 'pop it first');
+  if (best.patch) return hint(best, 'already patched');
+  const shapes = ['dot', 'heart', 'star'];
+  best.patch = { shape: shapes[Math.floor(Math.random() * 3)], rot: (Math.random() - 0.5) * 0.7, born: best.time };
+  const pts = best.sanitized ? 50 : 30;
+  G.score += pts;
+  G.fx.text(best.x, best.y - best.r * 2.2, best.sanitized ? `clean & patched +${pts}` : `patched +${pts}`, '#ffd6e6', 16);
+  audio.cap();
+  buzz('medium');
 }
 
 // ---- two-finger squeeze
@@ -605,6 +653,7 @@ function endPointer(e) {
   if (!ptr) return;
   pointers.delete(e.pointerId);
   if (ptr.kind === 'treat') G.treat?.up();
+  if ((ptr.kind === 'treat' || (ptr.kind === 'wipe' && ptr.big)) && G.sup.dropAt(ptr.x, ptr.y)) { /* dropped it in the bin */ }
   if (ptr.kind === 'treat' || ptr.kind === 'wipe') G.sup.hand = null;
   if (ptr.kind === 'ear') G.ear?.up(e.pointerId);
   if (ptr.kind === 'pinch') {
@@ -622,6 +671,9 @@ function endPointer(e) {
     checkLevelDone();
   }
 }
+// the supplies' close-ups track the finger directly
+canvas.addEventListener('pointermove', (e) => G.sup?.move(e.pointerId, e.clientX, e.clientY));
+for (const t of ['pointerup', 'pointercancel']) canvas.addEventListener(t, (e) => G.sup?.up(e.pointerId));
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('lostpointercapture', endPointer);
@@ -648,7 +700,7 @@ function wipeAt(x, y, speed, big = false) {
     G.sup.hand = { x, y };
     const k = 1 + 0.2 * up('pad');
     cleaned = G.fx.wipe(x, y, 44 * k * G.scale, 0.45);
-    pad.dirt = Math.min(1, pad.dirt + cleaned / (G.fx.messMade * 0.34 * k + 2));   // ~3 pads per face
+    pad.dirt = Math.min(1, pad.dirt + cleaned / Math.max(45 * k, G.fx.messMade * 0.34 * k));   // ~3 pads per face
   } else if (G.mode === 'ear') {
     G.fx.addTrail(x, y, 26);
     cleaned = G.fx.wipe(x, y, 22 * G.scale, 0.22);
@@ -717,6 +769,7 @@ function update(dt) {
   if (G.ear) G.ear.update(dt);
   G.sup.sync();
   G.sup.update(dt);
+  toolfx.update(dt);
   if (G.treat) { G.treat.update(dt); G.treat.updatePuffs(dt); }
   G.fx.update(dt);
   G.shake *= Math.pow(0.001, dt);
@@ -738,13 +791,16 @@ function render() {
   // healed/done pimples first so active ones draw on top
   for (const p of G.pimples) if (p.state === 'done') p.draw(ctx, G.time);
   G.fx.drawSplats(ctx);
+  for (const p of G.pimples) p.drawPatch(ctx);
   for (const p of G.pimples) if (p.state !== 'done') p.draw(ctx, G.time);
   for (const p of G.pimples) p.drawRing(ctx, G.time);
   if (G.ear) G.ear.drawChunks(ctx);
   if (G.treat) G.treat.draw(ctx);
   G.sup.draw(ctx);
+  toolfx.draw(ctx, pointers);
   G.fx.drawAir(ctx);
   ctx.restore();
+  G.sup.drawCloseup(ctx);
 }
 
 // ---------------------------------------------------------------- HUD & screens

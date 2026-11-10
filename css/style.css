@@ -140,8 +140,8 @@ button {
   bottom: calc(var(--safe-bottom) + 10px);
   transform: translateX(-50%);
   display: flex;
-  gap: 6px;
-  padding: 6px;
+  gap: 3px;
+  padding: 5px;
   border-radius: 22px;
   background: rgba(40, 18, 28, 0.6);
   backdrop-filter: blur(10px);
@@ -149,8 +149,8 @@ button {
   z-index: 5;
 }
 .tool {
-  width: 62px;
-  height: 58px;
+  width: 48px;
+  height: 56px;
   border-radius: 16px;
   background: transparent;
   color: var(--muted);
@@ -159,10 +159,11 @@ button {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  font-size: 10.5px;
+  font-size: 9px;
   font-weight: 700;
+  letter-spacing: -0.2px;
 }
-.tool svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.tool svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .tool .ico { font-size: 22px; line-height: 26px; }
 .tool.active { background: var(--accent); color: #fff; box-shadow: 0 4px 12px rgba(255, 111, 145, 0.45); }
 
