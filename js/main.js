@@ -1,6 +1,7 @@
 import { Pimple, TYPES } from './pimple.js';
 import { FX } from './fx.js';
 import { Ear } from './ear.js';
+import { Treatment } from './steps.js';
 import { SKIN_TONES, renderSkin } from './skin.js';
 import * as audio from './audio.js';
 import { buzz, setHapticsEnabled } from './haptics.js';
@@ -37,6 +38,10 @@ const G = {
   // callbacks used by pimples
   onPop, onDrain, onFinish, onEarPull,
   ear: null,
+  treat: null,           // spa steps (lather, rinse, steam, soothe) when enabled
+  plan: null,
+  onStepDone,
+  spawnNow: (type) => placePimple(type),
   tool: 'finger',        // finger | extractor | needle | tweezers | pad
 };
 
@@ -135,6 +140,7 @@ function newScene(seed) {
   G.spawnQueue = [];
   G.time = 0;
   G.ear = null;
+  G.treat = null;
 }
 
 function startLevel(n) {
@@ -146,12 +152,76 @@ function startLevel(n) {
   G.paused = false;
   newScene(n * 7919 + 13);
   const plan = levelPlan(n);
-  plan.types.forEach((t, i) => G.spawnQueue.push({ t: 0.25 + i * 0.12, type: t }));
-  plan.later.forEach((t, i) => G.spawnQueue.push({ t: 6 + i * 4 + Math.random() * 2, type: t, breakout: true }));
+  G.plan = plan;
+  if (save.settings.steps) {
+    // full treatment: wash first, the pimples come up during the steam
+    G.treat = new Treatment(G);
+    G.treat.start('lather');
+    addDirt();
+  } else {
+    plan.types.forEach((t, i) => G.spawnQueue.push({ t: 0.25 + i * 0.12, type: t }));
+    queueBreakouts();
+  }
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
-  toast(n === 1 ? 'Hold a pimple — or pinch it with 2 fingers 🤏' : n === 2 ? 'Blackheads: try the Loop tool' : n === 3 ? 'Cysts are deep — Needle them first' : n === 4 ? 'Ingrown hairs: pull with Tweezers' : `Patient #${n}`, 2800);
+  if (G.treat) toast('Step 1: Lather up — rub all over the face 🫧', 3000);
+  else toast(toolHint(n), 2800);
+}
+
+const toolHint = (n) => (n === 1 ? 'Hold a pimple — or pinch it with 2 fingers 🤏' : n === 2 ? 'Blackheads: try the Loop tool' : n === 3 ? 'Cysts are deep — Needle them first' : n === 4 ? 'Ingrown hairs: pull with Tweezers' : `Patient #${n}`);
+
+function queueBreakouts() {
+  G.plan.later.forEach((t, i) => G.spawnQueue.push({ t: G.time + 6 + i * 4 + Math.random() * 2, type: t, breakout: true }));
+}
+
+// grime to wash off in the first step
+function addDirt() {
+  for (let i = 0; i < 18; i++) {
+    const r = (8 + Math.random() * 16) * G.scale;
+    G.fx.addSplat({
+      kind: 'drop', x: 20 + Math.random() * (G.W - 40), y: playTop() + Math.random() * (G.H - playTop() - 40),
+      rx: r * (1 + Math.random()), ry: r, rot: Math.random() * 3, bx: r * 2,
+      color: Math.random() < 0.6 ? '#6f5340' : '#3d3a37', alpha: 0.35 + Math.random() * 0.25, mass: 1,
+    });
+  }
+}
+
+const STEP_BONUS = 100;
+function onStepDone(phase) {
+  G.score += STEP_BONUS;
+  G.fx.text(G.W / 2, G.H * 0.4, `step done! +${STEP_BONUS}`, '#8dffa8', 22);
+  G.fx.sparkleBurst(G.W / 2, G.H * 0.4, 12);
+  audio.perfect();
+  buzz('medium');
+  if (phase === 'lather') {
+    G.treat.start('rinse');
+    toast('Now rinse — swipe the foam away 💦', 2600);
+  } else if (phase === 'rinse') {
+    G.fx.reset();
+    G.treat.start('steam');
+    toast('Step 2: Steam — press and hold to open the pores ♨️', 3000);
+  } else if (phase === 'steam') {
+    G.treat.start('pop');
+    queueBreakouts();
+    refreshTools();
+    toast(`Step 3: Pop! ${toolHint(G.level)}`, 3000);
+  } else if (phase === 'soothe') {
+    toast('Glowing ✨', 1500);
+    setTimeout(endLevel, 1000);
+  }
+}
+
+// after the popping (and wiping): on to the soothing gel, or straight to results
+function afterWipe() {
+  if (!G.treat) return endLevel();
+  if (G.treat.phase === 'soothe' || G.ended) return;
+  $('btn-finish').classList.add('hidden');
+  releaseAll();
+  G.cleanAtWipe = G.fx.cleanliness();
+  G.treat.start('soothe');
+  refreshTools();
+  toast('Step 5: Soothe — spread the cooling gel 🌿', 3000);
 }
 
 function startZen() {
@@ -192,6 +262,7 @@ function onEarPull() {
   if (G.fx.cleanliness() >= 0.985) {
     setTimeout(endEar, 900);
   } else {
+    $('btn-finish').textContent = 'All done ✨ Finish';
     $('btn-finish').classList.remove('hidden');
     toast('All out! Swipe to wipe up the flakes ✨', 2600);
   }
@@ -290,10 +361,11 @@ function checkLevelDone() {
   if (G.pimples.every((p) => p.state === 'done')) {
     G.allDone = true;
     if (G.fx.cleanliness() >= 0.985) {
-      setTimeout(endLevel, 900);
+      setTimeout(afterWipe, 900);
     } else {
+      $('btn-finish').textContent = G.treat ? 'Next step →' : 'All done ✨ Finish';
       $('btn-finish').classList.remove('hidden');
-      toast('All popped! Swipe to wipe up for a bonus ✨', 2600);
+      toast(G.treat ? 'Step 4: Wipe up the mess ✨' : 'All popped! Swipe to wipe up for a bonus ✨', 2600);
     }
   }
 }
@@ -303,7 +375,7 @@ function endLevel() {
   G.ended = true;
   $('btn-finish').classList.add('hidden');
   const s = G.stats;
-  const clean = G.fx.cleanliness();
+  const clean = G.treat ? (G.cleanAtWipe ?? 1) : G.fx.cleanliness();
   const cleanBonus = Math.round(clean * 300);
   G.score += cleanBonus;
   const perfectRatio = s.total ? s.perfects / s.total : 0;
@@ -351,6 +423,11 @@ canvas.addEventListener('pointerdown', (e) => {
   if (G.mode === 'demo' || G.paused || G.ended) return;
   try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   const x = e.clientX, y = e.clientY;
+  if (G.treat && G.treat.active) {
+    pointers.set(e.pointerId, { kind: 'treat', x, y });
+    G.treat.down(x, y);
+    return;
+  }
   if (G.mode === 'ear') {
     if (G.ear.down(e.pointerId, x, y)) {
       pointers.set(e.pointerId, { kind: 'ear', x, y });
@@ -458,6 +535,7 @@ canvas.addEventListener('pointermove', (e) => {
   const x = e.clientX, y = e.clientY;
   if (ptr.kind === 'pinch') { ptr.x = x; ptr.y = y; updatePinch(ptr.pin); return; }
   if (ptr.kind === 'tweeze') { ptr.p.fx = x; ptr.p.fy = y; }
+  if (ptr.kind === 'treat') G.treat?.move(ptr.x, ptr.y, x, y);
   if (ptr.kind === 'ear') G.ear?.move(e.pointerId, x, y);
   if (ptr.kind === 'wipe') {
     const dist = Math.hypot(x - ptr.x, y - ptr.y);
@@ -473,6 +551,7 @@ function endPointer(e) {
   const ptr = pointers.get(e.pointerId);
   if (!ptr) return;
   pointers.delete(e.pointerId);
+  if (ptr.kind === 'treat') G.treat?.up();
   if (ptr.kind === 'ear') G.ear?.up(e.pointerId);
   if (ptr.kind === 'pinch') {
     const pin = ptr.pin;
@@ -501,6 +580,7 @@ function releaseAll() {
   }
   pointers.clear();
   if (G.ear) G.ear.releaseAll();
+  if (G.treat) G.treat.holding = 0;
   audio.oozeStop();
 }
 
@@ -511,10 +591,10 @@ function wipeAt(x, y, speed, big = false) {
     audio.wipe(Math.min(1, speed / 40));
     if (Math.random() < 0.3) buzz('light');
   }
-  if (G.allDone && !G.ended && G.fx.cleanliness() >= 0.985) {
+  if (G.allDone && !G.ended && G.fx.cleanliness() >= (G.treat ? 0.92 : 0.985)) {
     G.fx.sparkleBurst(x, y, 14);
     audio.sparkle();
-    (G.mode === 'ear' ? endEar : endLevel)();
+    (G.mode === 'ear' ? endEar : afterWipe)();
   }
 }
 
@@ -564,6 +644,7 @@ function update(dt) {
 
   for (const p of G.pimples) p.update(dt, G);
   if (G.ear) G.ear.update(dt);
+  if (G.treat) { G.treat.update(dt); G.treat.updatePuffs(dt); }
   G.fx.update(dt);
   G.shake *= Math.pow(0.001, dt);
   if (G.shake < 0.2) G.shake = 0;
@@ -586,6 +667,7 @@ function render() {
   for (const p of G.pimples) if (p.state !== 'done') p.draw(ctx, G.time);
   for (const p of G.pimples) p.drawRing(ctx, G.time);
   if (G.ear) G.ear.drawChunks(ctx);
+  if (G.treat) G.treat.draw(ctx);
   G.fx.drawAir(ctx);
   ctx.restore();
 }
@@ -602,7 +684,15 @@ function updateHud() {
   if (G.mode === 'level') {
     setText('hud-title', `Level ${G.level}`);
     const left = G.pimples.filter((p) => p.state !== 'done').length + G.spawnQueue.length;
-    setText('hud-sub', G.allDone ? `${Math.round(G.fx.cleanliness() * 100)}% clean` : `${left} left`);
+    if (G.treat) {
+      const t = G.treat, pct = `${Math.round(t.progress * 100)}%`;
+      const label = t.phase === 'lather' ? `1/5 Lather ${pct}` : t.phase === 'rinse' ? `1/5 Rinse ${pct}`
+        : t.phase === 'steam' ? `2/5 Steam ${pct}` : t.phase === 'soothe' ? `5/5 Soothe ${pct}`
+        : G.allDone ? `4/5 Wipe ${Math.round(G.fx.cleanliness() * 100)}%` : `3/5 Pop · ${left} left`;
+      setText('hud-sub', label);
+    } else {
+      setText('hud-sub', G.allDone ? `${Math.round(G.fx.cleanliness() * 100)}% clean` : `${left} left`);
+    }
   } else if (G.mode === 'ear') {
     setText('hud-title', `Ear ${G.level}`);
     setText('hud-sub', G.allDone ? `${Math.round(G.fx.cleanliness() * 100)}% clean` : `${G.ear.left} left`);
@@ -630,11 +720,16 @@ let screenReturn = 'menu';
 function showScreen(name) {
   currentScreen = name;
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== name);
-  $('tools').classList.toggle('hidden', !(name === null && (G.mode === 'level' || G.mode === 'zen')));
+  refreshTools();
   if (name === 'menu') {
     $('play-level').textContent = `Level ${save.level}`;
     $('ear-level').textContent = `Level ${save.earLevel}`;
   }
+}
+
+function refreshTools() {
+  const show = currentScreen === null && (G.mode === 'level' || G.mode === 'zen') && !(G.treat && G.treat.active);
+  $('tools').classList.toggle('hidden', !show);
 }
 
 function pause() {
@@ -669,6 +764,7 @@ function renderStats() {
 function renderSettings() {
   $('set-sound').checked = save.settings.sound;
   $('set-haptics').checked = save.settings.haptics;
+  $('set-steps').checked = save.settings.steps;
   const wrap = $('skin-tones');
   wrap.innerHTML = '';
   SKIN_TONES.forEach((t, i) => {
@@ -714,7 +810,7 @@ on('btn-restart', () => (G.mode === 'zen' ? startZen() : G.mode === 'ear' ? star
 on('btn-quit', () => goMenu());
 on('btn-next', () => (G.mode === 'ear' ? startEar(save.earLevel) : startLevel(save.level)));
 on('btn-res-menu', () => goMenu());
-on('btn-finish', () => (G.mode === 'ear' ? endEar : endLevel)());
+on('btn-finish', () => (G.mode === 'ear' ? endEar : afterWipe)());
 document.querySelectorAll('.back').forEach((b) => b.addEventListener('click', () => {
   audio.click();
   showScreen(currentScreen === 'howto' ? screenReturn : 'menu');
@@ -723,6 +819,10 @@ document.querySelectorAll('.back').forEach((b) => b.addEventListener('click', ()
 $('set-sound').addEventListener('change', (e) => {
   save.settings.sound = e.target.checked;
   audio.setSoundEnabled(save.settings.sound);
+  store.save(save);
+});
+$('set-steps').addEventListener('change', (e) => {
+  save.settings.steps = e.target.checked;
   store.save(save);
 });
 $('set-haptics').addEventListener('change', (e) => {

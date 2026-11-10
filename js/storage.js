@@ -15,7 +15,7 @@ const DEFAULTS = {
   earsCleaned: 0,
   earStars: {},
   stars: {},        // level -> best stars
-  settings: { sound: true, haptics: true, skin: 1 },
+  settings: { sound: true, haptics: true, skin: 1, steps: true },
 };
 
 export function load() {
