@@ -90,7 +90,7 @@ export class Treatment {
 
   // ---- input ----
   down(x, y) { this.holding++; this.fresh = false; this.apply(x, y); }
-  up() { this.holding = Math.max(0, this.holding - 1); }
+  up() { this.holding = Math.max(0, this.holding - 1); if (!this.holding) audio.loop('steam', false); }
   move(x0, y0, x1, y1) {
     const d = Math.hypot(x1 - x0, y1 - y0);
     const steps = Math.max(1, Math.ceil(d / 12));
@@ -106,7 +106,7 @@ export class Treatment {
       if (!sup.ready('soap')) { sup.nag('soap', 'open the cleanser & pump it'); return; }
       const d = sup.hitDollops(x, y);
       this.paint(this.foam, x, y, (d ? 70 : 38) * s, d ? 1 : 0.5);
-      audio.squish(0.2 + Math.random() * 0.3);
+      audio.scrub();
       if (Math.random() < 0.15) audio.bloop();
     } else if (this.phase === 'rinse') {
       const c = sup.useCloth('wipes');
@@ -159,7 +159,7 @@ export class Treatment {
       if (this.holding > 0 && !G.sup.ready('steamer')) G.sup.nag('steamer', 'switch the steamer on');
       if (this.holding > 0 && G.sup.ready('steamer')) {
         this.progress += dt / 3.2 * (G.spaMult || 1);
-        audio.wipe(0.1);
+        audio.loop('steam', true);
         if (Math.random() < dt * 4) buzz('light');
         for (let k = 0; k < 2; k++) {
           if (Math.random() < dt * 14) {
@@ -282,7 +282,7 @@ export class Treatment {
     if ((this.phase === 'lather' || this.phase === 'soothe' || this.phase === 'mask') && this.progress > 0.5 && !this.done) {
       const arr = this.phase === 'lather' ? foam : gel;
       const p = 0.5 + 0.5 * Math.sin(this.time * 6);
-      ctx.strokeStyle = `rgba(255,79,154,${0.45 + p * 0.45})`;
+      ctx.strokeStyle = `rgba(123,97,255,${0.45 + p * 0.45})`;
       ctx.fillStyle = `rgba(255,255,255,${0.18 + p * 0.2})`;
       ctx.lineWidth = 2;
       ctx.beginPath();

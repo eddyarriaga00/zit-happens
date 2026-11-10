@@ -649,7 +649,7 @@ export class Pimple {
       for (const d of [-1, 1]) {
         const fx = x + d * (R + 16 - bob);
         ctx.fillStyle = `rgba(255,255,255,${0.38 * a})`;
-        ctx.strokeStyle = `rgba(255,79,154,${0.9 * a})`;
+        ctx.strokeStyle = `rgba(123,97,255,${0.9 * a})`;
         ctx.beginPath(); ctx.arc(fx, y, 19, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(fx - d * 2 + d * 6, y - 7); ctx.lineTo(fx - d * 6, y); ctx.lineTo(fx - d * 2 + d * 6, y + 7); ctx.stroke();

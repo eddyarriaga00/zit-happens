@@ -285,7 +285,7 @@ export class Supplies {
       ctx.save();
       ctx.translate(it.x, it.y);
       // tray plate
-      ctx.fillStyle = 'rgba(255,120,178,0.62)';
+      ctx.fillStyle = 'rgba(60,50,95,0.5)';
       ctx.beginPath();
       ctx.arc(0, 0, 42, 0, Math.PI * 2);
       ctx.fill();
@@ -352,7 +352,7 @@ export class Supplies {
     const out = c.done ? clamp01((c.done - 0.3) / 0.25) : 0;
     const e = (1 - Math.pow(1 - c.t, 3)) * (1 - out);
     const cx = G.W / 2, cy = G.H * 0.46;
-    ctx.fillStyle = `rgba(120,20,70,${0.72 * e})`;
+    ctx.fillStyle = `rgba(30,24,60,${0.72 * e})`;
     ctx.fillRect(0, 0, G.W, G.H);
     ctx.save();
     ctx.translate(lerp(c.it.x, cx, e), lerp(c.it.y, cy, e));
@@ -434,13 +434,13 @@ export class Supplies {
   // Containers take p = how far open (0 shut .. 1 open), so the close-up can
   // show the lid, seal or cap moving under your finger.
   draw_soap(ctx, it, p) {
-    ctx.fillStyle = '#ffa9cd';
+    ctx.fillStyle = '#9fd4f5';
     rr(ctx, -17, -14, 34, 44, 9); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     rr(ctx, -12, -8, 7, 30, 4); ctx.fill();
     ctx.fillStyle = '#ffffff';
     rr(ctx, -11, 2, 22, 16, 4); ctx.fill();
-    ctx.fillStyle = '#ff4f9a';
+    ctx.fillStyle = '#4a90d9';
     ctx.beginPath(); ctx.arc(0, 10, 4, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#e9f4fb';
     rr(ctx, -6, -22, 12, 9, 2); ctx.fill();
@@ -483,7 +483,7 @@ export class Supplies {
     rr(ctx, -22, -8, 44, 34, 9); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     rr(ctx, -17, -3, 6, 22, 3); ctx.fill();
-    ctx.fillStyle = '#ff8fc0';
+    ctx.fillStyle = '#2ec4b6';
     rr(ctx, -12, 4, 24, 12, 4); ctx.fill();
     if (p > 0) {                                   // the goo inside
       ctx.fillStyle = '#1d1d24';
@@ -504,11 +504,11 @@ export class Supplies {
   }
 
   draw_wipes(ctx, it, p) {
-    ctx.fillStyle = '#ff9ec4';
+    ctx.fillStyle = '#58c7c2';
     rr(ctx, -30, -18, 60, 40, 9); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     rr(ctx, -30, -18, 60, 9, 5); ctx.fill();
-    ctx.fillStyle = '#d8438a';
+    ctx.fillStyle = '#2f8f8a';
     rr(ctx, -15, -6, 30, 14, 6); ctx.fill();          // the opening
     if (p > 0.4) {
       ctx.globalAlpha *= clamp01((p - 0.4) / 0.4);
@@ -520,10 +520,10 @@ export class Supplies {
     }
     // sticky seal peeling off to the right
     const fx = lerp(-18, 14, p), fw = lerp(36, 9, p);
-    ctx.fillStyle = '#fff0f6';
+    ctx.fillStyle = '#e8fffd';
     rr(ctx, fx, -9, fw, 20, 5); ctx.fill();
     if (p > 0.02 && p < 1) {
-      ctx.fillStyle = '#ffc9de';
+      ctx.fillStyle = '#bfeeea';
       ctx.beginPath(); ctx.ellipse(fx, 1, 4, 10, 0, 0, Math.PI * 2); ctx.fill();   // curled edge
     }
   }
@@ -540,19 +540,19 @@ export class Supplies {
     for (let i = 0; i < 4; i++) {
       ctx.beginPath(); ctx.ellipse(0, 20 - i * 9, 17, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
-    ctx.fillStyle = '#f0b8c8';
+    ctx.fillStyle = '#c9b8f5';
     if (p >= 1) { rr(ctx, 12, 20, 26, 8, 4); ctx.fill(); return; }   // lid set down beside it
     ctx.save();
     ctx.translate(12 * p, -34 * p);
     ctx.rotate(0.45 * p);
     rr(ctx, -24, -26, 48, 11, 5); ctx.fill();
-    ctx.fillStyle = '#e0709a';
+    ctx.fillStyle = '#7b61ff';
     ctx.beginPath(); ctx.arc(0, -29, 5, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
   draw_bin(ctx, it) {
-    ctx.fillStyle = '#e89bbd';
+    ctx.fillStyle = '#8b93a1';
     ctx.beginPath();
     ctx.moveTo(-19, -12); ctx.lineTo(19, -12); ctx.lineTo(14, 26); ctx.lineTo(-14, 26);
     ctx.closePath(); ctx.fill();
@@ -563,7 +563,7 @@ export class Supplies {
     ctx.save();
     ctx.translate(0, -15);
     ctx.rotate(-Math.sin(it.bounce * Math.PI) * 0.5);
-    ctx.fillStyle = '#f6bfd6';
+    ctx.fillStyle = '#aab2c0';
     rr(ctx, -23, -5, 46, 8, 4); ctx.fill();
     ctx.restore();
   }
@@ -592,7 +592,7 @@ export class Supplies {
 
   /** "tap to open" badge */
   lock(ctx) {
-    ctx.fillStyle = '#ff4f9a';
+    ctx.fillStyle = '#7b61ff';
     rr(ctx, -22, 30, 44, 15, 7); ctx.fill();
     ctx.fillStyle = '#ffffff';
     ctx.font = '800 9.5px ui-rounded, -apple-system, system-ui, sans-serif';

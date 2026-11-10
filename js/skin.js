@@ -325,7 +325,7 @@ function drawZone(x, w, h, zone, tone, look, R) {
     // the room behind, the curve of the shoulder, a top strap
     const cx = w * 0.25, cy = h * 1.05, rad = h * 0.95;
     const wall = x.createLinearGradient(0, 0, w, h * 0.6);
-    wall.addColorStop(0, '#f6d3e2'); wall.addColorStop(1, '#e9b3cc');
+    wall.addColorStop(0, '#e6ecf5'); wall.addColorStop(1, '#c9d3e6');
     x.fillStyle = wall;
     x.beginPath(); x.rect(0, 0, w, h); x.arc(cx, cy, rad, 0, Math.PI * 2, true); x.fill('evenodd');
     x.save();

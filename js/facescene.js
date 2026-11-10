@@ -63,15 +63,18 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
 
   // ---- the room behind
   const wall = x.createLinearGradient(0, 0, w, h);
-  wall.addColorStop(0, (look.wall && look.wall[0]) || '#f4e9ee'); wall.addColorStop(1, (look.wall && look.wall[1]) || '#dcc5d3');
+  wall.addColorStop(0, (look.wall && look.wall[0]) || '#eef1f6'); wall.addColorStop(1, (look.wall && look.wall[1]) || '#cfd6e4');
   x.fillStyle = wall; x.fillRect(0, 0, w, h);
   soft(w * 0.2, h * 0.2, w * 0.5, h * 0.3, 'rgba(255,255,255,0.5)');
+  if (look.backdrop) look.backdrop(x, w, h);     // e.g. the hair salon's mirror
+  else {
   // an out-of-focus room: window light, a shelf, a few soft glints
   x.fillStyle = 'rgba(255,255,255,0.35)';
   x.beginPath(); x.roundRect(w * 0.02, h * 0.1, w * 0.2, h * 0.34, 14); x.fill();
   x.fillStyle = 'rgba(150,110,130,0.18)';
   x.fillRect(w * 0.7, h * 0.3, w * 0.32, h * 0.012);
-  for (let i = 0; i < 9; i++) soft(R() * w, R() * h * 0.6, 10 + R() * 26, 10 + R() * 26, `rgba(255,${200 + Math.floor(R() * 55)},${215 + Math.floor(R() * 40)},0.22)`);
+  for (let i = 0; i < 9; i++) soft(R() * w, R() * h * 0.6, 10 + R() * 26, 10 + R() * 26, `rgba(255,${235 + Math.floor(R() * 20)},${225 + Math.floor(R() * 30)},0.22)`);
+  }
 
   // ---- hair behind the head
   if (style === 'long' || style === 'curly') {
@@ -388,7 +391,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   soft(cx, my - hh * 0.062, hw * 0.05, hh * 0.012, 'rgba(255,255,255,0.4)');             // cupid's bow catches the light
   // the room falls away into soft shadow at the edges
   const vg = x.createRadialGradient(cx, cy, Math.min(w, h) * 0.45, cx, cy, Math.max(w, h) * 0.8);
-  vg.addColorStop(0, 'rgba(40,10,25,0)'); vg.addColorStop(1, 'rgba(40,10,25,0.3)');
+  vg.addColorStop(0, 'rgba(20,18,40,0)'); vg.addColorStop(1, 'rgba(20,18,40,0.3)');
   x.fillStyle = vg; x.fillRect(0, 0, w, h);
 
   // ---- where things are, for the game

@@ -4,7 +4,7 @@
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
 
-export const LIP_SHADES = ['#c2185b', '#e53935', '#d81b60', '#ff7043', '#8e244d', '#b56576', '#6d1b3b', '#ff4f9a'];
+export const LIP_SHADES = ['#c2185b', '#e53935', '#d81b60', '#ff7043', '#8e244d', '#b56576', '#6d1b3b', '#7b61ff'];
 export const BLUSH_SHADES = ['#ff8fa3', '#ffab91', '#f48fb1', '#e57373'];
 export const SHADOW_SHADES = ['#8e6bbf', '#b08968', '#4f8fbf', '#e0a3c8', '#5f7a61', '#c9a227'];
 
@@ -233,7 +233,7 @@ export class Haircut {
         ctx.rotate(d * open);
         ctx.strokeStyle = '#d7dbe2'; ctx.lineWidth = 4;
         ctx.beginPath(); ctx.moveTo(-34, 0); ctx.lineTo(26, 0); ctx.stroke();
-        ctx.strokeStyle = '#ff4f9a'; ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#7b61ff'; ctx.lineWidth = 3.5;
         ctx.beginPath(); ctx.arc(34, d * 7, 8, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
       }

@@ -94,7 +94,7 @@ export class ToolFX {
     ctx.strokeStyle = '#d9dee6';
     ctx.lineWidth = 2.2;
     ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + ux * 60, ty + uy * 60); ctx.stroke();
-    ctx.strokeStyle = '#ff8fb0';
+    ctx.strokeStyle = '#7b61ff';
     ctx.lineWidth = 9;
     ctx.beginPath(); ctx.moveTo(tx + ux * 60, ty + uy * 60); ctx.lineTo(tx + ux * 104, ty + uy * 104); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,0.5)';
@@ -116,7 +116,7 @@ export class ToolFX {
       ctx.moveTo(-2, o); ctx.lineTo(34, 9 + o); ctx.lineTo(92, 4 + o);
       ctx.stroke();
     }
-    ctx.fillStyle = '#ff8fb0';
+    ctx.fillStyle = '#7b61ff';
     ctx.beginPath(); ctx.roundRect(84, -8, 22, 16, 6); ctx.fill();
     ctx.restore();
   }
@@ -127,14 +127,14 @@ export class ToolFX {
     ctx.rotate(0.5);
     ctx.fillStyle = 'rgba(40,20,20,0.25)';
     ctx.beginPath(); ctx.roundRect(-11, -4, 26, 42, 8); ctx.fill();
-    ctx.fillStyle = '#ffc2dc';
+    ctx.fillStyle = '#bfe9ff';
     ctx.beginPath(); ctx.roundRect(-13, -8, 26, 42, 8); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.beginPath(); ctx.roundRect(-9, -2, 6, 28, 3); ctx.fill();
     ctx.fillStyle = '#ffffff';
     ctx.beginPath(); ctx.roundRect(-7, -18, 14, 11, 3); ctx.fill();
     ctx.beginPath(); ctx.roundRect(-22, -24, 24, 8, 3); ctx.fill();
-    ctx.fillStyle = '#ff8fb0';
+    ctx.fillStyle = '#7b61ff';
     ctx.beginPath(); ctx.roundRect(2, squeezing ? -16 : -13, 9, 6, 2); ctx.fill();
     ctx.restore();
   }

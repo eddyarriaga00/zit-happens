@@ -27,8 +27,8 @@ def smooth(edge0, edge1, x):
     return t * t * (3 - 2 * t)
 
 
-BG_TOP = hexc("#ffa3b8")
-BG_BOT = hexc("#e85a80")
+BG_TOP = hexc("#ffcfae")
+BG_BOT = hexc("#7b61ff")
 SKIN = hexc("#ffd9c2")
 SKIN_SHADE = hexc("#f2b196")
 INK = hexc("#4a2430")

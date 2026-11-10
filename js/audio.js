@@ -22,6 +22,18 @@ export function unlock() {
     master.gain.value = enabled ? 0.9 : 0;
     const comp = ctx.createDynamicsCompressor();
     master.connect(comp).connect(ctx.destination);
+    // a little room reverb makes every pop and squish feel closer and wetter
+    const len = Math.floor(ctx.sampleRate * 1.1);
+    const impulse = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+    }
+    const verb = ctx.createConvolver();
+    verb.buffer = impulse;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.22;
+    master.connect(verb).connect(wet).connect(comp);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -76,12 +88,14 @@ export function squish(p) {
 export function pop(size = 1) {
   if (!ready()) return;
   const t = ctx.currentTime;
-  tone(t, 0.12, { freq: 260 / size + 80, freqEnd: 60, gain: 0.55, type: 'sine' });
-  noise(t, 0.09, { type: 'highpass', freq: 1800, q: 0.7, gain: 0.5 });
-  noise(t + 0.01, 0.25 + size * 0.1, { type: 'lowpass', freq: 1400, freqEnd: 200, q: 3, gain: 0.45 });
-  // wet splat tail
-  noise(t + 0.04, 0.32, { type: 'bandpass', freq: 700, freqEnd: 160, q: 7, gain: 0.35 });
-  tone(t + 0.05, 0.1, { freq: 150, freqEnd: 420, gain: 0.16 });
+  const v = 0.9 + Math.random() * 0.25;                     // no two pops quite alike
+  noise(t, 0.012, { type: 'highpass', freq: 5000, q: 0.7, gain: 0.35 });           // skin giving way
+  tone(t + 0.004, 0.14, { freq: (260 / size + 80) * v, freqEnd: 55, gain: 0.6, type: 'sine' });   // the thump
+  noise(t + 0.004, 0.09, { type: 'highpass', freq: 1800, q: 0.7, gain: 0.45 });
+  noise(t + 0.015, 0.25 + size * 0.1, { type: 'lowpass', freq: 1400 * v, freqEnd: 200, q: 3, gain: 0.45 });
+  noise(t + 0.045, 0.34, { type: 'bandpass', freq: 700 * v, freqEnd: 160, q: 7, gain: 0.36 });     // wet splat tail
+  tone(t + 0.055, 0.1, { freq: 150, freqEnd: 420 * v, gain: 0.16 });
+  tone(t + 0.12, 0.08, { freq: 300 * v, freqEnd: 700, gain: 0.07 });               // a last little blip
 }
 
 /** Wet squelch loop while pus is coming out. */
@@ -160,11 +174,103 @@ export function pluck() {
   tone(t + 0.03, 0.16, { freq: 150, freqEnd: 70, gain: 0.3 });
 }
 
-export function perfect() {
+/** The reward chime. It climbs a note with each Perfect in a row. */
+export function perfect(streak = 0) {
   if (!ready()) return;
   const t = ctx.currentTime;
-  tone(t, 0.18, { freq: 880, gain: 0.18, type: 'triangle' });
-  tone(t + 0.08, 0.3, { freq: 1320, gain: 0.18, type: 'triangle' });
+  const k = Math.pow(2, Math.min(streak, 10) / 12);
+  tone(t, 0.18, { freq: 880 * k, gain: 0.17, type: 'triangle' });
+  tone(t + 0.08, 0.32, { freq: 1320 * k, gain: 0.17, type: 'triangle' });
+  tone(t + 0.08, 0.5, { freq: 2640 * k, gain: 0.04, type: 'sine' });
+}
+
+// ---- sounds that run for as long as you keep doing something
+const loops = {};
+const LOOPS = {
+  water: { type: 'highpass', freq: 1800, q: 0.6, gain: 0.2, lfo: 11, depth: 500 },
+  dryer: { type: 'bandpass', freq: 520, q: 1.1, gain: 0.26, lfo: 38, depth: 60, hum: 118 },
+  steam: { type: 'highpass', freq: 3600, q: 0.5, gain: 0.12, lfo: 3, depth: 800 },
+};
+/** Turn a running sound ('water', 'dryer', 'steam') on or off. Safe to call every frame. */
+export function loop(name, on) {
+  if (!on) {
+    const n = loops[name];
+    if (!n) return;
+    const t = ctx.currentTime;
+    n.g.gain.cancelScheduledValues(t);
+    n.g.gain.setTargetAtTime(0.0001, t, 0.06);
+    for (const node of n.all) node.stop(t + 0.35);
+    delete loops[name];
+    return;
+  }
+  if (!ready() || loops[name]) return;
+  const o = LOOPS[name], t = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuf; src.loop = true;
+  const f = ctx.createBiquadFilter();
+  f.type = o.type; f.frequency.value = o.freq; f.Q.value = o.q;
+  const lfo = ctx.createOscillator(); lfo.frequency.value = o.lfo;
+  const lg = ctx.createGain(); lg.gain.value = o.depth;
+  lfo.connect(lg).connect(f.frequency);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(o.gain, t + 0.12);
+  src.connect(f).connect(g).connect(master);
+  const all = [src, lfo];
+  if (o.hum) {                       // the motor under the rush of air
+    const hum = ctx.createOscillator(); hum.type = 'sawtooth'; hum.frequency.value = o.hum;
+    const hg = ctx.createGain(); hg.gain.value = 0.05;
+    hum.connect(hg).connect(g);
+    hum.start(); all.push(hum);
+  }
+  src.start(); lfo.start();
+  loops[name] = { g, all };
+}
+export function loopStopAll() { for (const name of Object.keys(loops)) loop(name, false); }
+
+/** Soft foamy scrub. */
+export function scrub() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  if (t - lastSquish < 0.06) return;
+  lastSquish = t;
+  noise(t, 0.09, { type: 'bandpass', freq: 2200 + Math.random() * 1800, q: 1.4, gain: 0.07 });
+  if (Math.random() < 0.3) tone(t, 0.05, { freq: 700 + Math.random() * 900, freqEnd: 1800, gain: 0.03 });
+}
+
+/** A coin dropping in. */
+export function coin() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  tone(t, 0.09, { freq: 1568, gain: 0.14, type: 'square' });
+  tone(t + 0.07, 0.35, { freq: 2093, gain: 0.14, type: 'square' });
+}
+
+/** Cash register: the big payout. */
+export function chaChing() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  noise(t, 0.05, { type: 'highpass', freq: 3000, q: 0.7, gain: 0.25 });
+  tone(t + 0.05, 0.12, { freq: 1175, gain: 0.16, type: 'triangle' });
+  [1568, 2093, 2637].forEach((f, i) => tone(t + 0.16 + i * 0.05, 0.5, { freq: f, gain: 0.13, type: 'triangle' }));
+}
+
+/** Ding-dong: a client walks in. */
+export function doorbell() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  tone(t, 0.7, { freq: 659, gain: 0.2, type: 'sine' });
+  tone(t, 0.7, { freq: 1318, gain: 0.05, type: 'sine' });
+  tone(t + 0.32, 0.9, { freq: 523, gain: 0.2, type: 'sine' });
+  tone(t + 0.32, 0.9, { freq: 1046, gain: 0.05, type: 'sine' });
+}
+
+/** A proud little flourish for an award. */
+export function award() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  [784, 988, 1175, 1568, 1976].forEach((f, i) => tone(t + i * 0.07, 0.45, { freq: f, gain: 0.13, type: 'triangle' }));
+  tone(t + 0.36, 0.9, { freq: 2349, gain: 0.07, type: 'sine' });
 }
 
 export function ouch() {

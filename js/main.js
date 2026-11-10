@@ -3,7 +3,7 @@ import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS
 import { lookFor, portraitURL } from './faces.js';
 import { renderFaceScene, drawLids } from './facescene.js';
 import { Makeup, Haircut, LIP_SHADES } from './salon.js';
-import { HairService, STATIONS, WALLS, salonLevel, salonTitle } from './hairsalon.js';
+import { HairService, STATIONS, WALLS, salonLevel, salonTitle, salonPicture, salonBackdrop } from './hairsalon.js';
 import { FX } from './fx.js';
 import { Ear } from './ear.js';
 import { Treatment } from './steps.js';
@@ -80,7 +80,7 @@ function checkAwards() {
   if (earned.length) store.save(save);
   return earned;
 }
-const awardsHtml = (list) => list.map((a) => `<div class="reward award"><b>🏆 Award: ${a.name}</b><span>${a.desc} · +${a.coins} coins</span></div>`).join('');
+const awardsHtml = (list) => (list.length && setTimeout(() => audio.award(), 1300), list).map((a) => `<div class="reward award"><b>🏆 Award: ${a.name}</b><span>${a.desc} · +${a.coins} coins</span></div>`).join('');
 const awardCount = () => Object.keys(save.awards).length;
 
 const applyPus = () => setPusStyle((PUS_STYLES.find((p) => p.id === save.pus) || PUS_STYLES[0]).color);
@@ -453,7 +453,7 @@ function startSalon(kind) {
     // your salon: its walls follow the Decor level, its stations decide the services
     G.salonLv = save.salon;
     const styles = ['long', 'pony', 'bun', 'curly', 'short'];
-    G.look = { ...G.look, wall: WALLS[save.salon.decor] || WALLS[0], style: styles.includes(G.look.style) ? G.look.style : 'long' };
+    G.look = { ...G.look, wall: WALLS[save.salon.decor] || WALLS[0], backdrop: (cx2, w2, h2) => salonBackdrop(cx2, w2, h2, save.salon), style: styles.includes(G.look.style) ? G.look.style : 'long' };
     paintSkin();
   }
   G.salon = kind === 'makeup' ? new Makeup(G, Math.min(LIP_SHADES.length, 3 + save.makeupDone))
@@ -463,6 +463,7 @@ function startSalon(kind) {
   $('btn-finish').classList.add('hidden');
   if (kind === 'makeup') renderMakeupBar();
   if (kind === 'hair') {
+    audio.doorbell();
     G.say = { text: G.salon.request(), t: 5 };
     toast(G.salon.hint(), 3400);
   } else toast(kind === 'makeup' ? 'Pick a product and a shade, then swipe it on 💄' : 'Swipe across each lock to snip it at the dashed line ✂️', 3400);
@@ -495,6 +496,7 @@ function onSalonStage(sv) {
 function showSalon() {
   const lv = save.salon;
   let html = `<div class="lv-top"><span>${salonTitle(lv)} · level ${salonLevel(lv)}</span><span>🪙 ${save.coins.toLocaleString()}</span></div>
+    <img class="salon-view" alt="Your salon" src="${salonPicture(lv)}">
     <p class="salon-note">${save.salonClients} client${save.salonClients === 1 ? '' : 's'} served. Upgrade stations to offer more and earn bigger tips.</p>`;
   for (const st of STATIONS) {
     const cur = lv[st.id] ?? st.start, max = st.start + st.costs.length, cost = st.costs[cur - st.start];
@@ -546,6 +548,7 @@ function endSalon() {
     const tip = Math.round((40 + sc) * (1 + 0.25 * save.salon.decor) * (happy ? 1.5 : 1));
     save.coins += tip;
     coins += tip;
+    setTimeout(() => audio.chaChing(), 500);
     save.salonClients++;
     save.haircutDone++;
     if (happy) save.salonHappy++;
@@ -610,7 +613,7 @@ function onFinish(p, rating) {
     G.score += pts;
     G.fx.text(p.x, y, `PERFECT! +${pts}`, '#8dffa8', 24);
     G.fx.sparkleBurst(p.x, p.y, 10);
-    audio.perfect();
+    audio.perfect(G.combo);
   } else if (rating === 'nice') {
     G.stats.nices++;
     G.score += 50;
@@ -696,6 +699,7 @@ function endLevel() {
 }
 
 function earnCoins(score, stars) {
+  setTimeout(() => audio.coin(), 900);
   const coins = Math.round((score / 20 + stars * 20) * (1 + 0.15 * up('magnet')));
   save.coins += coins;
   store.save(save);
@@ -829,12 +833,12 @@ function drawSay(ctx) {
   ctx.font = '800 15px ui-rounded, -apple-system, system-ui, sans-serif';
   const tw = ctx.measureText(sy.text).width, bw = tw + 26, bh = 34;
   const bx = G.W - bw - 12, by = playTop() - 4 - (1 - a) * 6;
-  ctx.fillStyle = 'rgba(120,30,70,0.25)';
+  ctx.fillStyle = 'rgba(40,30,80,0.25)';
   ctx.beginPath(); ctx.roundRect(bx + 2, by + 3, bw, bh, 15); ctx.fill();
   ctx.fillStyle = '#ffffff';
   ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 15); ctx.fill();
   ctx.beginPath(); ctx.moveTo(bx + 18, by + bh - 2); ctx.lineTo(bx + 10, by + bh + 12); ctx.lineTo(bx + 34, by + bh - 2); ctx.fill();
-  ctx.fillStyle = '#7a2148';
+  ctx.fillStyle = '#2b2540';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(sy.text, bx + bw / 2, by + bh / 2 + 1);
@@ -987,6 +991,7 @@ function releaseAll() {
     if (ptr.kind === 'tweeze') ptr.p.held = null;
   }
   pointers.clear();
+  audio.loopStopAll();
   if (G.ear) G.ear.releaseAll();
   if (G.treat) G.treat.holding = 0;
   G.sup.hand = null;

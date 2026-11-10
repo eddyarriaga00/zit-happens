@@ -319,7 +319,7 @@ export function drawFace(ctx, cx, cy, s, look, opts = {}) {
     }
   }
   if (spots && opts.ring) {
-    ctx.strokeStyle = '#ff4f9a';
+    ctx.strokeStyle = '#7b61ff';
     ctx.lineWidth = s * 0.02;
     ctx.setLineDash([s * 0.05, s * 0.04]);
     ctx.beginPath(); ctx.ellipse(spots[0], spots[1], spots[2] * 1.25, spots[3] * 1.5, 0, 0, Math.PI * 2); ctx.stroke();
@@ -337,8 +337,8 @@ export function portraitURL(def, opts = {}, size = 240) {
   x.scale(dpr, dpr);
   const look = lookFor(def);
   const bg = x.createLinearGradient(0, 0, 0, size);
-  bg.addColorStop(0, '#ffe3ee');
-  bg.addColorStop(1, '#ffc4dc');
+  bg.addColorStop(0, '#f1efff');
+  bg.addColorStop(1, '#d8d3ff');
   x.fillStyle = bg;
   x.fillRect(0, 0, size, size);
   drawFace(x, size / 2, size * 0.44, size * 0.5, look, opts);
