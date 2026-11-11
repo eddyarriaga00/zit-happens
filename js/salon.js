@@ -61,8 +61,10 @@ export class Makeup {
       }
       return;
     }
-    a.dabs.push({ x, y, r, c: this.color[this.product] });
-    if (a.dabs.length > 260) a.dabs.shift();
+    // eyeshadow is laid down once per spot, so going over it again never pushes the first strokes out
+    const near = this.product === 'shadow' && a.dabs.some((q) => (q.x - x) ** 2 + (q.y - y) ** 2 < (r * 0.5) ** 2);
+    if (!near) a.dabs.push({ x, y, r, c: this.color[this.product] });
+    if (a.dabs.length > 420) a.dabs.shift();
     for (const [key, on] of a.cells) {
       if (on) continue;
       const [cx, cy] = key.split(',').map(Number);
@@ -85,6 +87,13 @@ export class Makeup {
       if (!a.dabs.length) continue;
       ctx.save();
       if (name === 'lips') ctx.clip(a.path);
+      // eyeshadow goes on the closed lid; once her eyes are open it only shows above them
+      if (name === 'shadow' && (this.G.lidK || 0) < 0.6 && this.G.geo.eyePaths) {
+        const hole = new Path2D();
+        hole.rect(0, 0, this.G.W, this.G.H);
+        for (const ep of this.G.geo.eyePaths) hole.addPath(ep);
+        ctx.clip(hole, 'evenodd');
+      }
       if (name === 'lips') {
         // lipstick is a stain, not paint: the lip's own creases and shape show through it
         ctx.globalAlpha = 0.74;

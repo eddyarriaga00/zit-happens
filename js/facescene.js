@@ -376,7 +376,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   }
 
   // ---- eyes
-  const eyes = [];
+  const eyes = [], eyePaths = [];
   for (const d of [-1, 1]) {
     const px = X(d * ex), py = Y(ey);
     eyes.push({ x: px, y: py, rx: erx, ry: ery });
@@ -384,6 +384,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     almond.moveTo(px - d * erx, py + ery * 0.25);
     almond.quadraticCurveTo(px - d * erx * 0.2, py - ery * 1.25, px + d * erx, py - ery * 0.1);
     almond.quadraticCurveTo(px + d * erx * 0.1, py + ery * 1.05, px - d * erx, py + ery * 0.25);
+    eyePaths.push(almond);
     x.save();
     x.clip(almond);
     const sc = x.createRadialGradient(px, py, erx * 0.2, px, py, erx * 1.1);
@@ -675,10 +676,10 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   const inLips = (px, py) => x.isPointInPath(lipsPath, px * dpr, py * dpr);
   const lipsBox = [cx - mw, my - hh * 0.06, cx + mw, my + hh * 0.105];
   const cheeks = [-1, 1].map((d) => ({ x: X(d * 0.56), y: Y(0.3), rx: hw * 0.27, ry: hh * 0.16 }));
-  const lids = eyes.map((e) => ({ x: e.x, y: e.y - ery * 1.42, rx: erx * 1.12, ry: ery * 0.72 }));
+  const lids = eyes.map((e) => ({ x: e.x, y: e.y - ery * 0.78, rx: erx * 1.12, ry: ery * 1.28 }));     // the whole lid, lash line to crease: she shuts her eyes for it
   const onSkin = (px, py) => inHead(px, py) && (py - cy) / hh >= edgeV((px - cx) / hw);   // face, not hair
   const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint,
-    lipsPath, inLips, lipsBox, cheeks, lids, onHair, headPath: head, eyeCol: look.eye, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
+    lipsPath, inLips, lipsBox, cheeks, lids, onHair, headPath: head, eyeCol: look.eye, eyePaths, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
   return { canvas: c, geo };
 }
 
