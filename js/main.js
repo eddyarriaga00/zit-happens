@@ -342,7 +342,7 @@ function addDirt() {
     G.fx.addSplat({
       kind: 'drop', ...(G.geo ? G.geo.anyPoint() : { x: 20 + Math.random() * (G.W - 40), y: playTop() + Math.random() * (G.H - playTop() - 40) }),
       rx: r * (1 + Math.random()), ry: r, rot: Math.random() * 3, bx: r * 2,
-      color: Math.random() < 0.6 ? '#6f5340' : '#3d3a37', alpha: 0.14 + Math.random() * 0.16, mass: 1,
+      color: Math.random() < 0.6 ? '#6f5340' : '#3d3a37', alpha: 0.3 + Math.random() * 0.25, mass: 1, dirt: true,
     });
   }
 }

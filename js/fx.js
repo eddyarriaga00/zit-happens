@@ -167,6 +167,18 @@ export class FX {
         ctx.save();
         ctx.translate(s.x, s.y);
         ctx.rotate(s.rot);
+        if (s.dirt) {
+          // grime is a matte smudge with no edge: a soft smear and a few specks, no shine
+          ctx.scale(1, s.ry / s.rx);
+          const dg = ctx.createRadialGradient(0, 0, 0, 0, 0, s.rx * 1.9);
+          dg.addColorStop(0, s.color); dg.addColorStop(0.5, s.color + '99'); dg.addColorStop(1, s.color + '00');
+          ctx.fillStyle = dg;
+          ctx.beginPath(); ctx.arc(0, 0, s.rx * 1.9, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = s.color;
+          for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(Math.cos(i * 2.4) * s.rx * (0.5 + i * 0.3), Math.sin(i * 2.4) * s.rx * (0.5 + i * 0.3), 0.7, 0, Math.PI * 2); ctx.fill(); }
+          ctx.restore();
+          continue;
+        }
         // a blob with a tail and a darker wet edge, not a neat oval
         const hex = s.color[0] === '#';
         if (hex) {
