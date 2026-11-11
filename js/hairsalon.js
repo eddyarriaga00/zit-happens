@@ -180,6 +180,11 @@ export class HairService {
       ctx.beginPath();
       for (let i = 0; i < this.cells.length; i++) { if (this.dry[i] > 0.5) continue; const c = this.cells[i]; ctx.moveTo(c.x + CELL * 0.75, c.y); ctx.arc(c.x, c.y, CELL * 0.75, 0, Math.PI * 2); }
       ctx.fill();
+      // wet strands catch the light in thin streaks
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 0.9; ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let i = 0; i < this.cells.length; i += 2) { if (this.dry[i] > 0.5) continue; const c = this.cells[i]; ctx.moveTo(c.x + (c.j - 0.5) * CELL, c.y - CELL * 0.4); ctx.lineTo(c.x + (c.j - 0.5) * CELL + (c.k - 0.5) * 3, c.y + CELL * 0.4); }
+      ctx.stroke();
     }
     // dye paste
     if (this.stage === 'dye' && this.pick.dye) {
@@ -189,6 +194,15 @@ export class HairService {
       for (let i = 0; i < this.cells.length; i++) { const v = this.coat[i]; if (v < 0.05) continue; const c = this.cells[i], r = CELL * (0.5 + 0.35 * v); ctx.moveTo(c.x + r, c.y); ctx.arc(c.x + (c.j - 0.5) * 6, c.y + (c.k - 0.5) * 6, r, 0, Math.PI * 2); }
       ctx.fill();
       ctx.globalAlpha = 1;
+      // the paste is thick and wet: a darker edge underneath and glossy streaks on top
+      ctx.fillStyle = 'rgba(0,0,0,0.14)';
+      ctx.beginPath();
+      for (let i = 0; i < this.cells.length; i += 2) { const v = this.coat[i]; if (v < 0.3) continue; const c = this.cells[i]; ctx.moveTo(c.x + CELL * 0.3, c.y + CELL * 0.32); ctx.ellipse(c.x, c.y + CELL * 0.32, CELL * 0.42, CELL * 0.16, 0, 0, Math.PI * 2); }
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.beginPath();
+      for (let i = 0; i < this.cells.length; i += 3) { const v = this.coat[i]; if (v < 0.3) continue; const c = this.cells[i]; ctx.moveTo(c.x, c.y); ctx.ellipse(c.x - CELL * 0.15, c.y - CELL * 0.2, CELL * 0.28, CELL * 0.08, -0.5, 0, Math.PI * 2); }
+      ctx.fill();
     }
     if (this.cut) this.cut.draw(ctx);
     // shampoo lather
@@ -206,6 +220,20 @@ export class HairService {
           }
         }
         ctx.fill();
+      }
+      // real suds: clear bubbles riding on the foam, each with a rim, a glint and a hint of rainbow
+      for (let i = 0; i < this.cells.length; i += 3) {
+        const v = this.foam[i]; if (v < 0.35) continue;
+        const c = this.cells[i];
+        const x = c.x + (c.k - 0.5) * CELL * 1.2, y = c.y + (c.j - 0.5) * CELL * 1.2 + Math.sin(t * 1.6 + c.k * 30) * 1.5, r = CELL * (0.16 + 0.22 * c.j);
+        ctx.fillStyle = i % 2 ? 'rgba(210,235,255,0.25)' : 'rgba(255,225,245,0.25)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(120,150,190,0.35)'; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.arc(x, y, r * 0.92, 0.3, 1.8); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.4, Math.max(0.6, r * 0.2), 0, Math.PI * 2); ctx.fill();
       }
     }
     // rinse water
