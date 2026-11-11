@@ -962,7 +962,7 @@ function say(kind, always = false) {
 function drawSay(ctx) {
   const sy = G.say;
   if (!sy || sy.t <= 0) return;
-  const a = Math.min(1, sy.t * 3, (1.9 - sy.t) * 8);
+  const a = Math.max(0, Math.min(1, sy.t * 3));
   ctx.save();
   ctx.globalAlpha = a;
   // long lines shrink to fit rather than running off the screen
@@ -970,7 +970,10 @@ function drawSay(ctx) {
   ctx.font = `800 ${size}px ui-rounded, -apple-system, system-ui, sans-serif`;
   while (ctx.measureText(sy.text).width + 26 > G.W - 20 && size > 10) { size -= 0.5; ctx.font = `800 ${size}px ui-rounded, -apple-system, system-ui, sans-serif`; }
   const tw = ctx.measureText(sy.text).width, bw = tw + 26, bh = 34;
-  const bx = Math.max(8, G.W - bw - 12), by = playTop() - 4 - (1 - a) * 6;
+  // sits clear of the HUD, and drops below the hint toast while one is showing
+  const tEl = $('toast');
+  const below = tEl.classList.contains('hidden') ? 0 : tEl.getBoundingClientRect().bottom + 8;
+  const bx = Math.max(8, G.W - bw - 12), by = Math.max(G.safeTop + 88, below) - (1 - a) * 6;
   ctx.fillStyle = 'rgba(40,30,80,0.25)';
   ctx.beginPath(); ctx.roundRect(bx + 2, by + 3, bw, bh, 15); ctx.fill();
   ctx.fillStyle = '#ffffff';
