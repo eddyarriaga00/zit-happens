@@ -1430,9 +1430,10 @@ function showLevels() {
   let fk = 0;
   (function paintFaces() {
     for (let j = 0; j < 2 && fk < faces.length; j++, fk++) {
-      const n = +faces[fk].dataset.face;
-      if (!faceCache.has(n)) faceCache.set(n, portraitURL(levelDef(n), { clear: true }, 72));
-      faces[fk].src = faceCache.get(n);
+      // untreated patients look worried and spotty; once you have treated them they are clear and smiling
+      const n = +faces[fk].dataset.face, done = (save.stars[n] || 0) > 0, key = `${n}:${done}`, def = levelDef(n);
+      if (!faceCache.has(key)) faceCache.set(key, portraitURL(def, done ? { clear: true, mood: 'happy' } : { mood: 'worried', zone: def.zone }, 72));
+      faces[fk].src = faceCache.get(key);
     }
     if (fk < faces.length && faces[fk].isConnected) setTimeout(paintFaces, 0);
   })();
