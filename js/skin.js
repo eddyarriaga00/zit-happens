@@ -162,6 +162,7 @@ export function zoneBlocked(zone, px, py, w, h) {
   if (zone === 'nose') return v > 0.7 || u < 0.14 || u > 0.86;
   if (zone === 'chin') return v < 0.31;
   if (zone === 'cheek') return v < 0.26 || u > 0.86 || u < 0.1;
+  if (zone === 'back') return Math.abs(u - 0.2) < 0.06 || Math.abs(u - 0.8) < 0.06;     // not under the straps
   if (zone === 'shoulder') {
     const strap = u > 0.05 + 0.1 * v && u < 0.26 + 0.1 * v;
     return strap || Math.hypot(px - w * 0.25, py - h * 1.05) > h * 0.95 - 46;
@@ -308,19 +309,42 @@ function drawZone(x, w, h, zone, tone, look, R) {
     // sideburn / hair at the edge
     if (look.style !== 'bald') hairs(x, R, 320, hair, 0.9, 1.5, () => [w * (0.9 + R() * 0.12), h * (0.05 + R() * 0.75), 1.75 + R() * 0.4, 24 + R() * 40, -6]);
   } else if (zone === 'back') {
-    // spine groove and shoulder blades
-    const sp = x.createLinearGradient(w * 0.38, 0, w * 0.62, 0);
-    sp.addColorStop(0, 'rgba(255,255,255,0.07)'); sp.addColorStop(0.35, shade(0)); sp.addColorStop(0.5, shade(0.6)); sp.addColorStop(0.65, shade(0)); sp.addColorStop(1, 'rgba(255,255,255,0.07)');
-    x.fillStyle = sp; x.fillRect(w * 0.38, 0, w * 0.24, h);
+    // a back seen from behind: it turns away at both sides, the spine runs down a soft groove
+    // with its row of bumps, the shoulder blades catch the light, and two thin straps cross it
+    const edge = x.createLinearGradient(0, 0, w, 0);
+    edge.addColorStop(0, shade(0.6)); edge.addColorStop(0.17, shade(0)); edge.addColorStop(0.83, shade(0)); edge.addColorStop(1, shade(0.65));
+    x.fillStyle = edge; x.fillRect(0, 0, w, h);
+    soft(x, w * 0.5, h * 0.03, w * 0.55, h * 0.07, shade(0.35));                         // under the hairline at the base of the neck
+    soft(x, w * 0.5, h * 0.5, w * 0.07, h * 0.62, shade(0.42));                          // the groove of the spine
+    soft(x, w * 0.41, h * 0.55, w * 0.06, h * 0.5, 'rgba(255,255,255,0.09)');            // the long muscles either side of it
+    soft(x, w * 0.59, h * 0.55, w * 0.06, h * 0.5, 'rgba(255,255,255,0.06)');
+    for (let i = 0; i < 9; i++) soft(x, w * 0.5, h * (0.09 + i * 0.1), w * 0.024, h * 0.02, 'rgba(255,255,255,0.11)');   // vertebrae
+    x.lineCap = 'round';
     for (const d of [-1, 1]) {
-      x.strokeStyle = shade(0.16); x.lineWidth = 30;
-      x.beginPath(); x.arc(w * (0.5 + d * 0.3), h * 0.34, w * 0.2, d > 0 ? Math.PI * 0.55 : -Math.PI * 0.05, d > 0 ? Math.PI * 1.05 : Math.PI * 0.45); x.stroke();
-      soft(x, w * (0.5 + d * 0.28), h * 0.3, w * 0.16, w * 0.14, 'rgba(255,255,255,0.10)');
+      soft(x, w * (0.5 + d * 0.27), h * 0.27, w * 0.18, h * 0.12, 'rgba(255,255,255,0.12)');     // the blade itself
+      x.beginPath(); x.moveTo(w * (0.5 + d * 0.13), h * 0.17); x.quadraticCurveTo(w * (0.5 + d * 0.09), h * 0.31, w * (0.5 + d * 0.25), h * 0.41);
+      x.strokeStyle = shade(0.1); x.lineWidth = 22; x.stroke();                                   // its inner edge, soft then sharper
+      x.strokeStyle = shade(0.16); x.lineWidth = 8; x.stroke();
+      soft(x, w * (0.5 + d * 0.3), h * 0.45, w * 0.2, h * 0.05, shade(0.2));                      // shadow beneath it
+      soft(x, w * (0.5 + d * 0.33), h * 0.7, w * 0.12, h * 0.2, shade(0.12));                     // the waist curving in
+      soft(x, w * (0.5 + d * 0.11), h * 0.88, w * 0.036, h * 0.018, shade(0.34));                 // dimples of the lower back
     }
-    for (let i = 0; i < 7; i++) {
-      const mx = R() * w, my = h * (0.12 + R() * 0.7), mr = 1.5 + R() * 2.5;
-      x.fillStyle = 'rgba(80,45,30,0.75)';
+    for (let i = 0; i < 4; i++) {
+      const mx = w * (0.26 + R() * 0.48), my = h * (0.12 + R() * 0.7), mr = 1 + R() * 1.4;
+      soft(x, mx, my, mr * 2.2, mr * 2.2, 'rgba(80,45,30,0.3)');
+      x.fillStyle = 'rgba(80,45,30,0.6)';
       x.beginPath(); x.arc(mx, my, mr, 0, Math.PI * 2); x.fill();
+    }
+    // thin straps of her top, with a little shadow on the skin beside each
+    for (const u of [0.2, 0.8]) {
+      soft(x, w * (u + 0.035), h * 0.5, w * 0.05, h * 0.6, 'rgba(60,20,15,0.12)');
+      const sg = x.createLinearGradient(w * (u - 0.04), 0, w * (u + 0.04), 0);
+      sg.addColorStop(0, 'rgba(0,0,0,0.16)'); sg.addColorStop(0.3, 'rgba(255,255,255,0.18)'); sg.addColorStop(1, 'rgba(0,0,0,0.2)');
+      x.fillStyle = look.shirt || '#f2a7c3'; x.fillRect(w * (u - 0.04), 0, w * 0.08, h);
+      x.fillStyle = sg; x.fillRect(w * (u - 0.04), 0, w * 0.08, h);
+      x.strokeStyle = 'rgba(255,255,255,0.45)'; x.lineWidth = 1.2; x.setLineDash([5, 5]);
+      x.beginPath(); x.moveTo(w * (u - 0.028), 0); x.lineTo(w * (u - 0.028), h); x.moveTo(w * (u + 0.028), 0); x.lineTo(w * (u + 0.028), h); x.stroke();
+      x.setLineDash([]);
     }
     if (look.beard || look.stubble || look.stache) hairs(x, R, 700, hair, 0.35, 0.8, () => [R() * w, R() * h, 1.2 + R() * 0.8, 6 + R() * 10, 3]);
   } else if (zone === 'shoulder') {
