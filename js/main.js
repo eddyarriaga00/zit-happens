@@ -547,7 +547,7 @@ function showSalon() {
   for (const st of STATIONS) {
     const cur = lv[st.id] ?? st.start, max = st.start + st.costs.length, cost = st.costs[cur - st.start];
     const pips = Array.from({ length: max }, (_, i) => `<i class="${i < cur ? 'on' : ''}"></i>`).join('');
-    html += `<div class="shop-item"><div><b>${st.name}</b><small>${st.desc[cur]}</small><div class="pips">${pips}</div></div>
+    html += `<div class="shop-item"><i class="shop-ico">${SHOP_ICONS[st.id] || '✨'}</i><div><b>${st.name}</b><small>${st.desc[cur]}</small><div class="pips">${pips}</div></div>
       <button class="buy" data-st="${st.id}" ${cost == null || save.coins < cost ? 'disabled' : ''}>${cost == null ? 'MAX' : `${cur === 0 ? 'Buy' : 'Up'} ${cost} 🪙`}</button></div>`;
   }
   $('salon-name').textContent = mySalon();
@@ -1408,6 +1408,7 @@ function refreshTools() {
 }
 
 // ---- level map, patient card, shop
+const SHOP_ICONS = { steady: '🤲', loop: '⭕', pad: '🧽', spa: '🧖‍♀️', lucky: '🍀', magnet: '🧲', wash: '🚿', chair: '💺', colour: '🎨', style: '💁‍♀️', decor: '🪞' };
 const faceCache = new Map();     // level -> small portrait, kept for the session
 function showLevels() {
   const total = Object.values(save.stars).reduce((a, b) => a + b, 0);
@@ -1473,7 +1474,7 @@ function showShop() {
   for (const u of UPGRADES) {
     const lv = up(u.id), cost = u.costs[lv];
     const pips = u.costs.map((_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
-    html += `<div class="shop-item"><div><b>${u.name}</b><small>${u.desc}</small><div class="pips">${pips}</div></div>
+    html += `<div class="shop-item"><i class="shop-ico">${SHOP_ICONS[u.id] || '✨'}</i><div><b>${u.name}</b><small>${u.desc}</small><div class="pips">${pips}</div></div>
       <button class="buy" data-up="${u.id}" ${cost == null || save.coins < cost ? 'disabled' : ''}>${cost == null ? 'MAX' : `${cost} 🪙`}</button></div>`;
   }
   html += '<h3>Pus style</h3><div class="pus-row">';

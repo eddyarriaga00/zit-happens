@@ -588,3 +588,8 @@ button.tile:active i { transform: scale(1.15) rotate(-6deg); }
 .lv { position: relative; }
 .zone-chip { position: absolute; left: 9px; top: 9px; font-style: normal; font-size: 9.5px; font-weight: 800; letter-spacing: 0.2px; padding: 2px 6px; border-radius: 8px; background: rgba(38, 30, 70, 0.78); color: #fff; }
 .zone-chip.boss-chip { left: auto; right: 9px; background: var(--accent-2); }
+
+/* ---------- v81: shop and salon upgrades get icons ---------- */
+.shop-item { display: flex; align-items: center; gap: 10px; }
+.shop-item > div { flex: 1; min-width: 0; }
+.shop-ico { font-style: normal; flex: none; width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; font-size: 21px; background: rgba(var(--accent-rgb), 0.12); }

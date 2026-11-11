@@ -745,9 +745,9 @@ export function drawMood(ctx, geo, k) {
       const g = ctx.createRadialGradient(c.x, c.y - c.ry * 0.3, 0, c.x, c.y - c.ry * 0.3, c.rx * 0.9);
       g.addColorStop(0, `rgba(255,120,120,${0.13 * a})`); g.addColorStop(1, 'rgba(255,120,120,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y - c.ry * 0.3, c.rx * 0.9, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = `rgba(90,45,40,${0.22 * a})`; ctx.lineWidth = 1.4;      // the eyes crinkle from below
+      ctx.strokeStyle = `rgba(90,45,40,${0.1 * a})`; ctx.lineWidth = 1.2;      // the eyes crinkle from below
       const e = geo.eyes[c.x < geo.cx ? 0 : geo.eyes.length - 1];
-      if (e) { ctx.beginPath(); ctx.moveTo(e.x - e.rx * 0.8, e.y + e.ry * 1.25); ctx.quadraticCurveTo(e.x, e.y + e.ry * (1.25 - 0.5 * a), e.x + e.rx * 0.8, e.y + e.ry * 1.25); ctx.stroke(); }
+      if (e) { ctx.beginPath(); ctx.moveTo(e.x - e.rx * 0.55, e.y + e.ry * 1.05); ctx.quadraticCurveTo(e.x, e.y + e.ry * (1.05 - 0.35 * a), e.x + e.rx * 0.55, e.y + e.ry * 1.05); ctx.stroke(); }
     }
   } else {
     // pained: the brows pinch together
