@@ -164,7 +164,7 @@ export function zoneBlocked(zone, px, py, w, h) {
   if (zone === 'cheek') return v < 0.26 || u > 0.86 || u < 0.1;
   if (zone === 'back') return Math.abs(u - 0.2) < 0.06 || Math.abs(u - 0.8) < 0.06;     // not under the straps
   if (zone === 'shoulder') {
-    const strap = u > 0.05 + 0.1 * v && u < 0.26 + 0.1 * v;
+    const strap = (u > 0.05 + 0.1 * v && u < 0.26 + 0.1 * v) || (u < 0.14 && v < 0.3);     // the strap, and the lock of hair
     return strap || Math.hypot(px - w * 0.25, py - h * 1.05) > h * 0.95 - 46;
   }
   return false;
@@ -371,6 +371,32 @@ function drawZone(x, w, h, zone, tone, look, R) {
     x.strokeStyle = 'rgba(255,255,255,0.5)'; x.lineWidth = 1.5; x.setLineDash([6, 6]);
     x.beginPath(); x.moveTo(w * 0.09, 0); x.lineTo(w * 0.19, h); x.moveTo(w * 0.22, 0); x.lineTo(w * 0.32, h); x.stroke();
     x.setLineDash([]);
+    // the strap is cloth: lit along one edge, shaded on the other
+    const stg = x.createLinearGradient(w * 0.12, 0, w * 0.3, 0);
+    stg.addColorStop(0, 'rgba(255,255,255,0.2)'); stg.addColorStop(0.5, 'rgba(255,255,255,0)'); stg.addColorStop(1, 'rgba(0,0,0,0.2)');
+    x.fillStyle = stg;
+    x.beginPath(); x.moveTo(w * 0.07, 0); x.lineTo(w * 0.24, 0); x.lineTo(w * 0.34, h); x.lineTo(w * 0.17, h); x.closePath(); x.fill();
     soft(x, w * 0.4, h * 0.5, w * 0.1, h * 0.5, 'rgba(60,20,15,0.12)');
+    // the round of the shoulder catching the light, the dip of the collarbone, the arm falling away
+    soft(x, w * 0.66, h * 0.3, w * 0.3, h * 0.16, 'rgba(255,255,255,0.14)');
+    soft(x, w * 0.6, h * 0.66, w * 0.32, h * 0.2, 'rgba(255,255,255,0.07)');
+    x.lineCap = 'round';
+    x.beginPath(); x.moveTo(w * 0.36, h * 0.2); x.quadraticCurveTo(w * 0.6, h * 0.25, w * 0.9, h * 0.17);
+    x.strokeStyle = shade(0.12); x.lineWidth = 26; x.stroke();
+    x.strokeStyle = shade(0.2); x.lineWidth = 9; x.stroke();
+    x.strokeStyle = 'rgba(255,255,255,0.14)'; x.lineWidth = 7;
+    x.beginPath(); x.moveTo(w * 0.36, h * 0.175); x.quadraticCurveTo(w * 0.6, h * 0.225, w * 0.9, h * 0.145); x.stroke();
+    soft(x, w * 0.97, h * 0.6, w * 0.16, h * 0.5, shade(0.4));
+    // a lock of her hair falling over the top corner
+    if (look.style !== 'bald' && look.style !== 'buzz' && look.style !== 'short') {
+      const hc = /^#[0-9a-f]{6}$/i.test(look.hair || '') ? look.hair : '#3a2618';
+      x.fillStyle = hc;
+      x.beginPath(); x.moveTo(-10, -10); x.lineTo(w * 0.12, -10); x.quadraticCurveTo(w * 0.1, h * 0.12, w * 0.02, h * 0.26); x.lineTo(-10, h * 0.3); x.closePath(); x.fill();
+      hairs(x, R, 90, hc, 0.9, 1.1, () => [R() * w * 0.11, R() * h * 0.05, 1.5 + R() * 0.25, h * (0.12 + R() * 0.14), -3]);
+      x.strokeStyle = 'rgba(255,255,255,0.14)'; x.lineWidth = 1;
+      for (let i = 0; i < 14; i++) { const u0 = R() * 0.1; x.beginPath(); x.moveTo(w * u0, h * 0.02); x.quadraticCurveTo(w * (u0 + 0.01), h * 0.12, w * (u0 * 0.4), h * (0.2 + R() * 0.05)); x.stroke(); }
+      x.strokeStyle = 'rgba(0,0,0,0.2)'; x.lineWidth = 2;
+      for (let i = 0; i < 6; i++) { const u0 = R() * 0.1; x.beginPath(); x.moveTo(w * u0, 0); x.quadraticCurveTo(w * (u0 + 0.01), h * 0.12, w * (u0 * 0.4), h * (0.2 + R() * 0.05)); x.stroke(); }
+    }
   }
 }
