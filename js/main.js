@@ -1,7 +1,7 @@
 import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
 import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL, AWARDS, rankFor } from './levels.js';
 import { lookFor, portraitURL } from './faces.js';
-import { renderFaceScene, drawLids, drawMood } from './facescene.js';
+import { renderFaceScene, drawLids, drawMood, drawEyes } from './facescene.js';
 import { Makeup, Haircut, LIP_SHADES } from './salon.js';
 import { HairService, STATIONS, WALLS, salonLevel, salonTitle, salonPicture, salonBackdrop } from './hairsalon.js';
 import { Strip, Brows } from './extras.js';
@@ -1226,6 +1226,16 @@ function update(dt) {
   if (G.ear) G.ear.update(dt);
   if (G.salon) G.salon.update(dt);
   // the patient blinks now and then, and screws their eyes shut when it hurts
+  // her eyes follow your finger; with nothing to watch they drift a little, then come back to you
+  {
+    let tx = 0, ty = 0;
+    const ptr = pointers.values().next().value;
+    if (ptr && ptr.x != null) { tx = Math.max(-1, Math.min(1, (ptr.x - G.W / 2) / (G.W * 0.45))); ty = Math.max(-1, Math.min(1, (ptr.y - G.H * 0.38) / (G.H * 0.4))); }
+    else { tx = Math.sin(G.time * 0.37) * Math.max(0, Math.sin(G.time * 0.11)) * 0.5; ty = Math.sin(G.time * 0.23 + 1) * 0.12; }
+    const k = Math.min(1, dt * (ptr ? 9 : 3));
+    G.gazeX = (G.gazeX || 0) + (tx - (G.gazeX || 0)) * k;
+    G.gazeY = (G.gazeY || 0) + (ty - (G.gazeY || 0)) * k;
+  }
   // she shuts her eyes while her face is being washed, masked or steamed, and for eyeshadow
   const shutNow = (G.treat && G.treat.active && G.treat.phase !== 'pop')
     || (G.mode === 'makeup' && G.salon && G.salon.product === 'shadow')
@@ -1258,7 +1268,7 @@ function render() {
   // how shut her eyes are and what her face is doing this frame (the zoomed modes draw these too)
   G.lidK = Math.max(G.shut || 0, G.wince > 0 ? Math.min(1, G.wince * 6) : G.blinkA > 0 ? Math.sin(Math.PI * (1 - G.blinkA / 0.16)) : 0);
   G.moodK = G.mood && !(G.treat && G.treat.active) ? G.mood.k * Math.sin(Math.PI * Math.min(1, G.mood.t / G.mood.len)) ** 0.6 : 0;
-  if (G.geo) { drawLids(ctx, G.geo, G.lidK); drawMood(ctx, G.geo, G.moodK); }
+  if (G.geo) { drawEyes(ctx, G.geo, G.gazeX || 0, G.gazeY || 0); drawLids(ctx, G.geo, G.lidK); drawMood(ctx, G.geo, G.moodK); }
   else if (!G.skin) { ctx.fillStyle = '#eec1a2'; ctx.fillRect(0, 0, W, H); }   // back and shoulder scenes have no face geometry but do have painted skin
 
   ctx.save();

@@ -645,7 +645,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   const lids = eyes.map((e) => ({ x: e.x, y: e.y - ery * 1.42, rx: erx * 1.12, ry: ery * 0.72 }));
   const onSkin = (px, py) => inHead(px, py) && (py - cy) / hh >= edgeV((px - cx) / hw);   // face, not hair
   const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint,
-    lipsPath, inLips, lipsBox, cheeks, lids, onHair, headPath: head, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
+    lipsPath, inLips, lipsBox, cheeks, lids, onHair, headPath: head, eyeCol: look.eye, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
   return { canvas: c, geo };
 }
 
@@ -723,4 +723,44 @@ export function drawMood(ctx, geo, k) {
     }
   }
   ctx.restore();
+}
+
+/** Her eyes, repainted live so they can follow your finger: gx, gy = where she is looking, -1..1. */
+export function drawEyes(ctx, geo, gx, gy) {
+  if (!geo.eyeCol) return;
+  for (const e of geo.eyes) {
+    const d = Math.sign(e.x - geo.cx) || 1, px = e.x, py = e.y, erx = e.rx, ery = e.ry;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(px - d * erx, py + ery * 0.25);
+    ctx.quadraticCurveTo(px - d * erx * 0.2, py - ery * 1.25, px + d * erx, py - ery * 0.1);
+    ctx.quadraticCurveTo(px + d * erx * 0.1, py + ery * 1.05, px - d * erx, py + ery * 0.25);
+    ctx.clip();
+    const sc = ctx.createRadialGradient(px, py, erx * 0.2, px, py, erx * 1.1);
+    sc.addColorStop(0, '#f8f4f0'); sc.addColorStop(1, '#d9c9c6');
+    ctx.fillStyle = sc; ctx.fillRect(px - erx * 1.2, py - ery * 1.5, erx * 2.4, ery * 3);
+    const ir = ery * 1.14, ix = px + gx * erx * 0.3, iy = py - ery * 0.06 + gy * ery * 0.3;
+    const ig = ctx.createRadialGradient(ix, iy, ir * 0.15, ix, iy, ir);
+    ig.addColorStop(0, tint(geo.eyeCol, 1.55)); ig.addColorStop(0.45, tint(geo.eyeCol, 1.15)); ig.addColorStop(0.8, geo.eyeCol); ig.addColorStop(1, tint(geo.eyeCol, 0.3));
+    ctx.fillStyle = ig; ctx.beginPath(); ctx.arc(ix, iy, ir, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.5; ctx.lineWidth = 0.5;
+    for (let i = 0; i < 30; i++) {
+      const a = i * 0.21 + (i % 3) * 0.07, r0 = ir * (0.38 + (i % 4) * 0.035), r1 = ir * (0.72 + (i % 5) * 0.05);
+      ctx.strokeStyle = i % 3 ? tint(geo.eyeCol, 0.62) : tint(geo.eyeCol, 1.7);
+      ctx.beginPath(); ctx.moveTo(ix + Math.cos(a) * r0, iy + Math.sin(a) * r0); ctx.lineTo(ix + Math.cos(a) * r1, iy + Math.sin(a) * r1); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(20,12,10,0.55)'; ctx.lineWidth = ir * 0.12; ctx.beginPath(); ctx.arc(ix, iy, ir * 0.95, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#080505'; ctx.beginPath(); ctx.arc(ix, iy, ir * 0.38, 0, Math.PI * 2); ctx.fill();
+    // the catchlights stay where the light is, so they slide across the eye as it turns
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.beginPath(); ctx.ellipse(px - ir * 0.32 + gx * erx * 0.12, py - ery * 0.06 - ir * 0.34 + gy * ery * 0.1, ir * 0.16, ir * 0.2, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(ix + ir * 0.34, iy + ir * 0.3, ir * 0.08, 0, Math.PI * 2); ctx.fill();
+    const lidSh = ctx.createLinearGradient(0, py - ery * 1.2, 0, py + ery * 0.3);
+    lidSh.addColorStop(0, 'rgba(40,15,12,0.55)'); lidSh.addColorStop(1, 'rgba(40,15,12,0)');
+    ctx.fillStyle = lidSh; ctx.fillRect(px - erx * 1.2, py - ery * 1.3, erx * 2.4, ery * 1.7);
+    const pk = ctx.createRadialGradient(px - d * erx * 0.92, py + ery * 0.2, 0, px - d * erx * 0.92, py + ery * 0.2, erx * 0.22);
+    pk.addColorStop(0, 'rgba(214,120,120,0.8)'); pk.addColorStop(1, 'rgba(214,120,120,0)');
+    ctx.fillStyle = pk; ctx.beginPath(); ctx.arc(px - d * erx * 0.92, py + ery * 0.2, erx * 0.22, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
 }
