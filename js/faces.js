@@ -2,7 +2,7 @@
 // hair style and color, eyes, brows, facial hair, glasses, age.
 // The same traits color the close-up scene (hairline, eyebrows, stubble).
 
-import { renderFaceScene } from './facescene.js';
+import { renderFaceScene, drawMood } from './facescene.js';
 import { SKIN_TONES, rgba } from './skin.js';
 
 // name: [hair style, hair color, extras]
@@ -344,12 +344,16 @@ export function portraitURL(def, opts = {}, size = 240) {
     const w = size * 1.39, k = 0.8, xo = -(w * k - size) / 2, yo = size * 0.52 - 0.5336 * w * k;
     const scene = renderFaceScene(w, w, Math.min(2, dpr * k + 0.5), SKIN_TONES[def.skin] || SKIN_TONES[1], hashName(def.name), look, w * 0.12, w);
     x.drawImage(scene.canvas, xo, yo, w * k, w * k);
+    // she looks how she feels: worried before, pleased after
+    x.save(); x.translate(xo, yo); x.scale(k, k);
+    drawMood(x, scene.geo, opts.mood === 'happy' ? 1 : opts.mood === 'worried' ? -0.8 : 0);
+    x.restore();
     if (!opts.clear && opts.zone) {
       // before: an angry little breakout where the trouble is
       x.save(); x.translate(xo, yo); x.scale(k, k);
       const g = scene.geo;
-      for (let i = 0; i < 7; i++) {
-        const pt = g.zonePoint(opts.zone), r = g.hw * (0.03 + 0.018 * ((i * 7) % 3));
+      for (let i = 0; i < 9; i++) {
+        const pt = g.zonePoint(opts.zone), r = g.hw * (0.04 + 0.02 * ((i * 7) % 3));
         const gr = x.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, r * 2.2);
         gr.addColorStop(0, 'rgba(214,60,60,0.85)'); gr.addColorStop(1, 'rgba(214,60,60,0)');
         x.fillStyle = gr; x.beginPath(); x.arc(pt.x, pt.y, r * 2.2, 0, 7); x.fill();
