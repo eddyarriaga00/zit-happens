@@ -595,6 +595,30 @@ export class Ear {
     outline();
     ctx.stroke();
 
+    // form and flesh: the ear turns away into shadow at the back, thin cartilage glows red where
+    // light comes through it, the hollows between the ridges are darker, and the rim catches light
+    ctx.save();
+    outline(); ctx.clip();
+    const soft = (u, v, ru, rv, col) => {
+      ctx.save(); ctx.translate(X(u), Y(v)); ctx.scale(1, (rv * eh) / (ru * ew));
+      const sg = ctx.createRadialGradient(0, 0, 0, 0, 0, ru * ew / 2);
+      sg.addColorStop(0, col); sg.addColorStop(1, col.replace(/[\d.]+\)$/, '0)'));
+      ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, ru * ew / 2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    };
+    const turn = ctx.createLinearGradient(X(-0.7), 0, X(1), 0);
+    turn.addColorStop(0, rgba(tone.shade, 0.55)); turn.addColorStop(0.3, rgba(tone.shade, 0.1)); turn.addColorStop(0.75, rgba(tone.shade, 0)); turn.addColorStop(1, rgba(tone.shade, 0.3));
+    ctx.fillStyle = turn; ctx.fillRect(X(-1), Y(-1.1), ew, eh * 1.1);
+    soft(0.72, -0.35, 0.5, 0.5, 'rgba(214,70,60,0.22)');       // light through the upper rim
+    soft(0.05, 0.82, 0.55, 0.3, 'rgba(214,80,70,0.28)');       // the lobe, soft and warm
+    soft(0.18, -0.68, 0.5, 0.16, 'rgba(60,20,12,0.3)');        // hollow under the top of the rim
+    soft(0.62, -0.05, 0.16, 0.5, 'rgba(60,20,12,0.28)');       // groove down the back
+    soft(0.1, -0.5, 0.3, 0.14, 'rgba(60,20,12,0.22)');         // the little triangular hollow
+    soft(-0.2, -0.75, 0.6, 0.2, 'rgba(255,255,255,0.14)');     // top of the rim catching light
+    soft(-0.1, 0.9, 0.3, 0.14, 'rgba(255,255,255,0.12)');      // sheen on the lobe
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = ew * 0.05;
+    outline(); ctx.stroke();
+    ctx.restore();
+
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
