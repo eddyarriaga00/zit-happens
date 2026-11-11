@@ -260,24 +260,52 @@ export class HairService {
     ctx.save();
     ctx.translate(x + 34, y - 44);
     ctx.lineCap = 'round';
-    if (this.stage === 'rinse') {           // shower head
+    const lg = (x0, y0, x1, y1, stops) => { const g = ctx.createLinearGradient(x0, y0, x1, y1); for (const [o, c] of stops) g.addColorStop(o, c); return g; };
+    const steel = [[0, '#f4f6f9'], [0.45, '#aeb7c3'], [1, '#6b7482']];
+    if (this.stage === 'rinse') {           // a chrome hand shower: hose, handle, a round head with jets
       ctx.rotate(0.5);
-      ctx.strokeStyle = '#c9ced6'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(0, 0); ctx.stroke();
-      ctx.fillStyle = '#e3e7ee'; ctx.beginPath(); ctx.ellipse(0, 6, 20, 9, 0, 0, Math.PI * 2); ctx.fill();
-    } else if (this.stage === 'dry') {      // hair dryer, with air streaks
+      ctx.strokeStyle = 'rgba(30,15,15,0.2)'; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(3, -44); ctx.lineTo(3, 2); ctx.stroke();
+      ctx.strokeStyle = lg(-4, 0, 4, 0, steel); ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(0, -46); ctx.lineTo(0, 0); ctx.stroke();
+      ctx.strokeStyle = 'rgba(80,90,105,0.5)'; ctx.lineWidth = 0.8;
+      for (let yy = -44; yy < -22; yy += 3) { ctx.beginPath(); ctx.moveTo(-4, yy); ctx.lineTo(4, yy); ctx.stroke(); }     // ribbed hose
+      ctx.fillStyle = lg(-22, 0, 22, 0, steel); ctx.beginPath(); ctx.ellipse(0, 4, 22, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#39424e'; ctx.beginPath(); ctx.ellipse(0, 7, 18, 6.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#9fb0c2';
+      for (let i = 0; i < 11; i++) { const a = i / 11 * Math.PI * 2; ctx.beginPath(); ctx.arc(Math.cos(a) * 12, 7 + Math.sin(a) * 4, 0.9, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.ellipse(-8, 0, 7, 2, -0.2, 0, Math.PI * 2); ctx.fill();
+    } else if (this.stage === 'dry') {      // a salon dryer: barrel, nozzle, grille, handle, with air streaks
       ctx.rotate(-0.6);
-      ctx.fillStyle = '#7b61ff'; ctx.beginPath(); ctx.roundRect(-22, -12, 44, 24, 10); ctx.fill();
-      ctx.fillStyle = '#5a45d6'; ctx.beginPath(); ctx.roundRect(-4, 8, 12, 28, 5); ctx.fill();
-      ctx.fillStyle = '#5a5560'; ctx.beginPath(); ctx.roundRect(-30, -9, 10, 18, 3); ctx.fill();
+      ctx.fillStyle = 'rgba(30,15,15,0.2)'; ctx.beginPath(); ctx.roundRect(-20, -8, 46, 26, 11); ctx.fill();
+      ctx.fillStyle = lg(0, 8, 0, 40, [[0, '#3a3f49'], [0.5, '#23262d'], [1, '#15171c']]);
+      ctx.beginPath(); ctx.roundRect(-5, 6, 13, 32, 5); ctx.fill();                                   // handle
+      ctx.fillStyle = '#e94f7a'; ctx.beginPath(); ctx.roundRect(-3.5, 14, 4, 8, 2); ctx.fill();          // switch
+      ctx.fillStyle = lg(0, -13, 0, 13, [[0, '#5d646f'], [0.3, '#30343c'], [1, '#17191e']]);
+      ctx.beginPath(); ctx.roundRect(-22, -13, 46, 26, 11); ctx.fill();                                // barrel
+      ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.roundRect(-16, -10, 32, 4, 2); ctx.fill();
+      ctx.fillStyle = lg(0, -10, 0, 10, steel); ctx.beginPath(); ctx.roundRect(-33, -9.5, 12, 19, 3); ctx.fill();   // nozzle
+      ctx.fillStyle = '#0f1013'; ctx.beginPath(); ctx.ellipse(-33, 0, 2.2, 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#8a929e'; ctx.lineWidth = 1;                                                  // rear grille
+      for (const r of [3, 6.5, 10]) { ctx.beginPath(); ctx.ellipse(23, 0, 1.4, r, 0, 0, Math.PI * 2); ctx.stroke(); }
       ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
-      for (let i = -1; i <= 1; i++) { const o = (t * 90 + i * 9) % 26; ctx.beginPath(); ctx.moveTo(-34 - o, i * 7); ctx.lineTo(-44 - o, i * 9); ctx.stroke(); }
-    } else if (this.stage === 'dye') {      // tint brush
+      for (let i = -1; i <= 1; i++) { const o = (t * 90 + i * 9) % 26; ctx.beginPath(); ctx.moveTo(-38 - o, i * 7); ctx.lineTo(-48 - o, i * 9); ctx.stroke(); }
+    } else if (this.stage === 'dye') {      // a tint brush: slim black handle, steel ferrule, bristles loaded with colour
       ctx.rotate(0.7);
-      ctx.fillStyle = '#5a5560'; ctx.beginPath(); ctx.roundRect(-4, -34, 8, 34, 3); ctx.fill();
-      ctx.fillStyle = this.pick.dye || '#fff'; ctx.beginPath(); ctx.roundRect(-9, 0, 18, 16, 4); ctx.fill();
-    } else {                                // shampoo: a blob of suds on the fingertips
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.beginPath(); ctx.arc(-30, 40, 9, 0, Math.PI * 2); ctx.arc(-22, 46, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(30,15,15,0.2)'; ctx.beginPath(); ctx.roundRect(-1, -40, 8, 44, 3); ctx.fill();
+      ctx.fillStyle = lg(-4, 0, 4, 0, [[0, '#4a4f59'], [0.4, '#262a31'], [1, '#111317']]);
+      ctx.beginPath(); ctx.moveTo(-1.5, -46); ctx.lineTo(1.5, -46); ctx.lineTo(4, -6); ctx.lineTo(-4, -6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = lg(-9, 0, 9, 0, steel); ctx.beginPath(); ctx.roundRect(-9, -7, 18, 7, 1.5); ctx.fill();
+      const dye = this.pick.dye || '#e9e4da';
+      ctx.fillStyle = '#d9d2c4'; ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(9, 0); ctx.lineTo(8, 18); ctx.lineTo(-8, 18); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = dye; ctx.beginPath(); ctx.moveTo(-8.6, 6); ctx.lineTo(8.6, 6); ctx.lineTo(8, 18); ctx.quadraticCurveTo(0, 21, -8, 18); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 0.6;
+      for (let xx = -6; xx <= 6; xx += 2) { ctx.beginPath(); ctx.moveTo(xx, 1); ctx.lineTo(xx * 0.92, 18); ctx.stroke(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(-3, 13, 2.5, 4, 0, 0, Math.PI * 2); ctx.fill();
+    } else {                                // shampoo: a soft handful of suds on the fingertips
+      for (const [bx, by, br] of [[-30, 40, 9], [-22, 46, 6], [-36, 47, 5], [-27, 33, 4]]) {
+        const sg = ctx.createRadialGradient(bx - br * 0.3, by - br * 0.35, 0, bx, by, br);
+        sg.addColorStop(0, '#ffffff'); sg.addColorStop(0.7, 'rgba(236,243,250,0.95)'); sg.addColorStop(1, 'rgba(190,205,225,0.9)');
+        ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
+      }
     }
     ctx.restore();
   }
