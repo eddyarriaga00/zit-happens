@@ -3,6 +3,7 @@
 
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
+import { drawTweezers } from './tools.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -394,6 +395,7 @@ export class Brows {
     this.strokes = [];
     this.bald = [];
     this.fly = [];
+    this.spots = [];           // little pink marks where a hair just came out
     this.grabs = new Map();    // pointer -> { h, sx, sy, x, y }
     this.stage = 'pluck';
     this.mistakes = 0;
@@ -447,6 +449,7 @@ export class Brows {
     if (Math.hypot(x - gr.sx, y - gr.sy) > 36) {
       const h = gr.h;
       h.gone = true; this.plucked++;
+      this.spots.push({ x: h.x, y: h.y, t: 0 });
       this.grabs.delete(id);
       const a = Math.atan2(y - gr.sy, x - gr.sx);
       this.fly.push({ x: h.x, y: h.y, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60 - 30, rot: h.a, vr: rnd(-8, 8), len: h.len, t: 0 });
@@ -463,11 +466,12 @@ export class Brows {
 
   pencil(x, y) {
     const [fx, fy] = this.z.toFace(x, y);
-    if (!this.zones.some((b) => ((fx - b.x) / (b.rx + 6)) ** 2 + ((fy - b.y) / (b.ry + 6)) ** 2 < 1)) return;
+    const zb = this.zones.find((b) => ((fx - b.x) / (b.rx + 6)) ** 2 + ((fy - b.y) / (b.ry + 6)) ** 2 < 1);
+    if (!zb) return;
     let hit = 0;
     for (const c of this.cells) if (!c.on && (c.x - fx) ** 2 + (c.y - fy) ** 2 < 36) { c.on = true; this.filled++; hit++; }
     if (hit) {
-      this.strokes.push({ x: fx, y: fy });
+      this.strokes.push({ x: fx, y: fy, d: zb.d, j: Math.random() });
       if (this.strokes.length > 400) this.strokes.shift();
       if (this.t - (this.sndT || 0) > 0.1) { this.sndT = this.t; audio.wipe(30); }
     }
@@ -479,6 +483,8 @@ export class Brows {
     this.t += dt; this.coolT -= dt; this.idle += dt;
     for (const f of this.fly) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 160 * dt; f.rot += f.vr * dt; }
     this.fly = this.fly.filter((f) => f.t < 0.8);
+    for (const s of this.spots) s.t += dt;
+    this.spots = this.spots.filter((s) => s.t < 7);
   }
 
   draw(ctx) {
@@ -490,8 +496,16 @@ export class Brows {
       ctx.beginPath();
       for (const b of this.zones) { ctx.moveTo(b.x + b.rx, b.y); ctx.ellipse(b.x, b.y, b.rx, b.ry, 0, 0, Math.PI * 2); }
       ctx.clip();
-      ctx.fillStyle = this.col; ctx.globalAlpha = 0.16;
+      ctx.fillStyle = this.col; ctx.globalAlpha = 0.09;
       for (const s of this.strokes) { ctx.beginPath(); ctx.arc(s.x, s.y, 6, 0, 7); ctx.fill(); }
+      // the pencil lays down fine hair-like strokes in the direction the brow grows
+      ctx.strokeStyle = this.col; ctx.globalAlpha = 0.5; ctx.lineWidth = 0.7; ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (const s of this.strokes) for (let k = -1; k <= 1; k++) {
+        const ox = k * 2.3 + (s.j - 0.5) * 2;
+        ctx.moveTo(s.x + ox, s.y + 1.8 + k * 0.6); ctx.lineTo(s.x + ox + s.d * (3 + s.j * 2), s.y - 2.2 + (s.j - 0.5) * 2);
+      }
+      ctx.stroke();
       ctx.restore();
     }
     // slips leave a little gap
@@ -522,9 +536,18 @@ export class Brows {
         tx += (gx - ox) * 0.5; ty += (gy - oy) * 0.5;
         ctx.fillStyle = `rgba(255,150,140,${0.5 * pull})`; ctx.beginPath(); ctx.arc(h.x, h.y, 2 + 2 * pull, 0, 7); ctx.fill();
       }
-      ctx.strokeStyle = this.col; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(h.x, h.y);
-      ctx.quadraticCurveTo((h.x + tx) / 2 + h.bend * 2, (h.y + ty) / 2 + h.bend * 2, tx, ty); ctx.stroke();
+      const qx = (h.x + tx) / 2 + h.bend * 2, qy = (h.y + ty) / 2 + h.bend * 2;
+      ctx.strokeStyle = this.col; ctx.lineWidth = 0.9;                       // fine along its length
+      ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.quadraticCurveTo(qx, qy, tx, ty); ctx.stroke();
+      ctx.lineWidth = 1.7;                                                   // thicker toward the root
+      ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.quadraticCurveTo((h.x + qx) / 2, (h.y + qy) / 2, (h.x + 2 * qx + tx) / 4, (h.y + 2 * qy + ty) / 4); ctx.stroke();
+      ctx.fillStyle = 'rgba(120,60,50,0.45)'; ctx.beginPath(); ctx.arc(h.x, h.y, 1.1, 0, 7); ctx.fill();   // the follicle
+    }
+    for (const s of this.spots) {
+      const a = 0.55 * (1 - s.t / 7);
+      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 4);
+      g.addColorStop(0, `rgba(230,90,90,${a})`); g.addColorStop(1, 'rgba(230,90,90,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, 7); ctx.fill();
     }
     for (const f of this.fly) {
       ctx.save(); ctx.globalAlpha = 1 - f.t / 0.8; ctx.translate(f.x, f.y); ctx.rotate(f.rot);
@@ -539,13 +562,6 @@ export class Brows {
     }
     ctx.restore();
     // tweezers at each finger holding a hair
-    for (const gr of this.grabs.values()) {
-      ctx.save(); ctx.translate(gr.x, gr.y); ctx.rotate(-0.6);
-      ctx.strokeStyle = '#dfe3ea'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-7, -70); ctx.moveTo(0, 0); ctx.lineTo(7, -70); ctx.stroke();
-      ctx.strokeStyle = '#9aa3b2'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-7, -70); ctx.moveTo(0, 0); ctx.lineTo(7, -70); ctx.stroke();
-      ctx.restore();
-    }
+    for (const gr of this.grabs.values()) drawTweezers(ctx, gr.x, gr.y, -2.1);
   }
 }
