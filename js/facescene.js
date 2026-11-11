@@ -466,8 +466,22 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   for (const d of [-1, 1]) soft(cx + d * mw * 1.04, my + hh * 0.006, hw * 0.035, hh * 0.022, 'rgba(60,20,20,0.35)');   // corners of the mouth
   x.strokeStyle = 'rgba(70,22,26,0.6)'; x.lineWidth = 1.3;
   x.beginPath(); x.moveTo(cx - mw * 1.03, my + hh * 0.008); x.quadraticCurveTo(cx, my + hh * 0.014, cx + mw * 1.03, my + hh * 0.008); x.stroke();
-  x.strokeStyle = 'rgba(90,30,36,0.2)'; x.lineWidth = 0.8;
-  for (let i = 0; i < 14; i++) { const u = (R() - 0.5) * 1.5; x.beginPath(); x.moveTo(cx + u * mw, my + hh * 0.012); x.lineTo(cx + u * mw * 0.95, my + hh * 0.085); x.stroke(); }
+  // lip texture: faint short creases fanning from the centre, kept inside the lips
+  x.save(); x.clip(lower);
+  x.lineWidth = 0.6;
+  for (let i = 0; i < 26; i++) {
+    const u = (R() - 0.5) * 1.6, v0 = 0.02 + R() * 0.02, v1 = v0 + 0.02 + R() * 0.035;
+    x.strokeStyle = i % 3 ? 'rgba(90,30,36,0.09)' : 'rgba(255,255,255,0.1)';
+    x.beginPath(); x.moveTo(cx + u * mw * 0.9, my + hh * v0); x.quadraticCurveTo(cx + u * mw * 0.96, my + hh * (v0 + v1) / 2, cx + u * mw * 0.98, my + hh * v1); x.stroke();
+  }
+  x.restore();
+  x.save(); x.clip(upper);
+  for (let i = 0; i < 14; i++) {
+    const u = (R() - 0.5) * 1.5;
+    x.strokeStyle = 'rgba(90,30,36,0.08)';
+    x.beginPath(); x.moveTo(cx + u * mw, my - hh * 0.005); x.lineTo(cx + u * mw * 0.94, my - hh * 0.045); x.stroke();
+  }
+  x.restore();
   soft(cx, Y(noseY + 0.14), hw * 0.05, hh * 0.05, rgba(tone.pore, 0.2));     // philtrum
 
   // ---- the small things that make a face read as a person: soft planes of light and
