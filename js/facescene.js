@@ -28,6 +28,10 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   const hair = /^#[0-9a-f]{6}$/i.test(look.hair || '') ? look.hair : '#3a2618';
   const grey = ['#cfcfcf', '#b9b9b9', '#8f8f8f'].includes(hair);
   const hairLo = tint(hair, 0.72), hairHi = tint(hair, 1.16);
+  // shine takes the hair's own colour, and dark hair shows far less of it than fair hair
+  const hch = [0, 1, 2].map((i) => parseInt(hair.slice(1 + 2 * i, 3 + 2 * i), 16));
+  const hlum = (hch[0] + hch[1] + hch[2]) / 765;
+  const shine = (a) => `rgba(${hch.map((v) => Math.round(v + (255 - v) * 0.55)).join(',')},${(a * Math.min(1, 0.25 + hlum * 1.6)).toFixed(3)})`;
   const style = look.style || 'short';
   const hasHair = style !== 'bald';
   const hairline = style === 'bald' ? -2 : style === 'balding' ? -2 : style === 'buzz' ? -0.7 : -0.68;      // a proper forehead
@@ -104,7 +108,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     }
     strands(140, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1; return [X(u * 0.8), Y(-0.4), X(u), Y(0.9 + R() * 0.9), d * 16, 'rgba(0,0,0,0.2)']; }, 3);
     strands(900, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1; return [X(u * 0.75), Y(-0.6), X(u), Y(0.7 + R() * 1.2), d * (style === 'curly' ? 30 * Math.sin(R() * 9) : 18), hairCol()]; }, 0.6);
-    strands(360, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1, v = 0.25 + R() * 0.2; return [X(u * 0.97), Y(v), X(u), Y(v + 0.22), d * 3, 'rgba(255,255,255,0.1)']; }, 0.9);
+    strands(360, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1, v = 0.25 + R() * 0.2; return [X(u * 0.97), Y(v), X(u), Y(v + 0.22), d * 3, shine(0.2)]; }, 0.9);
   }
   if (style === 'pony') {
     x.fillStyle = hairFill; x.beginPath(); x.ellipse(X(1.02), Y(0.1), hw * 0.26, hh * 0.9, -0.2, 0, Math.PI * 2); x.fill();
@@ -123,7 +127,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     const k = style === 'buzz' ? 1.02 : 1.09;
     x.fillStyle = hairFill;
     x.beginPath(); x.ellipse(cx, Y(-0.3), hw * k, hh * (style === 'buzz' ? 0.76 : 0.8), 0, Math.PI, Math.PI * 2); x.fill();
-    soft(X(-0.15), Y(-0.98), hw * 0.8, hh * 0.09, 'rgba(255,255,255,0.14)');     // light on the crown
+    soft(X(-0.15), Y(-0.98), hw * 0.8, hh * 0.09, shine(0.26));     // light on the crown
     x.fillRect(cx - hw * k, Y(-0.31), hw * 2 * k, hh * (style === 'long' || style === 'curly' ? 0.9 : 0.32));
     if (style !== 'buzz') {
       // strands combed over the crown from the parting, so the top isn't a flat helmet
@@ -298,8 +302,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
       }
       strands(260, () => fringe(R() * 2.1 - 1.05, 0, 1 - R() * 0.1, 1, 'rgba(0,0,0,0.16)'), 2.6);          // depth between locks
       strands(1500, () => fringe(R() * 2.1 - 1.05, 0, 1 - R() * 0.12, 1, rgba(hair, 0.55)), 0.6);
-      strands(900, () => { const v = 0.22 + R() * 0.14; return fringe(R() * 2.1 - 1.05, v, v + 0.1 + R() * 0.08, 0.25, 'rgba(255,245,225,0.085)'); }, 0.9);   // shine band
-      strands(500, () => { const v = 0.6 + R() * 0.1; return fringe(R() * 2.1 - 1.05, v, v + 0.07, 0.15, 'rgba(255,255,255,0.07)'); }, 0.8);
+      strands(900, () => { const v = 0.22 + R() * 0.14; return fringe(R() * 2.1 - 1.05, v, v + 0.1 + R() * 0.08, 0.25, shine(0.2)); }, 0.9);   // shine band
+      strands(500, () => { const v = 0.6 + R() * 0.1; return fringe(R() * 2.1 - 1.05, v, v + 0.07, 0.15, shine(0.13)); }, 0.8);
       // the ends: uneven, wispy, a few falling past the line
       strands(420, () => { const u = R() * 1.8 - 0.9; return [X(u) - (u - part) * 3, Y(edge(u) - 0.05), X(u) + (R() - 0.5) * 4, Y(edge(u) + R() * 0.045), 1.5, R() < 0.5 ? hair : hairLo]; }, 0.75);
       strands(90, () => { const u = R() * 1.6 - 0.8; return [X(u), Y(edge(u) - 0.01), X(u) + (R() - 0.3) * 8, Y(edge(u) + 0.03 + R() * 0.05), 2, rgba(hair, 0.4)]; }, 0.6);
