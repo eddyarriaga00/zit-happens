@@ -150,17 +150,19 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   }
 
   // ---- the head
-  const jaw = look.fem ? 0.6 : 0.72;
+  const jaw = look.fem ? 0.6 : 0.7;
   const head = new Path2D();
   head.moveTo(cx, Y(-1));
-  head.bezierCurveTo(X(0.95), Y(-1), X(1.06), Y(-0.2), X(0.98), Y(0.15));
-  head.bezierCurveTo(X(0.92), Y(0.62), X(jaw), Y(0.98), cx, Y(1));
-  head.bezierCurveTo(X(-jaw), Y(0.98), X(-0.92), Y(0.62), X(-0.98), Y(0.15));
-  head.bezierCurveTo(X(-1.06), Y(-0.2), X(-0.95), Y(-1), cx, Y(-1));
+  head.bezierCurveTo(X(0.8), Y(-1.02), X(1.03), Y(-0.55), X(0.975), Y(-0.02));        // skull down to the cheekbone
+  head.bezierCurveTo(X(0.95), Y(0.34), X(0.86), Y(0.6), X(jaw), Y(0.8));              // cheek to the angle of the jaw
+  head.bezierCurveTo(X(jaw - 0.2), Y(0.97), X(0.22), Y(1.02), cx, Y(1.02));           // along the jaw to the chin
+  head.bezierCurveTo(X(-0.22), Y(1.02), X(-(jaw - 0.2)), Y(0.97), X(-jaw), Y(0.8));
+  head.bezierCurveTo(X(-0.86), Y(0.6), X(-0.95), Y(0.34), X(-0.975), Y(-0.02));
+  head.bezierCurveTo(X(-1.03), Y(-0.55), X(-0.8), Y(-1.02), cx, Y(-1));
   head.closePath();
 
   const ey = -0.06, ex = 0.42;                      // eye line / spacing (head units)
-  const erx = hw * 0.2, ery = hh * 0.075;
+  const erx = hw * 0.215, ery = hh * 0.084;
   const mouthY = 0.6, noseY = 0.36;
 
   x.save();
@@ -192,7 +194,6 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   soft(X(-0.05), Y(-0.36), hw * 0.2, hh * 0.08, 'rgba(255,255,255,0.14)');             // oily centre of the forehead
   const ridge = x.createLinearGradient(X(-0.09), 0, X(0.09), 0);
   ridge.addColorStop(0, 'rgba(255,255,255,0)'); ridge.addColorStop(0.45, 'rgba(255,255,255,0.2)'); ridge.addColorStop(1, 'rgba(255,255,255,0)');
-  x.fillStyle = ridge; x.fillRect(X(-0.09), Y(-0.1), hw * 0.18, hh * 0.4);
   soft(cx, Y(0.31), hw * 0.15, hh * 0.09, rgba(tone.blush, 0.3));                    // warmth in the nose
   soft(X(-0.02), Y(0.3), hw * 0.1, hh * 0.07, 'rgba(255,255,255,0.3)');             // tip of the nose
   soft(cx, Y(noseY + 0.07), hw * 0.2, hh * 0.04, 'rgba(50,16,12,0.4)');             // under the nose
@@ -264,14 +265,14 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   // ---- eyebrows: individual hairs following the arch
   const browCol = grey ? '#8a8a8a' : tint(hair, 0.8);
   for (const d of [-1, 1]) {
-    soft(X(d * ex), Y(ey - 0.21), hw * 0.26, hh * 0.035, rgba(browCol.startsWith('#') ? browCol : hair, 0.25));
-    strands(look.fem ? 150 : 210, () => {
+    soft(X(d * ex), Y(ey - 0.21), hw * 0.26, hh * 0.035, rgba(browCol.startsWith('#') ? browCol : hair, 0.42));
+    strands(look.fem ? 320 : 400, () => {
       const k = R();                         // 0 = inner end, 1 = tail
-      const bx = X(d * (ex - 0.24 + k * 0.5)), by = Y(ey - 0.19 - Math.sin(k * Math.PI * 0.8) * 0.05 + k * 0.03) + (R() - 0.5) * hh * (look.fem ? 0.03 : 0.045);
+      const bx = X(d * (ex - 0.24 + k * 0.5)), by = Y(ey - 0.19 - Math.sin(k * Math.PI * 0.8) * 0.05 + k * 0.03) + (R() - 0.5) * hh * (look.fem ? 0.034 : 0.046) * (1 - k * 0.65);
       const a = (d > 0 ? -0.25 : Math.PI + 0.25) + (0.6 - k) * (d > 0 ? -0.9 : 0.9);
-      const len = hw * (0.05 + R() * 0.04);
-      return [bx, by, bx + Math.cos(a) * len, by + Math.sin(a) * len, 0, rgba(grey ? '#8a8a8a' : hair, 0.85)];
-    }, look.fem ? 1.1 : 1.5);
+      const len = hw * (0.04 + R() * 0.035);
+      return [bx, by, bx + Math.cos(a) * len, by + Math.sin(a) * len, 0, rgba(grey ? '#8a8a8a' : hair, 0.5 + R() * 0.35)];
+    }, look.fem ? 0.75 : 0.95);
   }
 
   // ---- eyes
@@ -289,37 +290,57 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     sc.addColorStop(0, '#f8f4f0'); sc.addColorStop(1, '#d9c9c6');
     x.fillStyle = sc; x.fillRect(px - erx * 1.2, py - ery * 1.5, erx * 2.4, ery * 3);
     // iris with fibers, dark rim, pupil, wet highlight
-    const ir = ery * 1.02;
-    const ig = x.createRadialGradient(px, py, ir * 0.2, px, py, ir);
-    ig.addColorStop(0, tint(look.eye, 1.5)); ig.addColorStop(0.7, look.eye); ig.addColorStop(1, tint(look.eye, 0.45));
-    x.fillStyle = ig; x.beginPath(); x.arc(px, py, ir, 0, Math.PI * 2); x.fill();
-    x.strokeStyle = tint(look.eye, 0.6); x.lineWidth = 0.6;
-    for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2; x.beginPath(); x.moveTo(px + Math.cos(a) * ir * 0.4, py + Math.sin(a) * ir * 0.4); x.lineTo(px + Math.cos(a) * ir * 0.92, py + Math.sin(a) * ir * 0.92); x.stroke(); }
-    x.fillStyle = '#0c0807'; x.beginPath(); x.arc(px, py, ir * 0.42, 0, Math.PI * 2); x.fill();
-    x.fillStyle = 'rgba(255,255,255,0.9)'; x.beginPath(); x.arc(px - ir * 0.3, py - ir * 0.35, ir * 0.17, 0, Math.PI * 2); x.fill();
-    x.fillStyle = 'rgba(255,255,255,0.35)'; x.beginPath(); x.arc(px + ir * 0.3, py + ir * 0.3, ir * 0.1, 0, Math.PI * 2); x.fill();
+    const ir = ery * 1.14, iy = py - ery * 0.06;
+    const ig = x.createRadialGradient(px, iy, ir * 0.15, px, iy, ir);
+    ig.addColorStop(0, tint(look.eye, 1.55)); ig.addColorStop(0.45, tint(look.eye, 1.15)); ig.addColorStop(0.8, look.eye); ig.addColorStop(1, tint(look.eye, 0.3));
+    x.fillStyle = ig; x.beginPath(); x.arc(px, iy, ir, 0, Math.PI * 2); x.fill();
+    x.globalAlpha = 0.55; x.lineWidth = 0.5;
+    for (let i = 0; i < 60; i++) {
+      const a = R() * Math.PI * 2, r0 = ir * (0.36 + R() * 0.15), r1 = ir * (0.7 + R() * 0.26);
+      x.strokeStyle = i % 3 ? tint(look.eye, 0.62) : tint(look.eye, 1.7);
+      x.beginPath(); x.moveTo(px + Math.cos(a) * r0, iy + Math.sin(a) * r0); x.lineTo(px + Math.cos(a) * r1, iy + Math.sin(a) * r1); x.stroke();
+    }
+    x.globalAlpha = 1;
+    x.strokeStyle = 'rgba(20,12,10,0.55)'; x.lineWidth = ir * 0.12; x.beginPath(); x.arc(px, iy, ir * 0.95, 0, Math.PI * 2); x.stroke();   // dark rim of the iris
+    x.fillStyle = '#080505'; x.beginPath(); x.arc(px, iy, ir * 0.38, 0, Math.PI * 2); x.fill();
+    soft(px, iy + ir * 0.5, ir * 0.7, ir * 0.35, 'rgba(255,255,255,0.14)');           // light pooling low in the iris
+    x.fillStyle = 'rgba(255,255,255,0.92)'; x.beginPath(); x.ellipse(px - ir * 0.32, iy - ir * 0.34, ir * 0.16, ir * 0.2, -0.4, 0, Math.PI * 2); x.fill();
+    x.fillStyle = 'rgba(255,255,255,0.3)'; x.beginPath(); x.arc(px + ir * 0.34, iy + ir * 0.3, ir * 0.08, 0, Math.PI * 2); x.fill();
+    soft(px + d * erx * 0.8, py, erx * 0.35, ery * 0.6, 'rgba(200,150,150,0.28)');     // the white is pinker toward the corner
     // shadow cast by the upper lid, pink inner corner
     const lidSh = x.createLinearGradient(0, py - ery * 1.2, 0, py + ery * 0.3);
     lidSh.addColorStop(0, 'rgba(40,15,12,0.55)'); lidSh.addColorStop(1, 'rgba(40,15,12,0)');
     x.fillStyle = lidSh; x.fillRect(px - erx * 1.2, py - ery * 1.3, erx * 2.4, ery * 1.7);
     soft(px - d * erx * 0.92, py + ery * 0.2, erx * 0.2, ery * 0.4, 'rgba(214,120,120,0.8)');
     x.restore();
-    // lids, crease, lashes
-    x.strokeStyle = '#2a1712'; x.lineWidth = s * (look.fem ? 0.011 : 0.008);
-    x.beginPath(); x.moveTo(px - d * erx, py + ery * 0.25); x.quadraticCurveTo(px - d * erx * 0.2, py - ery * 1.25, px + d * erx * 1.04, py - ery * 0.14); x.stroke();
-    x.strokeStyle = rgba(tone.pore, 0.55); x.lineWidth = 1.2;
-    x.beginPath(); x.moveTo(px + d * erx, py - ery * 0.1); x.quadraticCurveTo(px + d * erx * 0.1, py + ery * 1.05, px - d * erx, py + ery * 0.25); x.stroke();
-    x.strokeStyle = rgba(tone.pore, 0.4); x.lineWidth = 1.6;
-    x.beginPath(); x.moveTo(px - d * erx * 0.85, py - ery * 0.8); x.quadraticCurveTo(px, py - ery * 2.0, px + d * erx * 1.05, py - ery * 0.75); x.stroke();
-    if (look.fem) {
-      strands(20, () => {
-        const k = 0.25 + R() * 0.75;                              // mostly toward the outer corner
-        const t = k, lx = (1 - t) * (1 - t) * (px - d * erx) + 2 * (1 - t) * t * (px - d * erx * 0.2) + t * t * (px + d * erx * 1.04);
-        const ly = (1 - t) * (1 - t) * (py + ery * 0.25) + 2 * (1 - t) * t * (py - ery * 1.25) + t * t * (py - ery * 0.14);
-        const len = ery * 0.34 * (0.5 + k * 0.7);
-        return [lx, ly, lx + d * len * (0.3 + k), ly - len, d * 1, 'rgba(25,14,10,0.85)'];
-      }, 1);
+    // upper lash line: darkest and thickest toward the outer corner, never a hard outline
+    const P0 = [px - d * erx, py + ery * 0.25], P1 = [px - d * erx * 0.2, py - ery * 1.25], P2 = [px + d * erx * 1.04, py - ery * 0.14];
+    const onLid = (t) => [(1 - t) ** 2 * P0[0] + 2 * (1 - t) * t * P1[0] + t * t * P2[0], (1 - t) ** 2 * P0[1] + 2 * (1 - t) * t * P1[1] + t * t * P2[1]];
+    for (let i = 0; i < 24; i++) {
+      const a = onLid(i / 24), b = onLid((i + 1) / 24);
+      x.strokeStyle = `rgba(34,18,14,${0.5 + 0.45 * (i / 24)})`; x.lineWidth = s * (look.fem ? 0.0048 : 0.0036) * (0.6 + 1.2 * (i / 24));
+      x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
     }
+    // lower lid: a pale wet rim with the faintest shadow beneath, not a drawn line
+    x.strokeStyle = 'rgba(240,200,190,0.55)'; x.lineWidth = 1.1;
+    x.beginPath(); x.moveTo(px + d * erx * 0.96, py - ery * 0.08); x.quadraticCurveTo(px + d * erx * 0.1, py + ery * 1.0, px - d * erx * 0.9, py + ery * 0.26); x.stroke();
+    x.strokeStyle = rgba(tone.pore, 0.3); x.lineWidth = 0.9;
+    x.beginPath(); x.moveTo(px + d * erx, py - ery * 0.06); x.quadraticCurveTo(px + d * erx * 0.1, py + ery * 1.12, px - d * erx, py + ery * 0.27); x.stroke();
+    // the fold of the lid, and the lid itself catching a little light
+    x.strokeStyle = rgba(tone.pore, 0.42); x.lineWidth = 1.3;
+    x.beginPath(); x.moveTo(px - d * erx * 0.85, py - ery * 0.75); x.quadraticCurveTo(px, py - ery * 1.95, px + d * erx * 1.05, py - ery * 0.7); x.stroke();
+    soft(px, py - ery * 1.2, erx * 0.7, ery * 0.3, 'rgba(255,255,255,0.12)');
+    strands(look.fem ? 38 : 18, () => {
+      const k = 0.12 + R() * 0.88;
+      const [lx, ly] = onLid(k);
+      const len = ery * (look.fem ? 0.42 : 0.22) * (0.45 + k * 0.75);
+      return [lx, ly, lx + d * len * (0.15 + k * 0.9), ly - len * (1 - k * 0.25), d * len * 0.35, 'rgba(22,12,9,0.8)'];
+    }, 0.7);
+    strands(10, () => {
+      const k = 0.3 + R() * 0.65;
+      const lx = px - d * erx + d * erx * 2 * k, ly = py + ery * (0.25 + Math.sin(k * Math.PI) * 0.55 - k * 0.3);
+      return [lx, ly, lx + d * ery * 0.1, ly + ery * 0.18, 0, 'rgba(40,22,16,0.4)'];
+    }, 0.6);
     soft(px, py + ery * 2.1, erx * 1.0, ery * 0.7, rgba(tone.pore, look.age > 40 ? 0.26 : 0.12));    // under-eye
     if (look.age >= 55) {
       x.strokeStyle = rgba(tone.pore, 0.35); x.lineWidth = 1;
@@ -343,15 +364,30 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     x.beginPath(); x.arc(X(d * 0.14), Y(noseY - 0.015), hw * 0.06, d > 0 ? -1.3 : Math.PI - 0.9, d > 0 ? 0.9 : Math.PI + 1.3); x.stroke();
   }
 
+  // the wings of the nose, its shaded side, and the line where the tip meets the lip
+  for (const d of [-1, 1]) {
+    soft(X(d * 0.2), Y(noseY - 0.03), hw * 0.045, hh * 0.06, rgba(tone.pore, 0.3));
+    soft(X(d * 0.15), Y(noseY - 0.05), hw * 0.06, hh * 0.05, 'rgba(255,255,255,0.1)');
+  }
+  soft(X(0.1), Y(0.12), hw * 0.05, hh * 0.2, rgba(tone.shade, 0.22));
+  x.strokeStyle = rgba(tone.pore, 0.32); x.lineWidth = 1.2;
+  x.beginPath(); x.moveTo(X(-0.15), Y(noseY + 0.02)); x.quadraticCurveTo(X(-0.07), Y(noseY + 0.05), cx, Y(noseY + 0.035)); x.quadraticCurveTo(X(0.07), Y(noseY + 0.05), X(0.15), Y(noseY + 0.02)); x.stroke();
+
   // ---- lips
   const my = Y(mouthY), mw = hw * 0.36;
-  const lipBase = look.fem ? '#b8506a' : tint(tone.blush, 0.82);
+  const mixHex = (a, b, t) => {
+    if (!/^#[0-9a-f]{6}$/i.test(a) || !/^#[0-9a-f]{6}$/i.test(b)) return b;
+    const p = (c, i) => parseInt(c.slice(1 + i * 2, 3 + i * 2), 16);
+    return '#' + [0, 1, 2].map((i) => Math.round(p(a, i) + (p(b, i) - p(a, i)) * t).toString(16).padStart(2, '0')).join('');
+  };
+  const lipBase = mixHex(tone.base, look.fem ? '#b04a5c' : '#a8545a', look.fem ? 0.68 : 0.5);   // her own lip colour, not lipstick
   const upper = new Path2D();
   upper.moveTo(cx - mw, my);
   upper.quadraticCurveTo(cx - mw * 0.45, my - hh * 0.055, cx - mw * 0.12, my - hh * 0.05);
   upper.quadraticCurveTo(cx, my - hh * 0.03, cx + mw * 0.12, my - hh * 0.05);
   upper.quadraticCurveTo(cx + mw * 0.45, my - hh * 0.055, cx + mw, my);
   upper.quadraticCurveTo(cx, my + hh * 0.012, cx - mw, my);
+  x.shadowColor = tint(lipBase, 0.82); x.shadowBlur = hh * 0.014;
   x.fillStyle = tint(lipBase, 0.82); x.fill(upper);
   const lower = new Path2D();
   lower.moveTo(cx - mw, my);
@@ -360,9 +396,11 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   lower.quadraticCurveTo(cx - mw * 0.55, my + hh * 0.095, cx - mw, my);
   const lg = x.createLinearGradient(0, my, 0, my + hh * 0.1);
   lg.addColorStop(0, tint(lipBase, 0.85)); lg.addColorStop(0.5, lipBase); lg.addColorStop(1, tint(lipBase, 1.15));
-  x.fillStyle = lg; x.fill(lower);
+  x.shadowColor = lipBase; x.fillStyle = lg; x.fill(lower);
+  x.shadowColor = 'transparent'; x.shadowBlur = 0;
   soft(cx - mw * 0.1, my + hh * 0.05, mw * 0.5, hh * 0.025, 'rgba(255,255,255,0.32)');
-  x.strokeStyle = 'rgba(70,22,26,0.85)'; x.lineWidth = 1.8;
+  for (const d of [-1, 1]) soft(cx + d * mw * 1.04, my + hh * 0.006, hw * 0.035, hh * 0.022, 'rgba(60,20,20,0.35)');   // corners of the mouth
+  x.strokeStyle = 'rgba(70,22,26,0.6)'; x.lineWidth = 1.3;
   x.beginPath(); x.moveTo(cx - mw * 1.03, my + hh * 0.008); x.quadraticCurveTo(cx, my + hh * 0.014, cx + mw * 1.03, my + hh * 0.008); x.stroke();
   x.strokeStyle = 'rgba(90,30,36,0.2)'; x.lineWidth = 0.8;
   for (let i = 0; i < 14; i++) { const u = (R() - 0.5) * 1.5; x.beginPath(); x.moveTo(cx + u * mw, my + hh * 0.012); x.lineTo(cx + u * mw * 0.95, my + hh * 0.085); x.stroke(); }
@@ -373,15 +411,13 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   for (const d of [-1, 1]) {
     soft(X(d * ex), Y(ey + 0.125), hw * 0.21, hh * 0.035, 'rgba(110,60,90,0.08)');        // under-eye hollow
     soft(X(d * (ex - 0.16)), Y(ey + 0.09), hw * 0.07, hh * 0.04, 'rgba(110,60,90,0.07)');   // tear trough
-    soft(X(d * 0.62), Y(0.09), hw * 0.2, hh * 0.06, 'rgba(255,255,255,0.13)');            // cheekbone catches the light
+    soft(X(d * 0.62), Y(0.09), hw * 0.2, hh * 0.06, 'rgba(255,255,255,0.06)');            // cheekbone catches the light
     soft(X(d * 0.8), Y(0.42), hw * 0.16, hh * 0.22, rgba(tone.shade, 0.16));              // hollow of the cheek
     soft(X(d * 0.86), Y(-0.3), hw * 0.14, hh * 0.2, rgba(tone.shade, 0.14));              // temples
     const lines = (look.age || 25) >= 40 ? 1 : 0.35;                                       // deeper with age
     x.strokeStyle = rgba(tone.pore, 0.1 * lines); x.lineWidth = 3.2;                               // smile lines
     x.beginPath(); x.moveTo(X(d * 0.21), Y(noseY - 0.01)); x.quadraticCurveTo(X(d * 0.34), Y(noseY + 0.07), X(d * 0.38), Y(mouthY - 0.07)); x.stroke();
     x.strokeStyle = rgba(tone.pore, 0.07 * lines); x.lineWidth = 1.4; x.stroke();
-    x.strokeStyle = 'rgba(80,40,34,0.3)'; x.lineWidth = 1.1;                               // crease above the lid
-    x.beginPath(); x.ellipse(X(d * ex), Y(ey + 0.02), erx * 1.12, ery * 1.75, 0, Math.PI * 1.14, Math.PI * 1.86); x.stroke();
     soft(X(d * (ex + 0.02)), Y(ey - 0.115), hw * 0.16, hh * 0.022, 'rgba(255,255,255,0.14)'); // brow bone
   }
   soft(cx, Y(0.08), hw * 0.035, hh * 0.2, 'rgba(255,255,255,0.17)');                       // bridge of the nose
