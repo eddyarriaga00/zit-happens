@@ -299,6 +299,40 @@ export class Treatment {
         }
       }
       ctx.fill();
+      if (g && g.headPath) {
+        // the film follows the face underneath: light on the high points while wet, the nose and
+        // mouth still readable through it, and fine cracks once a mask has dried
+        const wetK = this.phase === 'soothe' ? 0.8 : 1 - dryK;
+        const blob = (u, v, ru, rv, col) => {
+          ctx.save(); ctx.translate(g.cx + u * g.hw, g.cy + v * g.hh); ctx.scale(1, (rv * g.hh) / (ru * g.hw));
+          const bg = ctx.createRadialGradient(0, 0, 0, 0, 0, ru * g.hw);
+          bg.addColorStop(0, col); bg.addColorStop(1, col.replace(/[\d.]+\)$/, '0)'));
+          ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(0, 0, ru * g.hw, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        };
+        const dk = this.phase === 'soothe' ? 0.12 : 0.3;
+        for (const d of [-1, 1]) {
+          blob(d * 0.17, 0.2, 0.07, 0.2, `rgba(0,0,0,${dk})`);                 // sides of the nose
+          blob(d * 0.09, 0.375, 0.06, 0.025, `rgba(0,0,0,${dk * 1.6})`);       // nostrils
+          blob(d * 0.6, 0.12, 0.2, 0.07, `rgba(255,255,255,${0.2 * wetK})`);   // cheekbones
+          blob(d * 0.8, 0.45, 0.2, 0.25, `rgba(0,0,0,${dk * 0.6})`);           // the face turning away
+        }
+        blob(0, 0.36, 0.2, 0.03, `rgba(0,0,0,${dk})`);                          // under the nose
+        blob(-0.05, -0.4, 0.4, 0.13, `rgba(255,255,255,${0.2 * wetK})`);        // forehead
+        blob(0, 0.1, 0.035, 0.2, `rgba(255,255,255,${0.26 * wetK})`);           // bridge of the nose
+        blob(0, 0.3, 0.08, 0.05, `rgba(255,255,255,${0.26 * wetK})`);           // tip of the nose
+        blob(0, 0.85, 0.2, 0.07, `rgba(255,255,255,${0.16 * wetK})`);           // chin
+        if (dryK > 0.3 && this.phase !== 'soothe') {
+          ctx.strokeStyle = `rgba(190,190,200,${0.3 * (dryK - 0.3) / 0.7})`; ctx.lineWidth = 0.7; ctx.lineCap = 'round';
+          ctx.beginPath();
+          for (let i = 0; i < 26; i++) {
+            const a = jit[i * 4] * 6.28, u = (jit[i * 4 + 1] * 2 - 1) * 0.85, v = jit[i * 4 + 2] * 1.6 - 0.65;
+            let x = g.cx + u * g.hw, y = g.cy + v * g.hh;
+            ctx.moveTo(x, y);
+            for (let k = 0; k < 3; k++) { x += Math.cos(a + (jit[i * 4 + 3] - 0.5) * 2 * k) * 9; y += Math.sin(a + (jit[i * 4 + 3] - 0.5) * 2 * k) * 9; ctx.lineTo(x, y); }
+          }
+          ctx.stroke();
+        }
+      }
       ctx.strokeStyle = `rgba(255,255,255,${this.phase === 'soothe' ? 0.35 : 0.3 * (1 - dryK)})`;
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
