@@ -64,7 +64,11 @@ export class HairService {
   buildGrid() {
     const G = this.G;
     this.cells = [];
-    for (let y = CELL / 2; y < G.H; y += CELL) for (let x = CELL / 2; x < G.W; x += CELL) if (G.geo.onHair(x, y)) this.cells.push({ x, y, j: Math.random(), k: Math.random() });
+    // hair you can actually reach: not the bits hidden behind her ears or lying under her top
+    const gq = G.geo;
+    const reach = (x, y) => gq.onHair(x, y) && y < gq.cy + gq.hh * 1.1
+      && !(Math.abs(x - gq.cx) > gq.hw * 0.92 && Math.abs(x - gq.cx) < gq.hw * 1.22 && Math.abs(y - (gq.cy + gq.hh * 0.03)) < gq.hh * 0.25);
+    for (let y = CELL / 2; y < G.H; y += CELL) for (let x = CELL / 2; x < G.W; x += CELL) if (reach(x, y)) this.cells.push({ x, y, j: Math.random(), k: Math.random() });
     const n = Math.max(1, this.cells.length);
     this.foam = new Float32Array(n);
     this.coat = new Float32Array(n);
