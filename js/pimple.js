@@ -432,6 +432,21 @@ export class Pimple {
       ctx.fill();
     }
 
+    // fine broken capillaries threading out through the redness
+    if (!T.hard && appear > 0.6) {
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 6; i++) {
+        const a = this.seed * 1.7 + i * 1.13, k = 0.36 + ((this.seed * 13 + i * 7) % 10) / 40;
+        const x0 = x + Math.cos(a) * r0 * 1.15, y0 = y + Math.sin(a) * r0 * 1.15;
+        const x1 = x + Math.cos(a + 0.25) * haloR * k, y1 = y + Math.sin(a + 0.25) * haloR * k;
+        ctx.strokeStyle = `rgba(176,44,50,${0.15 * inflame})`; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(x0, y0);
+        ctx.quadraticCurveTo((x0 + x1) / 2 + Math.sin(a * 3) * r0 * 0.3, (y0 + y1) / 2 + Math.cos(a * 3) * r0 * 0.3, x1, y1);
+        ctx.stroke();
+        if (i % 2) { ctx.beginPath(); ctx.moveTo((x0 + x1) / 2, (y0 + y1) / 2); ctx.lineTo(x1 + Math.sin(a) * r0 * 0.35, y1 - Math.cos(a) * r0 * 0.35); ctx.stroke(); }
+      }
+    }
+
     if (this.state === 'done') {
       // healing mark
       const a = 1 - this.heal;
@@ -480,6 +495,11 @@ export class Pimple {
     disc(x, y, bumpR, [[0, `rgba(204,${Math.round(74 - pr * 26)},${Math.round(66 - pr * 22)},0.8)`], [0.62, 'rgba(206,80,70,0.5)'], [1, 'rgba(206,80,70,0)']], bumpR * 0.1);
     // light falling across the dome
     disc(x - bumpR * 0.22, y - bumpR * 0.26, bumpR * 0.85, [[0, 'rgba(255,232,220,0.5)'], [1, 'rgba(255,232,220,0)']]);
+    // where the dome meets the skin: a thin dark crease on the shadow side
+    ctx.strokeStyle = 'rgba(96,30,24,0.09)'; ctx.lineWidth = Math.max(1.5, bumpR * 0.2);
+    ctx.beginPath(); ctx.arc(x, y, bumpR * 0.84, 0.05, 1.8); ctx.stroke();
+    // a second, softer catch of light low on the dome
+    disc(x + bumpR * 0.3, y + bumpR * 0.34, bumpR * 0.3, [[0, 'rgba(255,225,215,0.22)'], [1, 'rgba(255,225,215,0)']]);
     // tight, shiny skin
     ctx.fillStyle = `rgba(255,255,255,${0.25 + pr * 0.3})`;
     ctx.beginPath();
