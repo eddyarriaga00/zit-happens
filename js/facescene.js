@@ -94,7 +94,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const shine = (a) => `rgba(${hch.map((v) => Math.round(v + (255 - v) * 0.55)).join(',')},${(a * Math.min(1, 0.25 + hlum * 1.6)).toFixed(3)})`;
   const style = look.style || 'short';
   const hasHair = style !== 'bald';
-  const hairline = style === 'bald' ? -2 : style === 'balding' ? -2 : style === 'buzz' ? -0.7 : -0.68;      // a proper forehead
+  const hairline = style === 'bald' ? -2 : style === 'balding' ? -2 : style === 'buzz' ? -0.72 : -0.76;      // a proper forehead
   // the line the hair grows from. Drawn back for a ponytail or a bun it is an even arch, highest in the middle;
   // worn down it sits lower on the side the hair sweeps toward.
   const tiedBack = style === 'pony' || style === 'bun';
@@ -261,8 +261,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   x.fillStyle = look.shirt || '#9ad1b0';
   x.beginPath();
   x.moveTo(X(-2.2), h + 10);
-  x.quadraticCurveTo(X(-1.7), Y(1.28), X(-0.55), Y(1.2));
-  x.lineTo(X(0.55), Y(1.2));
+  x.quadraticCurveTo(X(-1.7), Y(1.28), X(-0.67), Y(1.2));
+  x.lineTo(X(0.67), Y(1.2));
   x.quadraticCurveTo(X(1.7), Y(1.28), X(2.2), h + 10);
   x.closePath(); x.fill();
   // the top is cloth, not a flat shape: it rounds over the shoulders, falls into shadow lower
@@ -275,7 +275,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     soft(X(d * 1.25), Y(1.42), hw * 0.55, hh * 0.14, 'rgba(255,255,255,0.16)');        // the round of the shoulder
     soft(X(d * 0.75), Y(1.7), hw * 0.3, hh * 0.4, 'rgba(0,0,0,0.1)');                  // hollow beside the chest
     for (let i = 0; i < 4; i++) {                                                      // creases fanning from the neckline
-      const u0 = d * (0.62 + i * 0.14), u1 = d * (0.95 + i * 0.3), v1 = 1.75 + i * 0.12 + R() * 0.1;
+      const u0 = d * (0.76 + i * 0.13), u1 = d * (0.95 + i * 0.3), v1 = 1.75 + i * 0.12 + R() * 0.1;
       x.strokeStyle = 'rgba(0,0,0,0.09)'; x.lineWidth = 3;
       x.beginPath(); x.moveTo(X(u0), Y(1.27 + i * 0.02)); x.quadraticCurveTo(X((u0 + u1) / 2 + d * 0.1), Y(1.45 + i * 0.05), X(u1), Y(v1)); x.stroke();
       x.strokeStyle = 'rgba(255,255,255,0.1)'; x.lineWidth = 1.5;
@@ -286,30 +286,30 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // the neck and the open neckline are one piece of skin: a column lit down the middle,
   // darker at its sides, with the chin's shadow lying across the top of it
   const neck = new Path2D();
-  neck.moveTo(X(-0.46), Y(0.5));
-  neck.bezierCurveTo(X(-0.42), Y(0.9), X(-0.46), Y(1.1), X(-0.58), Y(1.2));
-  neck.quadraticCurveTo(cx, Y(1.78), X(0.58), Y(1.2));
-  neck.bezierCurveTo(X(0.46), Y(1.1), X(0.42), Y(0.9), X(0.46), Y(0.5));
+  neck.moveTo(X(-0.6), Y(0.5));                       // a real neck is most of the width of the jaw, and widens into the shoulders
+  neck.bezierCurveTo(X(-0.55), Y(0.9), X(-0.58), Y(1.08), X(-0.71), Y(1.2));
+  neck.quadraticCurveTo(cx, Y(1.8), X(0.71), Y(1.2));
+  neck.bezierCurveTo(X(0.58), Y(1.08), X(0.55), Y(0.9), X(0.6), Y(0.5));
   neck.closePath();
   x.fillStyle = tone.base; x.fill(neck);
   x.save(); x.clip(neck);
   x.globalCompositeOperation = 'multiply';
-  const nside = x.createLinearGradient(X(-0.56), 0, X(0.56), 0);
+  const nside = x.createLinearGradient(X(-0.68), 0, X(0.68), 0);
   nside.addColorStop(0, 'rgba(158,98,86,0.7)'); nside.addColorStop(0.3, 'rgba(158,98,86,0.16)'); nside.addColorStop(0.45, 'rgba(158,98,86,0.1)');
   nside.addColorStop(0.72, 'rgba(158,98,86,0.3)'); nside.addColorStop(1, 'rgba(158,98,86,0.8)');
-  x.fillStyle = nside; x.fillRect(X(-0.7), Y(0.4), hw * 1.4, hh * 1.5);
+  x.fillStyle = nside; x.fillRect(X(-0.85), Y(0.4), hw * 1.7, hh * 1.5);
   const chinSh = x.createLinearGradient(0, Y(0.9), 0, Y(1.42));
   chinSh.addColorStop(0, 'rgba(120,66,58,0.75)'); chinSh.addColorStop(0.45, 'rgba(140,82,72,0.4)'); chinSh.addColorStop(1, 'rgba(158,98,86,0)');
-  x.fillStyle = chinSh; x.fillRect(X(-0.7), Y(0.4), hw * 1.4, hh * 1.1);
+  x.fillStyle = chinSh; x.fillRect(X(-0.85), Y(0.4), hw * 1.7, hh * 1.1);
   x.restore();
   x.strokeStyle = 'rgba(0,0,0,0.14)'; x.lineWidth = 5;
-  x.beginPath(); x.moveTo(X(-0.6), Y(1.2)); x.quadraticCurveTo(cx, Y(1.8), X(0.6), Y(1.2)); x.stroke();
+  x.beginPath(); x.moveTo(X(-0.72), Y(1.2)); x.quadraticCurveTo(cx, Y(1.82), X(0.72), Y(1.2)); x.stroke();
   // a stitched hem round the neckline
   x.strokeStyle = 'rgba(255,255,255,0.22)'; x.lineWidth = 1.2; x.setLineDash([3, 3]);
-  x.beginPath(); x.moveTo(X(-0.66), Y(1.215)); x.quadraticCurveTo(cx, Y(1.9), X(0.66), Y(1.215)); x.stroke();
+  x.beginPath(); x.moveTo(X(-0.78), Y(1.215)); x.quadraticCurveTo(cx, Y(1.92), X(0.78), Y(1.215)); x.stroke();
   x.setLineDash([]);
   for (const d of [-1, 1]) {
-    soft(X(d * 0.3), Y(1.18), hw * 0.07, hh * 0.3, rgba(tone.pore, 0.2));              // neck tendons
+    soft(X(d * 0.36), Y(1.18), hw * 0.08, hh * 0.3, rgba(tone.pore, 0.2));              // neck tendons
     soft(X(d * 1.1), Y(1.55), hw * 0.5, hh * 0.12, 'rgba(255,255,255,0.14)');           // light on the shoulders
     x.strokeStyle = rgba(tone.pore, 0.25); x.lineWidth = 3;                             // collarbones
     x.beginPath(); x.moveTo(X(d * 0.08), Y(1.5)); x.quadraticCurveTo(X(d * 0.3), Y(1.42), X(d * 0.52), Y(1.36)); x.stroke();
@@ -324,8 +324,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   //   hol the hollow under the cheekbone
   const SHAPES = {
     oval:    { T: 1.0,   C: 0.965, full: 0,     jaw: 0.66, jv: 0.70, a: 0.20, b: 0.17, bv: 0.21, cw: 0.30, chinV: 1.035, hol: 0.2 },
-    round:   { T: 1.0,   C: 0.985, full: 0.02,  jaw: 0.76, jv: 0.68, a: 0.16, b: 0.15, bv: 0.25, cw: 0.42, chinV: 1.0,   hol: 0.07 },
-    square:  { T: 1.0,   C: 0.965, full: 0.01,  jaw: 0.80, jv: 0.74, a: 0.08, b: 0.20, bv: 0.19, cw: 0.42, chinV: 1.025, hol: 0.16 },
+    round:   { T: 1.0,   C: 0.985, full: 0.02,  jaw: 0.72, jv: 0.68, a: 0.17, b: 0.15, bv: 0.25, cw: 0.38, chinV: 1.005,   hol: 0.07 },
+    square:  { T: 1.0,   C: 0.965, full: 0.01,  jaw: 0.76, jv: 0.74, a: 0.09, b: 0.20, bv: 0.19, cw: 0.42, chinV: 1.025, hol: 0.16 },
     heart:   { T: 1.0,   C: 0.965, full: -0.02, jaw: 0.59, jv: 0.68, a: 0.24, b: 0.17, bv: 0.23, cw: 0.21, chinV: 1.05,  hol: 0.27 },
     diamond: { T: 0.93,  C: 0.98,  full: -0.03, jaw: 0.60, jv: 0.70, a: 0.23, b: 0.17, bv: 0.21, cw: 0.24, chinV: 1.04,  hol: 0.3 },
     oblong:  { T: 0.985, C: 0.95,  full: 0.01,  jaw: 0.70, jv: 0.76, a: 0.15, b: 0.17, bv: 0.22, cw: 0.30, chinV: 1.085, hol: 0.22 },
@@ -366,21 +366,39 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // ---- the head, in her own shape
   const jaw = SH.jaw + (look.fem ? 0 : 0.08) + vr(1) * 0.07;
   const chinW = Math.max(0.14, SH.cw + vr(9) * 0.05), chinV = SH.chinV;
-  const head = new Path2D();
-  head.moveTo(cx, Y(-1));
-  for (const d of [1, -1]) {
-    const pts = [
-      [0.74, -1.02, SH.T, -0.6, SH.C, -0.06],                                       // skull down to the cheekbone
-      [SH.C - 0.015 + SH.full, 0.26, jaw + SH.a, 0.5, jaw, SH.jv],                  // cheek to the angle of the jaw
-      [jaw - SH.b, SH.jv + SH.bv, chinW, chinV, 0, chinV],                          // along the jaw to the chin
-    ];
-    if (d > 0) for (const q of pts) head.bezierCurveTo(X(q[0]), Y(q[1]), X(q[2]), Y(q[3]), X(q[4]), Y(q[5]));
-    else for (let i = 2; i >= 0; i--) {                                             // and back up the other side
-      const q = pts[i], e = i ? pts[i - 1] : [0, 0, 0, 0, 0, -1];
-      head.bezierCurveTo(X(-q[2]), Y(q[3]), X(-q[0]), Y(q[1]), X(-e[4]), Y(e[5]));
-    }
+  // the outline is not one smooth egg. Coming down from the skull it dips in at the temple, swells over
+  // the cheekbone, falls in a little beneath it, then turns at the jaw
+  const segs = [
+    [0, -1, 0.74, -1.02, SH.T, -0.6, SH.C, -0.06],                                       // skull down to the cheekbone
+    [SH.C, -0.06, SH.C - 0.015 + SH.full, 0.26, jaw + SH.a, 0.5, jaw, SH.jv],            // cheek to the angle of the jaw
+    [jaw, SH.jv, jaw - SH.b, SH.jv + SH.bv, chinW, chinV, 0, chinV],                     // along the jaw to the chin
+  ];
+  const gs = (t) => Math.exp(-0.5 * t * t);
+  const outline = [];
+  for (const q of segs) for (let i = 0; i < 30; i++) {
+    const t = i / 30, m = 1 - t;
+    let u = m * m * m * q[0] + 3 * m * m * t * q[2] + 3 * m * t * t * q[4] + t * t * t * q[6];
+    const v = m * m * m * q[1] + 3 * m * m * t * q[3] + 3 * m * t * t * q[5] + t * t * t * q[7];
+    const k = Math.max(0, Math.min(1, (u - 0.45) / 0.25));
+    u += k * (-(shape === 'diamond' ? 0.02 : 0.036) * gs((v + 0.3) / 0.13) + 0.014 * gs((v - 0.06) / 0.12) - (0.006 + SH.hol * 0.09) * gs((v - 0.42) / 0.15));
+    outline.push([u, v]);
   }
+  outline.push([0, chinV]);
+  const head = new Path2D();
+  outline.forEach(([u, v], i) => (i ? head.lineTo(X(u), Y(v)) : head.moveTo(X(u), Y(v))));
+  for (let i = outline.length - 2; i > 0; i--) head.lineTo(X(-outline[i][0]), Y(outline[i][1]));
   head.closePath();
+  // one side of the face from the cheekbone round to the chin, for shading that follows her own jaw
+  const jawLine = (d) => { const pth = new Path2D(); let on = false; for (const [u, v] of outline) if (v > -0.12) { if (on) pth.lineTo(X(d * u), Y(v)); else { pth.moveTo(X(d * u), Y(v)); on = true; } } return pth; };
+  // her jaw throws its own shadow on her neck, in its own shape
+  x.save();
+  x.clip(neck);
+  const notHead = new Path2D(); notHead.rect(0, 0, w, h); notHead.addPath(head);
+  x.clip(notHead, 'evenodd');
+  x.globalCompositeOperation = 'multiply';
+  x.fillStyle = 'rgba(140,82,72,0.065)';
+  for (let i = 1; i <= 14; i++) { x.save(); x.translate(hw * 0.02, hh * (0.012 * i + 0.0006 * i * i)); x.fill(head); x.restore(); }
+  x.restore();
 
   // highlights on dark skin are warm and subtle; white patches there read as chalk
   const skinLum = /^#[0-9a-f]{6}$/i.test(tone.base) ? [1, 3, 5].reduce((a, i) => a + parseInt(tone.base.slice(i, i + 2), 16), 0) / 765 : 0.7;
@@ -407,6 +425,13 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     const under = x.createLinearGradient(0, Y(0.5), 0, Y(chinV + 0.015));
     under.addColorStop(0, sh(0)); under.addColorStop(0.65, sh(0.1)); under.addColorStop(1, sh(0.5));
     x.fillStyle = under; x.fillRect(X(-1.1), Y(0.5), hw * 2.2, hh * 0.7);
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    for (const d of [-1, 1]) {                                                         // the face turns away at its edge, most along the jaw
+      const jl = jawLine(d);
+      for (const [wd, al] of [[0.3, 0.035], [0.22, 0.045], [0.15, 0.055], [0.09, 0.07], [0.045, 0.09]]) {
+        x.strokeStyle = sh(al * (d > 0 ? 1.25 : 0.7)); x.lineWidth = hw * wd; x.stroke(jl);
+      }
+    }
     for (const d of [-1, 1]) {
       const far = d > 0 ? 1 : 0;
       soft(X(d * 0.9), Y(-0.34), hw * 0.22, hh * 0.36, sh(0.26));                    // temples
