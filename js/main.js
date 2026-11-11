@@ -1417,7 +1417,7 @@ function showLevels() {
     for (let n = ch.from; n <= ch.to; n++) {
       const locked = false, st = save.stars[n] || 0;      // every patient is open from the start
       const cls = ['lv', locked ? 'locked' : '', LEVELS[n - 1].mix.boss ? 'boss' : '', n === save.level ? 'current' : ''].join(' ');
-      html += `<button class="${cls}" data-n="${n}" ${locked ? 'disabled' : ''}><img data-face="${n}" alt=""><b>${n}. ${esc(LEVELS[n - 1].name)}</b><i>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</i></button>`;
+      html += `<button class="${cls}" data-n="${n}" ${locked ? 'disabled' : ''}><img data-face="${n}" alt="">${FACE_ZONES.includes(LEVELS[n - 1].zone) ? '' : `<em class="zone-chip">${ZONE_NAMES[LEVELS[n - 1].zone] || ''}</em>`}${LEVELS[n - 1].mix.boss ? '<em class="zone-chip boss-chip">Boss</em>' : ''}<b>${n}. ${esc(LEVELS[n - 1].name)}</b><i>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</i></button>`;
     }
     html += '</div>';
   }

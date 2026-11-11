@@ -348,7 +348,7 @@ export function portraitURL(def, opts = {}, size = 240) {
     x.save(); x.translate(xo, yo); x.scale(k, k);
     drawMood(x, scene.geo, opts.mood === 'happy' ? 1 : opts.mood === 'worried' ? -0.8 : 0);
     x.restore();
-    if (!opts.clear && opts.zone) {
+    if (!opts.clear && ['forehead', 'nose', 'cheek', 'chin'].includes(opts.zone)) {     // a back or shoulder breakout doesn't show on her face
       // before: an angry little breakout where the trouble is
       x.save(); x.translate(xo, yo); x.scale(k, k);
       const g = scene.geo;
