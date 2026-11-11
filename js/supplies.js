@@ -400,33 +400,59 @@ export class Supplies {
     const d = Math.min(1, c.dirt);
     ctx.fillStyle = 'rgba(40,15,10,0.22)';
     if (c.kind === 'pads') {
-      ctx.beginPath(); ctx.arc(2, 4, 30, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = mix('#ffffff', '#cdb45a', d);
-      ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill();
-      // quilted stitching
-      ctx.strokeStyle = 'rgba(120,100,80,0.28)';
-      ctx.lineWidth = 1.2;
-      ctx.setLineDash([3, 4]);
-      ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
-    } else {
-      rr(ctx, -32, -26, 68, 60, 8); ctx.fill();
-      ctx.fillStyle = mix('#f4fbff', '#a39683', d);
-      rr(ctx, -34, -30, 68, 60, 8); ctx.fill();
-      ctx.strokeStyle = 'rgba(90,110,130,0.25)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(-34, -6); ctx.quadraticCurveTo(0, 2, 34, -8); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-4, -30); ctx.quadraticCurveTo(2, 0, -6, 30); ctx.stroke();
-    }
-    // grime blotches as it fills up
-    if (d > 0.15) {
-      ctx.fillStyle = c.kind === 'pads' ? `rgba(190,150,40,${d * 0.55})` : `rgba(90,70,55,${d * 0.4})`;
+      // a cotton round: soft fuzzy edge, pillowy quilting, a little thickness
+      ctx.beginPath(); ctx.arc(2, 5, 30, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = mix('#e4e6ec', '#b7a04f', d);
+      ctx.beginPath(); ctx.arc(0.6, 2.2, 30, 0, Math.PI * 2); ctx.fill();
+      const pg = ctx.createRadialGradient(-8, -10, 2, 0, 0, 31);
+      pg.addColorStop(0, mix('#ffffff', '#e2cf86', d)); pg.addColorStop(0.75, mix('#f6f7fa', '#cdb45a', d)); pg.addColorStop(1, mix('#e6e8ee', '#b9a24f', d));
+      ctx.fillStyle = pg;
       ctx.beginPath();
-      ctx.arc(-8, 5, 11 * d + 3, 0, Math.PI * 2);
-      ctx.arc(10, -8, 8 * d + 2, 0, Math.PI * 2);
-      ctx.arc(6, 12, 6 * d + 2, 0, Math.PI * 2);
-      ctx.fill();
+      for (let i = 0; i <= 40; i++) { const a = i / 40 * Math.PI * 2, r = 30 + Math.sin(i * 7.3) * 0.7 + Math.sin(i * 2.9) * 0.5; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      ctx.closePath(); ctx.fill();
+      // quilted rings: a pressed groove with a lit edge
+      for (const r of [24, 13]) {
+        ctx.strokeStyle = 'rgba(120,110,100,0.22)'; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(0.5, 0.9, r, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(150,140,130,0.25)';
+      for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; ctx.beginPath(); ctx.arc(Math.cos(a) * 18.5, Math.sin(a) * 18.5, 0.7, 0, Math.PI * 2); ctx.fill(); }
+    } else {
+      // a damp wipe: soft folds, a rumpled edge, light catching the wet fabric
+      rr(ctx, -31, -25, 68, 60, 9); ctx.fill();
+      const wg = ctx.createLinearGradient(-34, -30, 34, 30);
+      wg.addColorStop(0, mix('#ffffff', '#b3a591', d)); wg.addColorStop(0.5, mix('#eef6fb', '#a39683', d)); wg.addColorStop(1, mix('#dbe7f0', '#8f8371', d));
+      ctx.fillStyle = wg;
+      ctx.beginPath();
+      ctx.moveTo(-34, -24);
+      ctx.quadraticCurveTo(-16, -33, 0, -29); ctx.quadraticCurveTo(18, -26, 34, -31);
+      ctx.quadraticCurveTo(37, -6, 33, 12); ctx.quadraticCurveTo(36, 24, 31, 30);
+      ctx.quadraticCurveTo(10, 27, -4, 31); ctx.quadraticCurveTo(-22, 33, -34, 28);
+      ctx.quadraticCurveTo(-37, 6, -33, -8); ctx.closePath(); ctx.fill();
+      // folds: a shadowed valley beside a lit ridge
+      for (const [x0, y0, cx, cy, x1, y1] of [[-34, -6, 0, 2, 34, -8], [-4, -30, 2, 0, -6, 30], [-30, 16, -8, 10, 20, 22]]) {
+        ctx.strokeStyle = 'rgba(70,90,110,0.2)'; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(cx, cy, x1, y1); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x0 + 1, y0 - 2); ctx.quadraticCurveTo(cx + 1, cy - 2, x1 + 1, y1 - 2); ctx.stroke();
+      }
+      // the weave, just visible
+      ctx.strokeStyle = 'rgba(120,140,160,0.1)'; ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      for (let k = -28; k <= 28; k += 4) { ctx.moveTo(k, -27); ctx.lineTo(k, 28); ctx.moveTo(-31, k); ctx.lineTo(31, k); }
+      ctx.stroke();
+    }
+    // what it has picked up: soft stains soaking in, not flat discs
+    if (d > 0.15) {
+      const stain = c.kind === 'pads' ? '190,150,40' : '90,70,55';
+      for (const [sx, sy, sr] of [[-8, 5, 13 * d + 4], [10, -8, 10 * d + 3], [6, 13, 8 * d + 3], [-14, -12, 6 * d + 2]]) {
+        const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
+        sg.addColorStop(0, `rgba(${stain},${d * 0.6})`); sg.addColorStop(0.6, `rgba(${stain},${d * 0.3})`); sg.addColorStop(1, `rgba(${stain},0)`);
+        ctx.fillStyle = sg;
+        ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+      }
     }
     ctx.restore();
   }
