@@ -500,14 +500,14 @@ export class Ear {
       ctx.quadraticCurveTo(cx + Math.cos(a + 0.3) * Rd * 0.7, cy + Math.sin(a + 0.3) * Rd * 0.7, cx + Math.cos(a + 0.1) * Rd * 0.5, cy + Math.sin(a + 0.1) * Rd * 0.5);
       ctx.stroke();
     }
-    ctx.strokeStyle = 'rgba(250,240,225,0.75)'; ctx.lineWidth = Math.max(2, Rd * 0.13); ctx.lineCap = 'round';   // handle of the hammer bone
-    ctx.beginPath(); ctx.moveTo(cx - Rd * 0.2, cy - Rd * 0.62); ctx.lineTo(cx + Rd * 0.04, cy + Rd * 0.06); ctx.stroke();
-    ctx.fillStyle = 'rgba(250,240,225,0.8)';
-    ctx.beginPath(); ctx.arc(cx - Rd * 0.2, cy - Rd * 0.62, Math.max(1.6, Rd * 0.11), 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(250,240,225,0.42)'; ctx.lineWidth = Math.max(2.5, Rd * 0.2); ctx.lineCap = 'round';   // handle of the hammer bone, seen dimly through the membrane
+    ctx.beginPath(); ctx.moveTo(cx - Rd * 0.2, cy - Rd * 0.62); ctx.quadraticCurveTo(cx - Rd * 0.12, cy - Rd * 0.2, cx - Rd * 0.02, cy - Rd * 0.02); ctx.stroke();
+    ctx.fillStyle = 'rgba(250,240,225,0.5)';
+    ctx.beginPath(); ctx.arc(cx - Rd * 0.2, cy - Rd * 0.62, Math.max(1.6, Rd * 0.13), 0, Math.PI * 2); ctx.fill();
     const cone = ctx.createLinearGradient(cx, cy, cx + Rd * 0.6, cy + Rd * 0.75);
-    cone.addColorStop(0, 'rgba(255,255,255,0.75)'); cone.addColorStop(1, 'rgba(255,255,255,0)');
+    cone.addColorStop(0, 'rgba(255,255,255,0.5)'); cone.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = cone;                                                                       // cone of light
-    ctx.beginPath(); ctx.moveTo(cx + Rd * 0.05, cy + Rd * 0.08); ctx.lineTo(cx + Rd * 0.3, cy + Rd * 0.85); ctx.lineTo(cx + Rd * 0.72, cy + Rd * 0.55); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx + Rd * 0.02, cy + Rd * 0.04); ctx.lineTo(cx + Rd * 0.12, cy + Rd * 0.9); ctx.lineTo(cx + Rd * 0.84, cy + Rd * 0.42); ctx.closePath(); ctx.fill();
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(230,30,50,${this.flash * 1.4})`;
       ctx.beginPath();
