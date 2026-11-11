@@ -554,15 +554,31 @@ export class Ear {
     ctx.bezierCurveTo(G.W * 0.9, G.H * 0.62, G.W * 0.98, G.H * 0.4, G.W * 0.8, G.H * 0.22);
     ctx.bezierCurveTo(G.W * 0.62, G.H * 0.06, G.W * 0.4, G.H * 0.1, G.W * 0.2, 0);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 16; i++) {
-      const k = i / 15;
+    // depth: darker where it tucks in behind the ear
+    const hd = ctx.createLinearGradient(G.W * 0.55, 0, G.W, G.H * 0.5);
+    hd.addColorStop(0, 'rgba(0,0,0,0.28)'); hd.addColorStop(0.6, 'rgba(0,0,0,0.05)'); hd.addColorStop(1, 'rgba(0,0,0,0.2)');
+    ctx.fillStyle = hd; ctx.fill();
+    // strands in three tones and widths: shadowed gaps, the hair itself, and lit hairs on top
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 64; i++) {
+      const k = i / 63, j = Math.sin(i * 12.9898) * 43758.5453, r = j - Math.floor(j);
+      const kk = k + (r - 0.5) * 0.03;
+      ctx.strokeStyle = i % 4 === 0 ? 'rgba(0,0,0,0.22)' : i % 4 === 1 ? 'rgba(255,255,255,0.16)' : i % 4 === 2 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.1)';
+      ctx.lineWidth = i % 4 === 0 ? 3 + r * 3 : 0.8 + r * 1.2;
       ctx.beginPath();
-      ctx.moveTo(G.W * (0.35 + k * 0.6), 0);
-      ctx.bezierCurveTo(G.W * (0.75 + k * 0.25), G.H * 0.12, G.W * (0.9 + k * 0.1), G.H * 0.35, G.W * (0.93 + k * 0.07), G.H * (0.55 + k * 0.2));
+      ctx.moveTo(G.W * (0.35 + kk * 0.6), 0);
+      ctx.bezierCurveTo(G.W * (0.75 + kk * 0.25), G.H * (0.1 + r * 0.04), G.W * (0.9 + kk * 0.1), G.H * 0.35, G.W * (0.93 + kk * 0.07), G.H * (0.55 + kk * 0.2));
       ctx.stroke();
     }
+    // a band of shine across the strands
+    const sh = ctx.createLinearGradient(0, G.H * 0.1, 0, G.H * 0.32);
+    sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(0.5, 'rgba(255,255,255,0.09)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sh;
+    ctx.beginPath();
+    ctx.moveTo(G.W * 0.2, 0); ctx.lineTo(G.W, 0); ctx.lineTo(G.W, G.H * 0.8);
+    ctx.bezierCurveTo(G.W * 0.9, G.H * 0.62, G.W * 0.98, G.H * 0.4, G.W * 0.8, G.H * 0.22);
+    ctx.bezierCurveTo(G.W * 0.62, G.H * 0.06, G.W * 0.4, G.H * 0.1, G.W * 0.2, 0);
+    ctx.fill();
 
     // ear silhouette
     const outline = () => {
