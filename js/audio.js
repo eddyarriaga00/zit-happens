@@ -343,3 +343,10 @@ export function click() {
   if (!ready()) return;
   tone(ctx.currentTime, 0.04, { freq: 900, gain: 0.08, type: 'sine' });
 }
+
+/** One tiny crackle: a strip peeling, a plug letting go. */
+export function crackle() {
+  if (!ready()) return;
+  const t = ctx.currentTime;
+  noise(t, 0.03, { type: 'highpass', freq: 2400 + Math.random() * 2600, q: 0.8, gain: 0.17 });
+}

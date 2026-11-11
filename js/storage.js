@@ -30,6 +30,12 @@ const DEFAULTS = {
   bossPops: 0,
   makeupDone: 0,
   haircutDone: 0,
+  stripsDone: 0,
+  browsDone: 0,
+  visits: 0,        // VIP clients seen all the way through
+  fiveStars: 0,
+  reviews: [],      // newest first: { n, s, t }
+  dailyDone: '',    // day today's VIP was finished
   lastDay: '',      // YYYY-MM-DD of the last day played
   streak: 0,
   rewards: {},      // level -> true once its reward has been collected

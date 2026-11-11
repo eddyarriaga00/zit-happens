@@ -368,6 +368,36 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   for (let i = 0; i < 14; i++) { const u = (R() - 0.5) * 1.5; x.beginPath(); x.moveTo(cx + u * mw, my + hh * 0.012); x.lineTo(cx + u * mw * 0.95, my + hh * 0.085); x.stroke(); }
   soft(cx, Y(noseY + 0.14), hw * 0.05, hh * 0.05, rgba(tone.pore, 0.2));     // philtrum
 
+  // ---- the small things that make a face read as a person: soft planes of light and
+  // shadow, tired little under-eye hollows, smile lines, lid creases, fine skin grain
+  for (const d of [-1, 1]) {
+    soft(X(d * ex), Y(ey + 0.125), hw * 0.21, hh * 0.035, 'rgba(110,60,90,0.08)');        // under-eye hollow
+    soft(X(d * (ex - 0.16)), Y(ey + 0.09), hw * 0.07, hh * 0.04, 'rgba(110,60,90,0.07)');   // tear trough
+    soft(X(d * 0.62), Y(0.09), hw * 0.2, hh * 0.06, 'rgba(255,255,255,0.13)');            // cheekbone catches the light
+    soft(X(d * 0.8), Y(0.42), hw * 0.16, hh * 0.22, rgba(tone.shade, 0.16));              // hollow of the cheek
+    soft(X(d * 0.86), Y(-0.3), hw * 0.14, hh * 0.2, rgba(tone.shade, 0.14));              // temples
+    const lines = (look.age || 25) >= 40 ? 1 : 0.35;                                       // deeper with age
+    x.strokeStyle = rgba(tone.pore, 0.1 * lines); x.lineWidth = 3.2;                               // smile lines
+    x.beginPath(); x.moveTo(X(d * 0.21), Y(noseY - 0.01)); x.quadraticCurveTo(X(d * 0.34), Y(noseY + 0.07), X(d * 0.38), Y(mouthY - 0.07)); x.stroke();
+    x.strokeStyle = rgba(tone.pore, 0.14 * lines); x.lineWidth = 1.2; x.stroke();
+    x.strokeStyle = 'rgba(80,40,34,0.3)'; x.lineWidth = 1.1;                               // crease above the lid
+    x.beginPath(); x.ellipse(X(d * ex), Y(ey + 0.02), erx * 1.12, ery * 1.75, 0, Math.PI * 1.14, Math.PI * 1.86); x.stroke();
+    soft(X(d * (ex + 0.02)), Y(ey - 0.115), hw * 0.16, hh * 0.022, 'rgba(255,255,255,0.14)'); // brow bone
+  }
+  soft(cx, Y(0.08), hw * 0.035, hh * 0.2, 'rgba(255,255,255,0.17)');                       // bridge of the nose
+  soft(cx, Y(-0.42), hw * 0.42, hh * 0.13, 'rgba(255,255,255,0.1)');                       // forehead
+  soft(cx, Y(mouthY + 0.155), hw * 0.2, hh * 0.03, 'rgba(70,24,24,0.16)');                 // shadow under the lower lip
+  soft(cx, Y(0.84), hw * 0.16, hh * 0.06, 'rgba(255,255,255,0.11)');                       // chin
+  soft(cx, Y(1.0), hw * 0.7, hh * 0.1, rgba(tone.shade, 0.22));                            // jaw turning under
+  x.save();
+  x.clip(head);
+  for (let i = 0; i < 2600; i++) {
+    const u = (R() * 2 - 1), v = R() * 2.1 - 1.05;
+    x.fillStyle = i % 2 ? 'rgba(255,255,255,0.05)' : rgba(tone.pore, 0.06);
+    x.fillRect(X(u), Y(v), 0.9 + R() * 0.8, 0.9 + R() * 0.8);
+  }
+  x.restore();
+
   // ---- glasses
   if (look.glasses) {
     x.strokeStyle = '#27212b'; x.lineWidth = s * 0.014;

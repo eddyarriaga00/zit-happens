@@ -27,3 +27,10 @@ Then open http://localhost:8765.
 - `js/audio.js` / `js/haptics.js` – synthesized sound, haptics
 - `sw.js` – offline cache (bump `VERSION` when files are added or renamed)
 - `tools/make_icons.py` – redraws the app icons
+
+## Added in v23
+
+- Pore Strip and Brows close-up modes (`js/extras.js`)
+- VIP visits: one client, four treatments, a review and a tip; one daily VIP pays double
+- Home screen of mode tiles, HUD progress bar, guest book of reviews
+- Portraits painted by the same renderer as the in-game face

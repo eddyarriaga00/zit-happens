@@ -204,6 +204,18 @@ export const AWARDS = [
   A('salonUp6', 'Growing Business', 'Reach salon level 6', (s) => s.salonLevel >= 6, 200),
   A('salonMax', 'Legendary Salon', 'Fully upgrade your salon', (s) => s.salonLevel >= 12, 800),
   A('rich5k', 'Loaded', 'Hold 5,000 coins at once', (s) => s.coins >= 5000, 100),
+  A('strip1', 'Peel Good', 'Finish a pore strip', (s) => s.stripsDone >= 1, 60),
+  A('strip5', 'Strip Tease', 'Finish 5 pore strips', (s) => s.stripsDone >= 5, 200),
+  A('strip15', 'Pore Patrol', 'Finish 15 pore strips', (s) => s.stripsDone >= 15, 400),
+  A('brow1', 'Raised Brows', 'Shape a pair of brows', (s) => s.browsDone >= 1, 60),
+  A('brow5', 'Brow Boss', 'Shape 5 pairs of brows', (s) => s.browsDone >= 5, 200),
+  A('brow15', 'Arch Angel', 'Shape 15 pairs of brows', (s) => s.browsDone >= 15, 400),
+  A('vip1', 'The Full Works', 'Finish a VIP visit', (s) => s.visits >= 1, 100),
+  A('vip5', 'Regulars', 'Finish 5 VIP visits', (s) => s.visits >= 5, 300),
+  A('vip15', 'Fully Booked', 'Finish 15 VIP visits', (s) => s.visits >= 15, 600),
+  A('five1', 'Rave Review', 'Get a 5-star review', (s) => s.fiveStars >= 1, 150),
+  A('five5', 'Word of Mouth', 'Get 5 five-star reviews', (s) => s.fiveStars >= 5, 400),
+  A('five10', 'Talk of the Town', 'Get 10 five-star reviews', (s) => s.fiveStars >= 10, 800),
 ];
 // your title, from how many awards you hold (a new one every 8)
 export const RANKS = ['Trainee', 'Assistant', 'Esthetician', 'Specialist', 'Expert', 'Master', 'Legend'];

@@ -25,6 +25,7 @@
     <div class="hud-center">
       <div id="hud-title">Level 1</div>
       <div id="hud-sub">5 left</div>
+      <div id="hud-bar"><i></i></div>
     </div>
     <div class="hud-score">
       <div id="hud-score">0</div>
@@ -69,18 +70,20 @@
     <div class="menu-inner">
       <div class="logo">
         <div class="logo-zit"><span></span></div>
-        <h1>Zit<br>Happens</h1>
-        <p class="tagline">squeeze. pop. wipe. repeat.</p>
+        <h1>Zit Happens</h1>
         <p id="hello" class="streak"></p>
         <p id="streak" class="streak"></p>
       </div>
-      <button id="btn-play" class="big">Pimples <small id="play-level">Level 1</small></button>
-      <button id="btn-ear" class="big ear">Ear Wax <small id="ear-level">Level 1</small></button>
-      <div class="row">
-        <button id="btn-makeup" class="big mode">Makeup <small>quick glam</small></button>
-        <button id="btn-haircut" class="big mode">Hair Salon <small>wash, cut, colour</small></button>
+      <button id="btn-vip" class="vip"><img id="vip-face" alt=""><span><b id="vip-title">Today's VIP</b><small id="vip-sub">Full visit · double tip</small></span></button>
+      <button id="btn-play" class="tile wide"><i>🫧</i><span>Pimples<small id="play-level">Level 1</small></span></button>
+      <div class="tiles">
+        <button id="btn-ear" class="tile" style="--tint:#ffe0cc"><i>👂</i><span>Ear Wax<small id="ear-level">Level 1</small></span></button>
+        <button id="btn-strip" class="tile" style="--tint:#d5f5f0"><i>👃</i><span>Pore Strip<small>peel it slow</small></span></button>
+        <button id="btn-brows" class="tile" style="--tint:#e9e2ff"><i>🪮</i><span>Brows<small>pluck &amp; fill</small></span></button>
+        <button id="btn-makeup" class="tile" style="--tint:#ffdbe7"><i>💄</i><span>Makeup<small>quick glam</small></span></button>
+        <button id="btn-haircut" class="tile" style="--tint:#fff0bd"><i>💇‍♀️</i><span>Hair Salon<small>wash, cut, colour</small></span></button>
+        <button id="btn-zen" class="tile" style="--tint:#dcf3d6"><i>🌿</i><span>Zen<small>endless &amp; chill</small></span></button>
       </div>
-      <button id="btn-zen" class="big alt">Zen Mode <small>endless &amp; chill</small></button>
       <div class="row">
         <button id="btn-shop" class="small">Shop</button>
         <button id="btn-stats" class="small">Awards</button>
@@ -171,7 +174,8 @@
   <section id="stats" class="screen hidden">
     <div class="card tall">
       <h2>Stats &amp; Awards</h2>
-      <div class="scroll"><div id="stats-grid" class="stats-grid"></div><div id="awards-list"></div></div>
+      <div class="scroll"><div id="stats-grid" class="stats-grid"></div><div id="guest-book"></div>
+      <div id="awards-list"></div></div>
       <button class="big back">Back</button>
     </div>
   </section>
