@@ -340,12 +340,13 @@ export function portraitURL(def, opts = {}, size = 240) {
   x.scale(dpr, dpr);
   const look = lookFor(def);
   try {
-    const w = size * 1.39, k = 0.72;
-    const scene = renderFaceScene(w, w, Math.min(2, dpr * k + 0.5), SKIN_TONES[def.skin] || SKIN_TONES[1], hashName(def.name), look, 0, w);
-    x.drawImage(scene.canvas, 0, size * 0.02, w * k, w * k);
+    // framed like a passport photo: the whole head with a little room above the hair
+    const w = size * 1.39, k = 0.8, xo = -(w * k - size) / 2, yo = size * 0.52 - 0.5336 * w * k;
+    const scene = renderFaceScene(w, w, Math.min(2, dpr * k + 0.5), SKIN_TONES[def.skin] || SKIN_TONES[1], hashName(def.name), look, w * 0.12, w);
+    x.drawImage(scene.canvas, xo, yo, w * k, w * k);
     if (!opts.clear && opts.zone) {
       // before: an angry little breakout where the trouble is
-      x.save(); x.translate(0, size * 0.02); x.scale(k, k);
+      x.save(); x.translate(xo, yo); x.scale(k, k);
       const g = scene.geo;
       for (let i = 0; i < 7; i++) {
         const pt = g.zonePoint(opts.zone), r = g.hw * (0.03 + 0.018 * ((i * 7) % 3));

@@ -139,8 +139,9 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
       // flyaways breaking the outline
       strands(46, () => {
         const a = Math.PI + R() * Math.PI, px = cx + Math.cos(a) * hw * k, py = Y(-0.3) + Math.sin(a) * hh * 0.8;
-        return [px, py, px + Math.cos(a) * (6 + R() * 16) + (R() - 0.5) * 12, py + Math.sin(a) * (6 + R() * 14), (R() - 0.5) * 12, rgba(hair, 0.55)];
-      }, 0.7);
+        const fs = s / 380;     // flyaways scale with the head, so small portraits don't get a spiky halo
+        return [px, py, px + (Math.cos(a) * (6 + R() * 16) + (R() - 0.5) * 12) * fs, py + Math.sin(a) * (6 + R() * 14) * fs, (R() - 0.5) * 12 * fs, rgba(hair, 0.55)];
+      }, Math.max(0.3, 0.7 * Math.min(1, s / 380)));
     }
   }
   if (style === 'balding') {
@@ -552,7 +553,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   for (let i = 0; i < 3; i++) {
     const u = (R() - 0.5) * 1.3, v = -0.3 + R() * 1.1;
     x.fillStyle = 'rgba(85,48,34,0.7)';
-    x.beginPath(); x.arc(X(u), Y(v), 0.8 + R() * 1.3, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.arc(X(u), Y(v), (0.8 + R() * 1.3) * Math.max(0.3, Math.min(1, s / 380)), 0, Math.PI * 2); x.fill();
   }
 
   soft(cx, my - hh * 0.062, hw * 0.05, hh * 0.012, 'rgba(255,255,255,0.4)');             // cupid's bow catches the light
