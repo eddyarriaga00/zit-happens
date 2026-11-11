@@ -434,70 +434,110 @@ export class Supplies {
   // Containers take p = how far open (0 shut .. 1 open), so the close-up can
   // show the lid, seal or cap moving under your finger.
   draw_soap(ctx, it, p) {
-    ctx.fillStyle = '#9fd4f5';
+    // a clear pump bottle: you can see the cleanser inside, light down one side, a printed label
+    const lg = (x0, x1, stops) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); for (const [o, c] of stops) g.addColorStop(o, c); return g; };
+    ctx.fillStyle = 'rgba(20,30,60,0.22)';
+    ctx.beginPath(); ctx.ellipse(1, 31, 19, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = lg(-17, 17, [[0, '#7fb6dc'], [0.18, '#d5edfb'], [0.45, '#a9d6f2'], [0.8, '#8cc3e6'], [1, '#5f9cc6']]);
     rr(ctx, -17, -14, 34, 44, 9); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.45)';
-    rr(ctx, -12, -8, 7, 30, 4); ctx.fill();
+    ctx.fillStyle = lg(-15, 15, [[0, 'rgba(60,140,205,0.55)'], [0.3, 'rgba(110,185,235,0.5)'], [1, 'rgba(40,110,175,0.6)']]);   // the cleanser
+    rr(ctx, -15, -4 + (it.pumps || 0) * 2, 30, 32 - (it.pumps || 0) * 2, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    rr(ctx, -13, -9, 4, 32, 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    rr(ctx, 9, -8, 3, 30, 1.5); ctx.fill();
     ctx.fillStyle = '#ffffff';
-    rr(ctx, -11, 2, 22, 16, 4); ctx.fill();
-    ctx.fillStyle = '#4a90d9';
-    ctx.beginPath(); ctx.arc(0, 10, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#e9f4fb';
-    rr(ctx, -6, -22, 12, 9, 2); ctx.fill();
+    rr(ctx, -11, 2, 22, 17, 3); ctx.fill();
+    ctx.fillStyle = '#3f86cf';
+    ctx.beginPath(); ctx.moveTo(0, 5); ctx.quadraticCurveTo(5, 11, 0, 14.5); ctx.quadraticCurveTo(-5, 11, 0, 5); ctx.fill();   // a water drop
+    ctx.fillStyle = '#9db4c8'; ctx.fillRect(-7, 16, 14, 1.2);
+    // collar and pump
+    ctx.fillStyle = lg(-7, 7, [[0, '#c5d3de'], [0.4, '#ffffff'], [1, '#aab9c6']]);
+    rr(ctx, -7, -22, 14, 9, 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,140,160,0.5)'; ctx.lineWidth = 0.6;
+    for (const xx of [-4, -1.5, 1, 3.5]) { ctx.beginPath(); ctx.moveTo(xx, -21); ctx.lineTo(xx, -14); ctx.stroke(); }
     // pump head: twists out and pops up when unlocked, dips when pressed
     const hy = lerp(-23, -30, p) + Math.sin(it.press * Math.PI) * 6;
     const len = lerp(4, 20, p);
-    ctx.fillStyle = '#c9dbe8';
-    rr(ctx, -2, hy + 2, 4, -hy - 20, 1); ctx.fill();
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#b9cbd9';
+    rr(ctx, -1.5, hy + 2, 3, -hy - 20, 1); ctx.fill();
+    ctx.fillStyle = lg(-len, 5, [[0, '#dfe8ef'], [0.5, '#ffffff'], [1, '#c9d6e0']]);
     rr(ctx, -5, hy - 4, 10, 8, 2); ctx.fill();
     rr(ctx, -len, hy - 8, len + 5, 6, 3); ctx.fill();
+    ctx.fillStyle = 'rgba(120,140,160,0.4)'; ctx.fillRect(-len, hy - 3.2, len + 5, 0.8);
     this.pips(ctx, it);
   }
 
   draw_gel(ctx, it, p) {
-    ctx.fillStyle = '#7fd9b8';
+    // a soft squeeze tube standing on its cap: crimped end, a sheen down the side, a label band
+    const lg = (x0, x1, stops) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); for (const [o, c] of stops) g.addColorStop(o, c); return g; };
+    ctx.fillStyle = 'rgba(20,50,40,0.2)';
+    ctx.beginPath(); ctx.ellipse(1, 27, 15, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = lg(-16, 16, [[0, '#4fb894'], [0.22, '#b6f0da'], [0.5, '#7fd9b8'], [1, '#3f9f7e']]);
     ctx.beginPath();
     ctx.moveTo(-16, -26); ctx.lineTo(16, -26); ctx.lineTo(11, 14); ctx.lineTo(-11, 14);
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#5cc09c';
-    rr(ctx, -17, -30, 34, 6, 2); ctx.fill();
+    ctx.fillStyle = lg(-17, 17, [[0, '#3f9f7e'], [0.3, '#8fe0c2'], [1, '#34876b']]);
+    rr(ctx, -17, -31, 34, 6, 1.5); ctx.fill();                     // the crimp
+    ctx.strokeStyle = 'rgba(30,90,70,0.45)'; ctx.lineWidth = 0.6;
+    for (let xx = -14; xx <= 14; xx += 3.5) { ctx.beginPath(); ctx.moveTo(xx, -30.5); ctx.lineTo(xx, -25.5); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.moveTo(-13.4, -10); ctx.lineTo(13.4, -10); ctx.lineTo(12.2, 2); ctx.lineTo(-12.2, 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2f8f73';
+    ctx.beginPath(); ctx.ellipse(0, -5.5, 3.2, 2, -0.6, 0, Math.PI * 2); ctx.fill();   // a leaf
+    ctx.fillStyle = '#9fc9b9'; ctx.fillRect(-7, -1.2, 14, 1.1);
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    rr(ctx, -9, -20, 6, 28, 3); ctx.fill();
-    ctx.fillStyle = '#eafff7';
+    ctx.beginPath(); ctx.moveTo(-11, -24); ctx.lineTo(-7.5, -24); ctx.lineTo(-6, 12); ctx.lineTo(-8.5, 12); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = lg(-5, 5, [[0, '#cfe9df'], [0.5, '#ffffff'], [1, '#b9d6cb']]);
     rr(ctx, -5, 14, 10, 5, 2); ctx.fill();            // nozzle
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = lg(-9, 9, [[0, '#d6dde0'], [0.4, '#ffffff'], [1, '#bcc6ca']]);
     if (p >= 1) { rr(ctx, 16, 16, 14, 10, 3); ctx.fill(); }   // cap set down beside it
     else {
       rr(ctx, -9, 14 + p * 16, 18, 12, 3); ctx.fill();
       ctx.strokeStyle = 'rgba(120,160,150,0.5)';
-      ctx.lineWidth = 1;
-      for (const x of [-4, 0, 4]) { ctx.beginPath(); ctx.moveTo(x, 16 + p * 16); ctx.lineTo(x, 24 + p * 16); ctx.stroke(); }
+      ctx.lineWidth = 0.8;
+      for (const x of [-6, -3, 0, 3, 6]) { ctx.beginPath(); ctx.moveTo(x, 16 + p * 16); ctx.lineTo(x, 24 + p * 16); ctx.stroke(); }
     }
     this.pips(ctx, it);
   }
 
   draw_mask(ctx, it, p) {
-    // squat jar of charcoal mask
-    ctx.fillStyle = '#34343e';
+    // a squat glass jar of charcoal mask with a brushed gold lid
+    const lg = (x0, x1, stops) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); for (const [o, c] of stops) g.addColorStop(o, c); return g; };
+    ctx.fillStyle = 'rgba(10,10,20,0.25)';
+    ctx.beginPath(); ctx.ellipse(1, 27, 24, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = lg(-22, 22, [[0, '#1f1f27'], [0.2, '#55555f'], [0.45, '#34343e'], [0.85, '#26262e'], [1, '#15151b']]);
     rr(ctx, -22, -8, 44, 34, 9); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    rr(ctx, -17, -3, 6, 22, 3); ctx.fill();
-    ctx.fillStyle = '#2ec4b6';
-    rr(ctx, -12, 4, 24, 12, 4); ctx.fill();
-    if (p > 0) {                                   // the goo inside
-      ctx.fillStyle = '#1d1d24';
-      ctx.beginPath(); ctx.ellipse(0, -8, 19, 5, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.beginPath(); ctx.ellipse(-6, -9, 6, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    rr(ctx, -18, -3, 4, 24, 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    rr(ctx, 13, -3, 3, 24, 1.5); ctx.fill();
+    ctx.fillStyle = lg(-12, 12, [[0, '#239d92'], [0.4, '#49d6c9'], [1, '#1f8f85']]);
+    rr(ctx, -12, 4, 24, 12, 3); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(-8, 7.5, 16, 1.4); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(-6, 11, 12, 1.1);
+    if (p > 0) {                                   // the goo inside, glossy
+      ctx.fillStyle = '#4a4a55';
+      ctx.beginPath(); ctx.ellipse(0, -8, 21, 6, 0, 0, Math.PI * 2); ctx.fill();   // the rim of the glass
+      ctx.fillStyle = '#121217';
+      ctx.beginPath(); ctx.ellipse(0, -8, 18.5, 4.6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath(); ctx.ellipse(-6, -9.2, 7, 1.5, -0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.beginPath(); ctx.ellipse(7, -6.6, 4, 1, 0.1, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.fillStyle = '#e9c46a';
-    if (p >= 1) { rr(ctx, 12, 20, 26, 8, 4); ctx.fill(); }
+    const lid = (x, y, w, h, r) => {
+      ctx.fillStyle = lg(x, x + w, [[0, '#b98f2f'], [0.25, '#fbe6a2'], [0.5, '#e9c46a'], [0.8, '#c99b3a'], [1, '#9c7422']]);
+      rr(ctx, x, y, w, h, r); ctx.fill();
+      ctx.strokeStyle = 'rgba(120,85,20,0.35)'; ctx.lineWidth = 0.5;
+      for (let xx = x + 3; xx < x + w - 2; xx += 2.5) { ctx.beginPath(); ctx.moveTo(xx, y + 2); ctx.lineTo(xx, y + h - 1); ctx.stroke(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(x + 3, y + 1.2, w - 6, 1);
+    };
+    if (p >= 1) lid(12, 20, 26, 8, 4);
     else {
       ctx.save();
       ctx.translate(12 * p, -34 * p);
       ctx.rotate(0.45 * p);
-      rr(ctx, -24, -18, 48, 12, 5); ctx.fill();
+      lid(-24, -18, 48, 12, 5);
       ctx.restore();
     }
     this.pips(ctx, it);
