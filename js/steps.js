@@ -248,6 +248,22 @@ export class Treatment {
     if (FILM.includes(this.phase)) {
       // mint gel, or a charcoal mask that goes from wet and glossy to dry and matte
       const dryK = this.phase === 'dry' ? this.progress : this.phase === 'peel' ? 1 : 0;
+      // a mask or gel goes on the skin of the face only: it stops at the jaw and hairline,
+      // and leaves the eyes, brows and lips bare, the way a real one is applied
+      ctx.save();
+      const g = G.geo;
+      if (g && g.headPath) {
+        ctx.clip(g.headPath);
+        ctx.beginPath(); ctx.rect(0, g.hairlineY + g.hh * 0.04, G.W, G.H); ctx.clip();
+        ctx.beginPath(); ctx.rect(0, 0, G.W, G.H);
+        for (const e of g.eyes) {
+          ctx.moveTo(e.x + e.rx * 1.3, e.y - e.ry * 0.2); ctx.ellipse(e.x, e.y - e.ry * 0.2, e.rx * 1.3, e.ry * 2.0, 0, 0, Math.PI * 2);
+          ctx.moveTo(e.x + g.hw * 0.31, g.browY); ctx.ellipse(e.x, g.browY - g.hh * 0.012, g.hw * 0.31, g.hh * 0.045, 0, 0, Math.PI * 2);
+        }
+        const lb = g.lipsBox, lx = (lb[0] + lb[2]) / 2, ly = (lb[1] + lb[3]) / 2;
+        ctx.moveTo(lx + (lb[2] - lb[0]) * 0.56, ly); ctx.ellipse(lx, ly, (lb[2] - lb[0]) * 0.56, (lb[3] - lb[1]) * 0.66, 0, 0, Math.PI * 2);
+        ctx.clip('evenodd');
+      }
       const v = Math.round(36 + 44 * dryK);
       ctx.fillStyle = this.phase === 'soothe' ? 'rgba(140,225,195,0.42)' : `rgba(${v},${v},${v + 8},0.95)`;
       ctx.beginPath();
@@ -275,7 +291,7 @@ export class Treatment {
           ctx.lineTo(x + 10, y - 5);
         }
       }
-      ctx.stroke();
+      ctx.stroke();      ctx.restore();
     }
 
     // "you missed a spot": bare patches glow once most of the face is done

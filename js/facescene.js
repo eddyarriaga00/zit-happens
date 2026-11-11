@@ -618,7 +618,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   const lids = eyes.map((e) => ({ x: e.x, y: e.y - ery * 1.42, rx: erx * 1.12, ry: ery * 0.72 }));
   const onSkin = (px, py) => inHead(px, py) && (py - cy) / hh >= edgeV((px - cx) / hw);   // face, not hair
   const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint,
-    lipsPath, inLips, lipsBox, cheeks, lids, onHair, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
+    lipsPath, inLips, lipsBox, cheeks, lids, onHair, headPath: head, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
   return { canvas: c, geo };
 }
 
