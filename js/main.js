@@ -1247,7 +1247,7 @@ function render() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (G.skin) ctx.drawImage(G.skin, 0, 0, W, H);
   if (G.geo) drawLids(ctx, G.geo, G.wince > 0 ? Math.min(1, G.wince * 6) : G.blinkA > 0 ? Math.sin(Math.PI * (1 - G.blinkA / 0.16)) : 0);
-  else { ctx.fillStyle = '#eec1a2'; ctx.fillRect(0, 0, W, H); }
+  else if (!G.skin) { ctx.fillStyle = '#eec1a2'; ctx.fillRect(0, 0, W, H); }   // back and shoulder scenes have no face geometry but do have painted skin
 
   ctx.save();
   if (G.shake) ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
