@@ -233,44 +233,73 @@ export class Haircut {
     const g = this.G.geo;
     ctx.lineCap = 'round';
     for (const l of this.locks) {
-      // body of the lock, then individual strands on top
-      ctx.lineCap = 'butt';            // locks sit flush side by side, like one fringe
-      ctx.strokeStyle = this.hair;
-      ctx.lineWidth = l.w * 1.02;
-      ctx.beginPath(); ctx.moveTo(l.x, this.y0 - 6); ctx.lineTo(l.x, this.end(l) - 6); ctx.stroke();
-      ctx.lineCap = 'round';
-      ctx.lineWidth = 1.3;
-      this.strands(ctx, l.x, l.w, this.y0 - 6, this.end(l), l.seed);
+      // each lock is a ribbon of hair: dark at the root, lit across the middle, and ending either
+      // in a wispy point (uncut) or a clean blunt edge with a little texture (cut)
+      const top = this.y0 - 6, end = this.end(l) - 4, hw2 = l.w * 0.52, x = l.x;
+      ctx.beginPath();
+      ctx.moveTo(x - hw2, top); ctx.lineTo(x + hw2, top);
+      if (l.cut) {
+        ctx.lineTo(x + hw2, end - 2);
+        for (let k = 4; k >= -4; k--) ctx.lineTo(x + hw2 * k / 4, end + ((k + Math.floor(l.seed * 3)) % 2 ? 1.6 : -1));
+        ctx.lineTo(x - hw2, end - 2);
+      } else {
+        ctx.quadraticCurveTo(x + hw2 * 1.05, top + (end - top) * 0.75, x + Math.sin(l.seed) * hw2 * 0.5, end + 6);
+        ctx.quadraticCurveTo(x - hw2 * 1.05, top + (end - top) * 0.75, x - hw2, top);
+      }
+      ctx.closePath();
+      ctx.fillStyle = this.hair; ctx.fill();
+      const lg = ctx.createLinearGradient(0, top, 0, end);
+      lg.addColorStop(0, 'rgba(0,0,0,0)'); lg.addColorStop(0.1, 'rgba(0,0,0,0.14)'); lg.addColorStop(0.25, 'rgba(0,0,0,0.04)'); lg.addColorStop(0.42, 'rgba(255,255,255,0.14)'); lg.addColorStop(0.6, 'rgba(0,0,0,0.02)'); lg.addColorStop(1, 'rgba(0,0,0,0.2)');
+      ctx.fillStyle = lg; ctx.fill();
+      const sg = ctx.createLinearGradient(x - hw2, 0, x + hw2, 0);
+      sg.addColorStop(0, 'rgba(0,0,0,0.16)'); sg.addColorStop(0.3, 'rgba(0,0,0,0)'); sg.addColorStop(0.7, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,0.2)');
+      ctx.fillStyle = sg; ctx.fill();
+      ctx.lineWidth = 1;
+      this.strands(ctx, l.x, l.w, top, this.end(l) - (l.cut ? 3 : 0), l.seed);
     }
     for (const b of this.bits) {
+      // the offcut: a little tuft tumbling away
       ctx.save();
       ctx.globalAlpha = Math.max(0, 1 - b.t / 1.4);
       ctx.translate(b.x, b.y);
       ctx.rotate(b.rot);
-      ctx.strokeStyle = this.hair;
-      ctx.lineWidth = b.w * 0.9;
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, b.len - 5); ctx.stroke();
+      const bl = Math.max(6, b.len - 5), bw = b.w * 0.45;
+      ctx.fillStyle = this.hair;
+      ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(bw, 0); ctx.quadraticCurveTo(bw, bl * 0.7, 0, bl); ctx.quadraticCurveTo(-bw, bl * 0.7, -bw, 0); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 0.8;
+      for (const k of [-0.5, 0, 0.5]) { ctx.beginPath(); ctx.moveTo(bw * k, 1); ctx.lineTo(bw * k * 0.4, bl - 2); ctx.stroke(); }
       ctx.restore();
     }
-    // the line to cut along
-    ctx.save();
-    ctx.setLineDash([10, 8]);
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.beginPath(); ctx.moveTo(g.cx - g.hw * 0.95, this.target); ctx.lineTo(g.cx + g.hw * 0.95, this.target); ctx.stroke();
-    ctx.restore();
+    // the line to cut along, until the fringe is done
+    if (!this.ready) {
+      ctx.save();
+      ctx.setLineDash([10, 8]);
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath(); ctx.moveTo(g.cx - g.hw * 0.95, this.target); ctx.lineTo(g.cx + g.hw * 0.95, this.target); ctx.stroke();
+      ctx.restore();
+    }
     // scissors under the finger, snapping shut on each cut
     if (this.snip.show) {
       const open = this.snip.t > 0 ? 0.08 : 0.45;
       ctx.save();
       ctx.translate(this.snip.x, this.snip.y);
       for (const d of [-1, 1]) {
+        // a steel blade tapering to a point, with a black finger ring behind the pivot
         ctx.save();
         ctx.rotate(d * open);
-        ctx.strokeStyle = '#d7dbe2'; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(-34, 0); ctx.lineTo(26, 0); ctx.stroke();
-        ctx.strokeStyle = '#7b61ff'; ctx.lineWidth = 3.5;
-        ctx.beginPath(); ctx.arc(34, d * 7, 8, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = 'rgba(30,15,15,0.22)';
+        ctx.beginPath(); ctx.moveTo(-40, 5); ctx.lineTo(-2, 6); ctx.lineTo(-2, 9); ctx.closePath(); ctx.fill();
+        const bg = ctx.createLinearGradient(0, -4, 0, 4);
+        bg.addColorStop(0, '#f4f6f9'); bg.addColorStop(0.5, '#aeb7c3'); bg.addColorStop(1, '#6b7482');
+        ctx.fillStyle = bg;
+        ctx.beginPath(); ctx.moveTo(-42, d * 0.5); ctx.lineTo(-4, -3.2); ctx.lineTo(20, -2.4); ctx.lineTo(20, 2.4); ctx.lineTo(-4, 3.2); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(-38, d * 0.3 - 0.8); ctx.lineTo(16, -1.6); ctx.stroke();
+        ctx.strokeStyle = '#22252b'; ctx.lineWidth = 4.5;
+        ctx.beginPath(); ctx.ellipse(31, d * 7, 10, 7.5, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.ellipse(31, d * 7, 10, 7.5, 0, Math.PI * 1.1, Math.PI * 1.7); ctx.stroke();
         ctx.restore();
       }
       ctx.fillStyle = '#8a8f99';
