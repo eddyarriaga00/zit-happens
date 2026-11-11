@@ -379,7 +379,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     const lines = (look.age || 25) >= 40 ? 1 : 0.35;                                       // deeper with age
     x.strokeStyle = rgba(tone.pore, 0.1 * lines); x.lineWidth = 3.2;                               // smile lines
     x.beginPath(); x.moveTo(X(d * 0.21), Y(noseY - 0.01)); x.quadraticCurveTo(X(d * 0.34), Y(noseY + 0.07), X(d * 0.38), Y(mouthY - 0.07)); x.stroke();
-    x.strokeStyle = rgba(tone.pore, 0.14 * lines); x.lineWidth = 1.2; x.stroke();
+    x.strokeStyle = rgba(tone.pore, 0.07 * lines); x.lineWidth = 1.4; x.stroke();
     x.strokeStyle = 'rgba(80,40,34,0.3)'; x.lineWidth = 1.1;                               // crease above the lid
     x.beginPath(); x.ellipse(X(d * ex), Y(ey + 0.02), erx * 1.12, ery * 1.75, 0, Math.PI * 1.14, Math.PI * 1.86); x.stroke();
     soft(X(d * (ex + 0.02)), Y(ey - 0.115), hw * 0.16, hh * 0.022, 'rgba(255,255,255,0.14)'); // brow bone
