@@ -162,7 +162,7 @@ export function zoneBlocked(zone, px, py, w, h) {
   if (zone === 'nose') return v > 0.7 || u < 0.14 || u > 0.86;
   if (zone === 'chin') return v < 0.31;
   if (zone === 'cheek') return v < 0.26 || u > 0.86 || u < 0.1;
-  if (zone === 'back') return Math.abs(u - 0.2) < 0.06 || Math.abs(u - 0.8) < 0.06;     // not under the straps
+  if (zone === 'back') return Math.abs(u - 0.2) < 0.105 || Math.abs(u - 0.8) < 0.105;     // not under the straps
   if (zone === 'shoulder') {
     const strap = (u > 0.05 + 0.1 * v && u < 0.26 + 0.1 * v) || (u < 0.14 && v < 0.3);     // the strap, and the lock of hair
     return strap || Math.hypot(px - w * 0.25, py - h * 1.05) > h * 0.95 - 46;

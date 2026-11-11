@@ -666,22 +666,32 @@ export class Pimple {
       ctx.strokeStyle = `rgba(255,255,255,${0.9 * a})`;
       ctx.beginPath(); ctx.arc(x, y, R + 16, 0, Math.PI * 2); ctx.stroke();
       ctx.setLineDash([]);
+      // the two fingertips sit either side of the pimple, or above and below it when it is too
+      // close to the edge of the screen for both to fit side by side
+      const SW = window.innerWidth, SH = window.innerHeight, reach = R + 16 + 22;
+      const vert = x - reach < 4 || x + reach > SW - 4;
       for (const d of [-1, 1]) {
-        const fx = x + d * (R + 16 - bob);
+        const fx = x + (vert ? 0 : d * (R + 16 - bob)), fy = y + (vert ? d * (R + 16 - bob) : 0);
         ctx.fillStyle = `rgba(255,255,255,${0.38 * a})`;
         ctx.strokeStyle = `rgba(123,97,255,${0.9 * a})`;
-        ctx.beginPath(); ctx.arc(fx, y, 19, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(fx, fy, 19, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(fx - d * 2 + d * 6, y - 7); ctx.lineTo(fx - d * 6, y); ctx.lineTo(fx - d * 2 + d * 6, y + 7); ctx.stroke();
+        ctx.save(); ctx.translate(fx, fy); if (vert) ctx.rotate(Math.PI / 2);
+        ctx.beginPath(); ctx.moveTo(-d * 2 + d * 6, -7); ctx.lineTo(-d * 6, 0); ctx.lineTo(-d * 2 + d * 6, 7); ctx.stroke();
+        ctx.restore();
       }
       ctx.globalAlpha = a;
       ctx.font = '900 14px ui-rounded, -apple-system, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.lineWidth = 4;
       ctx.strokeStyle = 'rgba(60,20,40,0.75)';
-      ctx.strokeText('pinch with 2 fingers', x, y - R - 30);
+      // the label stays on screen and clear of the top bar
+      const tx = Math.max(84, Math.min(SW - 84, x));
+      let ty = y - R - 30 - (vert ? 26 : 0);
+      if (ty < 150) ty = Math.min(SH - 140, y + R + 46 + (vert ? 26 : 0));
+      ctx.strokeText('pinch with 2 fingers', tx, ty);
       ctx.fillStyle = '#fff';
-      ctx.fillText('pinch with 2 fingers', x, y - R - 30);
+      ctx.fillText('pinch with 2 fingers', tx, ty);
       ctx.globalAlpha = 1;
     }
     ctx.lineCap = 'round';
