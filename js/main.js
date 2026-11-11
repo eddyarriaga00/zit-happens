@@ -1,7 +1,7 @@
 import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
 import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL, AWARDS, rankFor } from './levels.js';
 import { lookFor, portraitURL } from './faces.js';
-import { renderFaceScene, drawLids } from './facescene.js';
+import { renderFaceScene, drawLids, drawMood } from './facescene.js';
 import { Makeup, Haircut, LIP_SHADES } from './salon.js';
 import { HairService, STATIONS, WALLS, salonLevel, salonTitle, salonPicture, salonBackdrop } from './hairsalon.js';
 import { Strip, Brows } from './extras.js';
@@ -299,6 +299,7 @@ function newScene(seed, def = null) {
   G.salon = null;
   G.finishing = false;
   G.say = null;
+  G.mood = null;
   G.treat = null;
   G.sup = new Supplies(G);
 }
@@ -953,6 +954,8 @@ const LINES = {
 };
 let sayCool = 0;
 function say(kind, always = false) {
+  // her face reacts every time, whether or not she says anything
+  G.mood = { k: kind === 'ouch' ? -1 : kind === 'pop' ? -0.45 : 1, t: 0, len: kind === 'ouch' ? 1.8 : kind === 'pop' ? 0.9 : 1.7 };
   if (G.mode !== 'level' && G.mode !== 'zen') return;
   if (!always && (sayCool > 0 || Math.random() > 0.45)) return;
   const list = LINES[kind];
@@ -1230,6 +1233,7 @@ function update(dt) {
   G.shut = (G.shut || 0) + ((shutNow ? 1 : 0) - (G.shut || 0)) * Math.min(1, dt * 7);
   G.wince = Math.max(0, G.wince - dt);
   sayCool = Math.max(0, sayCool - dt);
+  if (G.mood) { G.mood.t += dt; if (G.mood.t > G.mood.len) G.mood = null; }
   if (G.say) G.say.t -= dt;
   G.blinkA = Math.max(0, G.blinkA - dt);
   G.blinkT -= dt;
@@ -1252,6 +1256,7 @@ function render() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (G.skin) ctx.drawImage(G.skin, 0, 0, W, H);
   if (G.geo) drawLids(ctx, G.geo, Math.max(G.shut || 0, G.wince > 0 ? Math.min(1, G.wince * 6) : G.blinkA > 0 ? Math.sin(Math.PI * (1 - G.blinkA / 0.16)) : 0));
+  if (G.geo && G.mood && !(G.treat && G.treat.active)) drawMood(ctx, G.geo, G.mood.k * Math.sin(Math.PI * Math.min(1, G.mood.t / G.mood.len)) ** 0.6);
   else if (!G.skin) { ctx.fillStyle = '#eec1a2'; ctx.fillRect(0, 0, W, H); }   // back and shoulder scenes have no face geometry but do have painted skin
 
   ctx.save();

@@ -689,3 +689,38 @@ export function drawLids(ctx, geo, closed) {
     ctx.restore();
   }
 }
+
+/** A passing expression drawn live over the painted face: k = 1 pleased .. -1 pained. */
+export function drawMood(ctx, geo, k) {
+  if (Math.abs(k) < 0.03 || !geo.lipsBox) return;
+  const [x0, y0, x1, y1] = geo.lipsBox, sy = y0 + (y1 - y0) * 0.36, len = geo.hw * 0.075, a = Math.abs(k);
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const [cxm, d] of [[x0, -1], [x1, 1]]) {
+    // the corner of the mouth turns up or down, with the little crease that comes with it
+    const ex = cxm + d * len, ey = sy - len * 0.85 * k;
+    ctx.strokeStyle = `rgba(70,22,26,${0.6 * a})`; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(cxm - d * 2, sy); ctx.quadraticCurveTo(cxm + d * len * 0.6, sy - len * 0.1 * k, ex, ey); ctx.stroke();
+    const g = ctx.createRadialGradient(ex + d * 3, ey, 0, ex + d * 3, ey, len * 1.1);
+    g.addColorStop(0, `rgba(70,30,26,${0.22 * a})`); g.addColorStop(1, 'rgba(70,30,26,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ex + d * 3, ey, len * 1.1, 0, Math.PI * 2); ctx.fill();
+  }
+  if (k > 0) {
+    // pleased: the cheeks lift and flush a little
+    for (const c of geo.cheeks) {
+      const g = ctx.createRadialGradient(c.x, c.y - c.ry * 0.3, 0, c.x, c.y - c.ry * 0.3, c.rx * 0.9);
+      g.addColorStop(0, `rgba(255,120,120,${0.13 * a})`); g.addColorStop(1, 'rgba(255,120,120,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y - c.ry * 0.3, c.rx * 0.9, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(90,45,40,${0.22 * a})`; ctx.lineWidth = 1.4;      // the eyes crinkle from below
+      const e = geo.eyes[c.x < geo.cx ? 0 : geo.eyes.length - 1];
+      if (e) { ctx.beginPath(); ctx.moveTo(e.x - e.rx * 0.8, e.y + e.ry * 1.25); ctx.quadraticCurveTo(e.x, e.y + e.ry * (1.25 - 0.5 * a), e.x + e.rx * 0.8, e.y + e.ry * 1.25); ctx.stroke(); }
+    }
+  } else {
+    // pained: the brows pinch together
+    ctx.strokeStyle = `rgba(80,40,30,${0.5 * a})`; ctx.lineWidth = 1.6;
+    for (const d of [-1, 1]) {
+      ctx.beginPath(); ctx.moveTo(geo.cx + d * geo.hw * 0.05, geo.browY - geo.hh * 0.03); ctx.quadraticCurveTo(geo.cx + d * geo.hw * 0.075, geo.browY + geo.hh * 0.01, geo.cx + d * geo.hw * 0.055, geo.browY + geo.hh * 0.05); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
