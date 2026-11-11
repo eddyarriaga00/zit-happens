@@ -561,3 +561,13 @@ button.tile i { transition: transform 0.15s; }
 button.tile:active i { transform: scale(1.15) rotate(-6deg); }
 .card h2 { letter-spacing: -0.3px; }
 .stat { box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.08); }
+
+/* ---------- v49: the patient list shows who you are treating ---------- */
+.lv-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.lv { min-width: 0; }
+.lv { aspect-ratio: auto; height: auto; padding: 6px 6px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 18px; }
+.lv img { width: 100%; aspect-ratio: 1; border-radius: 13px; object-fit: cover; background: rgba(var(--accent-rgb), 0.12); display: block; }
+.lv b { font-size: 12.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv i { font-size: 11px; letter-spacing: 0; }
+.lv.current b { color: #fff; }
+.lv.boss { box-shadow: inset 0 0 0 2px rgba(var(--accent-rgb), 0.45); }

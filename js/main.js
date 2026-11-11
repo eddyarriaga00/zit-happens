@@ -1386,6 +1386,7 @@ function refreshTools() {
 }
 
 // ---- level map, patient card, shop
+const faceCache = new Map();     // level -> small portrait, kept for the session
 function showLevels() {
   const total = Object.values(save.stars).reduce((a, b) => a + b, 0);
   let html = `<div class="lv-top"><span>★ ${total} / ${LEVELS.length * 3}</span><span>🪙 ${save.coins.toLocaleString()}</span></div>`;
@@ -1394,7 +1395,7 @@ function showLevels() {
     for (let n = ch.from; n <= ch.to; n++) {
       const locked = false, st = save.stars[n] || 0;      // every patient is open from the start
       const cls = ['lv', locked ? 'locked' : '', LEVELS[n - 1].mix.boss ? 'boss' : '', n === save.level ? 'current' : ''].join(' ');
-      html += `<button class="${cls}" data-n="${n}" ${locked ? 'disabled' : ''}><b>${locked ? '🔒' : n}</b><i>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</i></button>`;
+      html += `<button class="${cls}" data-n="${n}" ${locked ? 'disabled' : ''}><img data-face="${n}" alt=""><b>${n}. ${esc(LEVELS[n - 1].name)}</b><i>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</i></button>`;
     }
     html += '</div>';
   }
@@ -1402,6 +1403,17 @@ function showLevels() {
   html += `<h3>Endless clinic</h3><button class="big alt lv-endless" data-n="${Math.max(LEVELS.length + 1, save.level)}" ${open ? '' : 'disabled'}>${open ? `Walk-in patient <small>Level ${save.level}</small>` : 'Finish Chapter 3 to unlock'}</button>`;
   $('clinic-name').textContent = `${myName()}'s Clinic`;
   $('levels-body').innerHTML = html;
+  // each patient's face, painted a couple at a time so the list opens instantly
+  const faces = [...$('levels-body').querySelectorAll('img[data-face]')];
+  let fk = 0;
+  (function paintFaces() {
+    for (let j = 0; j < 2 && fk < faces.length; j++, fk++) {
+      const n = +faces[fk].dataset.face;
+      if (!faceCache.has(n)) faceCache.set(n, portraitURL(levelDef(n), { clear: true }, 72));
+      faces[fk].src = faceCache.get(n);
+    }
+    if (fk < faces.length && faces[fk].isConnected) setTimeout(paintFaces, 0);
+  })();
   $('levels-body').querySelectorAll('[data-n]').forEach((b) => b.addEventListener('click', () => {
     audio.unlock(); audio.click();
     openIntro(+b.dataset.n);
