@@ -563,6 +563,39 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   }
   x.restore();
 
+  // ---- jewellery: most women wear a little something
+  const jewel = (seed >>> 3) % 5, chain = (seed >>> 5) % 3 === 0;
+  const metal = (seed >>> 7) % 2 ? ['#fff3c4', '#e9c46a', '#a9822a'] : ['#ffffff', '#cfd6df', '#7f8794'];
+  if (jewel) {
+    for (const d of [-1, 1]) {
+      const lx = X(d * 1.035), ly = Y(0.19), r = hw * 0.028;
+      if (jewel === 3) {                                   // a small hoop
+        x.strokeStyle = metal[2]; x.lineWidth = r * 0.75;
+        x.beginPath(); x.ellipse(lx, ly + r * 2.2, r * 1.3, r * 2.2, 0, 0, Math.PI * 2); x.stroke();
+        x.strokeStyle = metal[0]; x.lineWidth = r * 0.3;
+        x.beginPath(); x.ellipse(lx - r * 0.15, ly + r * 2.1, r * 1.3, r * 2.2, 0, Math.PI * 0.9, Math.PI * 1.6); x.stroke();
+      } else {                                             // a stud, a pearl or a little gem
+        soft(lx + r * 0.3, ly + r * 0.5, r * 1.8, r * 1.8, 'rgba(40,15,10,0.3)');
+        const jg = x.createRadialGradient(lx - r * 0.35, ly - r * 0.4, 0, lx, ly, r);
+        const cols = jewel === 1 ? metal : jewel === 2 ? ['#ffffff', '#f3ece4', '#c9bfb4'] : ['#ffffff', '#ff9fc0', '#c2185b'];
+        jg.addColorStop(0, cols[0]); jg.addColorStop(0.5, cols[1]); jg.addColorStop(1, cols[2]);
+        x.fillStyle = jg; x.beginPath(); x.arc(lx, ly, r, 0, Math.PI * 2); x.fill();
+        x.fillStyle = 'rgba(255,255,255,0.9)'; x.beginPath(); x.arc(lx - r * 0.35, ly - r * 0.38, r * 0.25, 0, Math.PI * 2); x.fill();
+      }
+    }
+  }
+  if (chain) {                                             // a fine chain with a tiny pendant in the hollow of the throat
+    x.strokeStyle = 'rgba(40,15,10,0.2)'; x.lineWidth = 2.2;
+    x.beginPath(); x.moveTo(X(-0.47), Y(1.14)); x.quadraticCurveTo(cx, Y(1.5), X(0.47), Y(1.14)); x.stroke();
+    x.strokeStyle = metal[1]; x.lineWidth = 1.1; x.setLineDash([1.6, 1.2]);
+    x.beginPath(); x.moveTo(X(-0.47), Y(1.13)); x.quadraticCurveTo(cx, Y(1.49), X(0.47), Y(1.13)); x.stroke();
+    x.setLineDash([]);
+    const pr = hw * 0.03, py2 = Y(1.325);
+    const pg = x.createRadialGradient(cx - pr * 0.3, py2 - pr * 0.3, 0, cx, py2, pr);
+    pg.addColorStop(0, metal[0]); pg.addColorStop(0.6, metal[1]); pg.addColorStop(1, metal[2]);
+    x.fillStyle = pg; x.beginPath(); x.arc(cx, py2, pr, 0, Math.PI * 2); x.fill();
+  }
+
   // ---- glasses
   if (look.glasses) {
     x.strokeStyle = '#27212b'; x.lineWidth = s * 0.014;
