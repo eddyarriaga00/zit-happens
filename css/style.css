@@ -571,3 +571,7 @@ button.tile:active i { transform: scale(1.15) rotate(-6deg); }
 .lv i { font-size: 11px; letter-spacing: 0; }
 .lv.current b { color: #fff; }
 .lv.boss { box-shadow: inset 0 0 0 2px rgba(var(--accent-rgb), 0.45); }
+
+/* ---------- v58: tool bar icons are little pictures of the real instruments ---------- */
+.tool svg.real { fill: initial; stroke: none; stroke-width: initial; width: 27px; height: 27px; filter: drop-shadow(0 1.5px 1.5px rgba(40, 20, 90, 0.25)); }
+.tool.active svg.real { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3)); }
