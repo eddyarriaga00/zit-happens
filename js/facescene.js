@@ -610,7 +610,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   const inLips = (px, py) => x.isPointInPath(lipsPath, px * dpr, py * dpr);
   const lipsBox = [cx - mw, my - hh * 0.06, cx + mw, my + hh * 0.105];
   const cheeks = [-1, 1].map((d) => ({ x: X(d * 0.56), y: Y(0.3), rx: hw * 0.27, ry: hh * 0.16 }));
-  const lids = eyes.map((e) => ({ x: e.x, y: e.y - ery * 1.75, rx: erx * 1.15, ry: ery * 0.95 }));
+  const lids = eyes.map((e) => ({ x: e.x, y: e.y - ery * 1.42, rx: erx * 1.12, ry: ery * 0.72 }));
   const onSkin = (px, py) => inHead(px, py) && (py - cy) / hh >= edgeV((px - cx) / hw);   // face, not hair
   const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint,
     lipsPath, inLips, lipsBox, cheeks, lids, onHair, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };

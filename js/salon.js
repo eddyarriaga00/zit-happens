@@ -84,7 +84,7 @@ export class Makeup {
       const a = this.areas[name];
       if (!a.dabs.length) continue;
       ctx.save();
-      ctx.clip(a.path);
+      if (name === 'lips') ctx.clip(a.path);
       if (name === 'lips') {
         // lipstick is a stain, not paint: the lip's own creases and shape show through it
         ctx.globalAlpha = 0.74;
@@ -114,9 +114,15 @@ export class Makeup {
         }
       } else {
         // soft, buildable powder
+        // powder has no edge: each dab fades the further it lands from the middle of the cheek or lid
+        const ells = name === 'blush' ? this.G.geo.cheeks : this.G.geo.lids;
         for (const d of a.dabs) {
+          let e = 9;
+          for (const q of ells) e = Math.min(e, ((d.x - q.x) / q.rx) ** 2 + ((d.y - q.y) / q.ry) ** 2);
+          const k = Math.max(0, Math.min(1, 1.15 - e));
+          if (k <= 0) continue;
           const g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r);
-          g.addColorStop(0, hexA(d.c, name === 'blush' ? 0.07 : 0.2));
+          g.addColorStop(0, hexA(d.c, (name === 'blush' ? 0.075 : 0.2) * k));
           g.addColorStop(1, hexA(d.c, 0));
           ctx.fillStyle = g;
           ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
