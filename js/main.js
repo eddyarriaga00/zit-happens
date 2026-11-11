@@ -1370,6 +1370,7 @@ function update(dt) {
   toolfx.update(dt);
   if (G.taps) { for (const tp of G.taps) tp.t += dt; G.taps = G.taps.filter((tp) => tp.t < 0.35); }
   if (G.treat) { G.treat.update(dt); G.treat.updatePuffs(dt); }
+  G.fx.keep = G.geo && !G.ear ? G.geo.onSkin : null;       // mess only ever lands on the face itself
   G.fx.update(dt);
   G.shake *= Math.pow(0.001, dt);
   if (G.shake < 0.2) G.shake = 0;
@@ -1396,7 +1397,10 @@ function render() {
   if (G.ear) G.ear.drawBack(ctx);
   // healed/done pimples first so active ones draw on top
   for (const p of G.pimples) if (p.state === 'done') p.draw(ctx, G.time);
+  ctx.save();
+  if (G.geo && !G.ear && G.geo.clipSkin) G.geo.clipSkin(ctx);     // what is on her face stops at her hairline and jaw
   G.fx.drawSplats(ctx);
+  ctx.restore();
   for (const p of G.pimples) p.drawPatch(ctx);
   for (const p of G.pimples) if (p.state !== 'done') p.draw(ctx, G.time);
   for (const p of G.pimples) p.drawRing(ctx, G.time);

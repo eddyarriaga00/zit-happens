@@ -274,8 +274,7 @@ export class Treatment {
       ctx.save();
       const g = G.geo;
       if (g && g.headPath) {
-        ctx.clip(g.headPath);
-        ctx.beginPath(); ctx.rect(0, g.hairlineY + g.hh * 0.04, G.W, G.H); ctx.clip();
+        g.clipSkin(ctx);          // follows the real hairline, so nothing sits on her hair
         ctx.beginPath(); ctx.rect(0, 0, G.W, G.H);
         for (const e of g.eyes) {
           ctx.moveTo(e.x + e.rx * 1.3, e.y - e.ry * 0.2); ctx.ellipse(e.x, e.y - e.ry * 0.2, e.rx * 1.3, e.ry * 2.0, 0, 0, Math.PI * 2);
@@ -398,6 +397,8 @@ export class Treatment {
 
     // lather: a creamy white layer with soft shading and a scatter of glossy bubbles
     if (this.phase === 'lather' || this.phase === 'rinse') {
+      ctx.save();
+      if (G.geo && G.geo.clipSkin) G.geo.clipSkin(ctx);      // lather stays on her face: not in her hair, on her ears or on the wall
       const wob = this.time * 2;
       const pass = (dx, dy, k, style) => {
         ctx.fillStyle = style;
@@ -435,6 +436,7 @@ export class Treatment {
           ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.4, Math.max(0.8, r * 0.22), 0, Math.PI * 2); ctx.fill();
         }
       }
+      ctx.restore();
     }
   }
 }

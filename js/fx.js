@@ -35,6 +35,7 @@ export class FX {
 
   // ---- splats ----
   addSplat(s) {
+    if (this.keep && s.kind === 'drop' && !this.keep(s.x, s.y)) return;     // a drop that lands off her face leaves no mark
     s.alpha = s.alpha ?? 1;
     s.mass = s.mass ?? 1;
     this.messMade += s.mass;

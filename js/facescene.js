@@ -416,6 +416,40 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   }
   soft(X(-0.02), Y(0.85), hw * 0.15, hh * 0.07, hi(0.17));                            // chin
 
+  // skin is not airbrushed: faint mottling, pores that are denser on the nose and inner cheeks,
+  // and on some fair faces a scatter of freckles over the nose
+  {
+    let s2 = ((seed ^ 0x9e3779b9) >>> 0) || 7;
+    const Q = () => { s2 = (s2 * 1664525 + 1013904223) >>> 0; return s2 / 4294967296; };
+    const px1 = Math.max(0.6, s / 380);                       // one "pore" at this size
+    mul(() => {
+      for (let i = 0; i < 46; i++) soft(X(Q() * 1.8 - 0.9), Y(Q() * 1.7 - 0.7), hw * (0.05 + Q() * 0.07), hh * (0.03 + Q() * 0.04), sh(0.035 + Q() * 0.03));
+      x.fillStyle = sh(0.2);
+      for (let i = 0; i < 2600; i++) {
+        let u = Q() * 1.9 - 0.95, v = Q() * 1.75 - 0.72;
+        if (i % 3 === 0) { u = (Q() + Q() - 1) * 0.5; v = 0.2 + (Q() + Q() - 1) * 0.28; }      // the nose and the cheeks beside it
+        x.globalAlpha = 0.25 + Q() * 0.5;
+        x.beginPath(); x.arc(X(u), Y(v), px1 * (0.35 + Q() * 0.4), 0, 6.3); x.fill();
+      }
+      x.globalAlpha = 1;
+      if (skinLum > 0.62 && vr(8) > 0.05) {
+        for (let i = 0; i < 150; i++) {
+          const u = (Q() + Q() + Q() - 1.5) * 0.62, v = 0.12 + (Q() + Q() - 1) * 0.2 - Math.abs(u) * 0.08;
+          x.fillStyle = `rgba(176,112,74,${(0.16 + Q() * 0.26).toFixed(2)})`;
+          x.beginPath(); x.ellipse(X(u), Y(v), px1 * (0.9 + Q() * 1.3), px1 * (0.7 + Q() * 1.0), Q() * 3, 0, 6.3); x.fill();
+        }
+      }
+    });
+    // and the tiny glints that make skin look alive rather than matte
+    x.fillStyle = hi(0.5);
+    for (let i = 0; i < 420; i++) {
+      const k = i % 2, u = k ? (Q() + Q() - 1) * 0.16 - 0.02 : (Q() < 0.5 ? -1 : 1) * 0.5 + (Q() + Q() - 1) * 0.22 - 0.05, v = k ? -0.1 + Q() * 0.42 : 0.13 + (Q() + Q() - 1) * 0.09;
+      x.globalAlpha = 0.12 + Q() * 0.22;
+      x.beginPath(); x.arc(X(u), Y(v), px1 * (0.3 + Q() * 0.35), 0, 6.3); x.fill();
+    }
+    x.globalAlpha = 1;
+  }
+
 
   // beard / stubble: thousands of little hairs, thinner on the cheeks
   if (look.beard || look.stubble || look.stache) {
@@ -833,8 +867,15 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const cheeks = [-1, 1].map((d) => ({ x: X(d * 0.56), y: Y(0.3), rx: hw * 0.27, ry: hh * 0.16 }));
   const lids = eyes.map((e) => ({ x: e.x, y: e.y - ery * 1.0, rx: erx * 1.12, ry: ery * 1.6 }));     // the whole lid, lash line to crease: she shuts her eyes for it
   const onSkin = (px, py) => inHead(px, py) && (py - cy) / hh >= edgeV((px - cx) / hw);   // face, not hair
+  // the same thing as a shape, for clipping whatever is put on her face (foam, masks, mess) so that
+  // none of it lands on her hair, ears, neck or the wall
+  const below = new Path2D();
+  below.moveTo(X(-1.4), Y(1.4));
+  for (let i = -28; i <= 28; i++) below.lineTo(X(i / 20), Y(edgeV(Math.max(-1, Math.min(1, i / 20))) + Math.max(0, Math.abs(i / 20) - 0.8) * 0.9));
+  below.lineTo(X(1.4), Y(1.4)); below.closePath();
+  const clipSkin = (ctx) => { ctx.clip(head); ctx.clip(below); };
   const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint,
-    lipsPath, inLips, lipsBox, cheeks, lids, onHair, headPath: head, eyeCol: look.eye, eyePaths, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
+    lipsPath, inLips, lipsBox, cheeks, lids, onHair, clipSkin, headPath: head, eyeCol: look.eye, eyePaths, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
   return { canvas: c, geo };
 }
 
