@@ -39,9 +39,9 @@ export class Strip {
     this.intro = 'Rub the nose to wet it first 💧';
     this.cx = g.cx;
     this.y0 = g.cy + 0.03 * g.hh;
-    this.y1 = g.cy + 0.345 * g.hh;
+    this.y1 = g.cy + 0.365 * g.hh;
     this.a = 0.1 * g.hw;       // half width at the bridge
-    this.b = 0.27 * g.hw;      // half width over the wings
+    this.b = 0.275 * g.hw;     // half width over the wings
     this.z = new Zoom(G, g.cx, (this.y0 + this.y1) / 2, clamp((0.6 * G.W) / (2 * this.b), 1.6, 2.7));
     const { cx, y0, y1, a, b } = this, ym = y0 + (y1 - y0) * 0.55, r = b * 0.3;
     const p = new Path2D();

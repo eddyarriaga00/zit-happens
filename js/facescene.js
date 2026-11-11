@@ -424,8 +424,15 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     ng.addColorStop(0, 'rgba(25,8,8,0.95)'); ng.addColorStop(0.7, 'rgba(50,16,14,0.8)'); ng.addColorStop(1, 'rgba(50,16,14,0)');
     x.fillStyle = ng; x.beginPath(); x.arc(0, 0, hw * 0.06, 0, Math.PI * 2); x.fill();
     x.restore();
-    x.strokeStyle = rgba(tone.pore, 0.28); x.lineWidth = 1.3;
-    x.beginPath(); x.arc(X(d * 0.14), Y(noseY - 0.015), hw * 0.06, d > 0 ? -1.3 : Math.PI - 0.9, d > 0 ? 0.9 : Math.PI + 1.3); x.stroke();
+    // the wing: a rounded bulb with a crease curling round it and a shadow where it meets the cheek
+    soft(X(d * 0.235), Y(noseY - 0.02), hw * 0.05, hh * 0.07, rgba(tone.shade, 0.3));
+    soft(X(d * 0.16), Y(noseY - 0.025), hw * 0.06, hh * 0.045, 'rgba(255,255,255,0.1)');
+    for (const [al, lw] of [[0.12, 3], [0.3, 1.1]]) {
+      x.strokeStyle = rgba(tone.pore, al); x.lineWidth = lw;
+      x.beginPath(); x.moveTo(X(d * 0.125), Y(noseY - 0.095));
+      x.bezierCurveTo(X(d * 0.2), Y(noseY - 0.09), X(d * 0.24), Y(noseY - 0.01), X(d * 0.175), Y(noseY + 0.03));
+      x.stroke();
+    }
   }
 
   // the wings of the nose, its shaded side, and the line where the tip meets the lip
