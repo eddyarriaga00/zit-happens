@@ -216,6 +216,10 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   head.bezierCurveTo(X(-1.03), Y(-0.55), X(-0.8), Y(-1.02), cx, Y(-1));
   head.closePath();
 
+  // highlights on dark skin are warm and subtle; white patches there read as chalk
+  const skinLum = /^#[0-9a-f]{6}$/i.test(tone.base) ? [1, 3, 5].reduce((a, i) => a + parseInt(tone.base.slice(i, i + 2), 16), 0) / 765 : 0.7;
+  const hiK = Math.max(0.22, Math.min(1, (skinLum - 0.25) / 0.5));
+  const hi = (a) => `rgba(255,${Math.round(225 + 30 * hiK)},${Math.round(200 + 55 * hiK)},${(a * hiK).toFixed(3)})`;
   const ey = -0.06, ex = 0.42;                      // eye line / spacing (head units)
   const erx = hw * 0.215, ery = hh * 0.084;
   const mouthY = 0.6, noseY = 0.36;
@@ -228,12 +232,12 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   side.addColorStop(0, rgba(tone.shade, 0.75)); side.addColorStop(0.2, rgba(tone.shade, 0.08));
   side.addColorStop(0.72, rgba(tone.shade, 0.12)); side.addColorStop(1, rgba(tone.shade, 0.9));
   x.fillStyle = side; x.fillRect(X(-1.1), Y(-1.1), s * 1.1, hh * 2.2);
-  soft(X(-0.12), Y(-0.5), hw * 0.55, hh * 0.22, 'rgba(255,255,255,0.16)');          // forehead
+  soft(X(-0.12), Y(-0.5), hw * 0.55, hh * 0.22, hi(0.16));          // forehead
   soft(cx, Y(1.14), hw * 1.0, hh * 0.3, rgba(tone.shade, 0.75));                    // under the jaw
   for (const d of [-1, 1]) {
     soft(X(d * ex), Y(ey - 0.02), hw * 0.32, hh * 0.16, rgba(tone.pore, 0.3));      // eye sockets
     soft(X(d * 0.55), Y(0.3), hw * 0.34, hh * 0.24, rgba(tone.blush, 0.36));        // cheeks
-    soft(X(d * 0.5 - 0.06), Y(0.14), hw * 0.2, hh * 0.1, 'rgba(255,255,255,0.13)'); // cheekbones
+    soft(X(d * 0.5 - 0.06), Y(0.14), hw * 0.2, hh * 0.1, hi(0.13)); // cheekbones
     soft(X(d * 0.17), Y(0.2), hw * 0.08, hh * 0.22, rgba(tone.pore, 0.22));         // sides of the nose
     if (look.age >= 35) {                                                           // smile lines
       x.strokeStyle = rgba(tone.pore, look.age >= 55 ? 0.09 : 0.04); x.lineWidth = s * 0.014;      // a soft fold, not a drawn line
@@ -243,17 +247,17 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   for (const d of [-1, 1]) {
     soft(X(d * 0.86), Y(-0.3), hw * 0.22, hh * 0.32, rgba(tone.shade, 0.4));           // temples
     soft(X(d * 0.64), Y(0.48), hw * 0.2, hh * 0.17, rgba(tone.shade, 0.34));           // hollow under the cheekbone
-    soft(X(d * 0.5 - 0.05), Y(0.1), hw * 0.13, hh * 0.045, 'rgba(255,255,255,0.2)');   // sheen on the cheekbone
+    soft(X(d * 0.5 - 0.05), Y(0.1), hw * 0.13, hh * 0.045, hi(0.2));   // sheen on the cheekbone
     soft(X(d * ex), Y(ey - 0.13), hw * 0.26, hh * 0.05, rgba(tone.pore, 0.2));         // shadow under the brow
   }
-  soft(X(-0.05), Y(-0.36), hw * 0.2, hh * 0.08, 'rgba(255,255,255,0.14)');             // oily centre of the forehead
+  soft(X(-0.05), Y(-0.36), hw * 0.2, hh * 0.08, hi(0.14));             // oily centre of the forehead
   const ridge = x.createLinearGradient(X(-0.09), 0, X(0.09), 0);
   ridge.addColorStop(0, 'rgba(255,255,255,0)'); ridge.addColorStop(0.45, 'rgba(255,255,255,0.2)'); ridge.addColorStop(1, 'rgba(255,255,255,0)');
   soft(cx, Y(0.31), hw * 0.15, hh * 0.09, rgba(tone.blush, 0.3));                    // warmth in the nose
-  soft(X(-0.02), Y(0.3), hw * 0.1, hh * 0.07, 'rgba(255,255,255,0.3)');             // tip of the nose
+  soft(X(-0.02), Y(0.3), hw * 0.1, hh * 0.07, hi(0.3));             // tip of the nose
   soft(cx, Y(noseY + 0.07), hw * 0.2, hh * 0.04, 'rgba(50,16,12,0.4)');             // under the nose
   soft(cx, Y(mouthY + 0.14), hw * 0.26, hh * 0.05, 'rgba(60,20,15,0.3)');           // under the lip
-  soft(X(-0.03), Y(0.84), hw * 0.26, hh * 0.1, 'rgba(255,255,255,0.14)');           // chin
+  soft(X(-0.03), Y(0.84), hw * 0.26, hh * 0.1, hi(0.14));           // chin
 
   // beard / stubble: thousands of little hairs, thinner on the cheeks
   if (look.beard || look.stubble || look.stache) {
