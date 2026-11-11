@@ -170,6 +170,9 @@ export class FX {
         // a blob with a tail and a darker wet edge, not a neat oval
         const hex = s.color[0] === '#';
         if (hex) {
+          // it sits on the skin: a soft shadow underneath, toward the lower right
+          ctx.fillStyle = 'rgba(60,24,16,0.2)';
+          ctx.beginPath(); ctx.ellipse(s.rx * 0.14, s.ry * 0.34, s.rx * 1.12, s.ry * 1.1, 0, 0, Math.PI * 2); ctx.fill();
           ctx.fillStyle = shade(s.color);
           ctx.beginPath();
           ctx.ellipse(0, 0, s.rx * 1.08, s.ry * 1.12, 0, 0, Math.PI * 2);
@@ -181,9 +184,20 @@ export class FX {
         ctx.ellipse(0, 0, s.rx, s.ry, 0, 0, Math.PI * 2);
         ctx.ellipse(s.rx * 0.72, s.ry * 0.14, s.rx * 0.42, s.ry * 0.52, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        // thicker in the middle, so it is paler there; two flecks that landed beside it
+        ctx.fillStyle = 'rgba(255,255,255,0.16)';
+        ctx.beginPath(); ctx.ellipse(s.rx * 0.05, s.ry * 0.05, s.rx * 0.62, s.ry * 0.58, 0, 0, Math.PI * 2); ctx.fill();
+        if (s.rx > 3) {
+          ctx.fillStyle = s.color;
+          ctx.beginPath();
+          ctx.ellipse(-s.rx * 1.55, s.ry * 0.7, s.rx * 0.2, s.ry * 0.17, 0.4, 0, Math.PI * 2);
+          ctx.ellipse(s.rx * 0.35, -s.ry * 1.65, s.rx * 0.14, s.ry * 0.13, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
         ctx.beginPath();
         ctx.ellipse(-s.rx * 0.25, -s.ry * 0.32, s.rx * 0.28, s.ry * 0.2, 0, 0, Math.PI * 2);
+        ctx.ellipse(s.rx * 0.5, -s.ry * 0.1, s.rx * 0.09, s.ry * 0.08, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       } else if (s.hair) {
