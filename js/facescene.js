@@ -658,11 +658,15 @@ export function drawLids(ctx, geo, closed) {
     const ax = e.x - d * rx, ay = e.y + ry * 0.25, bx = e.x + d * rx * 1.02, by = e.y - ry * 0.12;
     const mx = e.x + d * rx * 0.1, my = e.y + ry * (-1.3 + 2.45 * closed);
     ctx.save();
-    const g = ctx.createLinearGradient(0, e.y - ry * 1.3, 0, e.y + ry * 0.9);
-    g.addColorStop(0, geo.lidShade); g.addColorStop(0.5, geo.lid); g.addColorStop(1, geo.lidShade);
+    const g = ctx.createLinearGradient(0, e.y - ry * 2.2, 0, e.y + ry * 0.9);
+    g.addColorStop(0, geo.lid); g.addColorStop(0.3, geo.lidShade); g.addColorStop(0.62, geo.lid); g.addColorStop(1, geo.lidShade);
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.moveTo(ax, ay);
-    ctx.quadraticCurveTo(e.x - d * rx * 0.2, e.y - ry * 1.38, bx, by);
+    // as it closes, the lid also covers the open eye's upper lashes, which would otherwise float above it
+    const up = 1.38 + 0.85 * Math.max(0, (closed - 0.5) * 2);
+    ctx.lineTo(ax - d * rx * 0.06 * closed, ay - ry * 0.5 * closed);
+    ctx.quadraticCurveTo(e.x - d * rx * 0.2, e.y - ry * up, bx + d * rx * 0.1 * closed, by - ry * 0.55 * closed);
+    ctx.lineTo(bx, by);
     ctx.quadraticCurveTo(mx, my, ax, ay);
     ctx.fill();
     if (closed > 0.5) {
