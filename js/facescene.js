@@ -524,32 +524,35 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
 export function drawLids(ctx, geo, closed) {
   if (closed <= 0.02) return;
   for (const e of geo.eyes) {
-    const rx = e.rx * 1.08, ry = e.ry * 1.3;
+    // a real lid: skin sliding down from the upper lash line, its edge curving with the eyeball
+    const d = Math.sign(e.x - geo.cx) || 1, rx = e.rx * 1.03, ry = e.ry;
+    const ax = e.x - d * rx, ay = e.y + ry * 0.25, bx = e.x + d * rx * 1.02, by = e.y - ry * 0.12;
+    const mx = e.x + d * rx * 0.1, my = e.y + ry * (-1.3 + 2.45 * closed);
     ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(e.x, e.y - e.ry * 0.05, rx, ry, 0, 0, Math.PI * 2);
-    ctx.clip();
-    const yb = e.y - ry + ry * 2 * closed;
-    const g = ctx.createLinearGradient(0, e.y - ry, 0, yb);
-    g.addColorStop(0, geo.lidShade);
-    g.addColorStop(1, geo.lid);
+    const g = ctx.createLinearGradient(0, e.y - ry * 1.3, 0, e.y + ry * 0.9);
+    g.addColorStop(0, geo.lidShade); g.addColorStop(0.5, geo.lid); g.addColorStop(1, geo.lidShade);
     ctx.fillStyle = g;
-    ctx.fillRect(e.x - rx, e.y - ry - 2, rx * 2, yb - (e.y - ry) + 2);
-    ctx.strokeStyle = geo.lash;
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.moveTo(e.x - rx, yb - 1);
-    ctx.quadraticCurveTo(e.x, yb + ry * 0.35 * closed, e.x + rx, yb - 1);
-    ctx.stroke();
-    // lashes along the closed edge, and the fold above it
-    ctx.lineWidth = 1.2;
-    for (let i = 0; i < 9; i++) {
-      const k = i / 8, lx = e.x - rx + rx * 2 * k, ly = yb - 1 + Math.sin(k * Math.PI) * ry * 0.3 * closed;
-      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + (k - 0.5) * 5, ly + 4 * closed); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ax, ay);
+    ctx.quadraticCurveTo(e.x - d * rx * 0.2, e.y - ry * 1.38, bx, by);
+    ctx.quadraticCurveTo(mx, my, ax, ay);
+    ctx.fill();
+    if (closed > 0.5) {
+      const hl = ctx.createRadialGradient(e.x, e.y - ry * 0.1, 0, e.x, e.y - ry * 0.1, rx * 0.6);
+      hl.addColorStop(0, 'rgba(255,255,255,0.2)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = hl; ctx.beginPath(); ctx.ellipse(e.x, e.y - ry * 0.1, rx * 0.6, ry * 0.4, 0, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.strokeStyle = 'rgba(70,30,25,0.3)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(e.x - rx * 0.8, e.y - ry * 0.55); ctx.quadraticCurveTo(e.x, e.y - ry * 1.05, e.x + rx * 0.8, e.y - ry * 0.55); ctx.stroke();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = geo.lash; ctx.lineWidth = 1.7;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(mx, my, bx, by); ctx.stroke();
+    ctx.lineWidth = 0.8;
+    for (let i = 1; i < 18; i++) {
+      const t = i / 18, u = 1 - t;
+      const lx = u * u * ax + 2 * u * t * mx + t * t * bx, ly = u * u * ay + 2 * u * t * my + t * t * by;
+      const len = ry * 0.34 * (0.5 + t * 0.6);
+      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + d * len * (0.2 + t * 0.7), ly + len * (2 * closed - 1)); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(70,30,25,0.28)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(e.x - d * rx * 0.85, e.y - ry * 0.75); ctx.quadraticCurveTo(e.x, e.y - ry * 1.95, e.x + d * rx * 1.05, e.y - ry * 0.7); ctx.stroke();
     ctx.restore();
   }
 }

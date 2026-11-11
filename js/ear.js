@@ -3,6 +3,7 @@
 // Don't poke the eardrum in the middle.
 
 import * as audio from './audio.js';
+import { drawTweezers, drawExtractor, drawSyringe } from './tools.js';
 import { buzz } from './haptics.js';
 import { rgba } from './skin.js';
 
@@ -419,16 +420,13 @@ export class Ear {
       const f = this.flush;
       ctx.fillStyle = 'rgba(200,232,255,0.25)';
       ctx.beginPath(); ctx.arc(f.x, f.y, 34, 0, Math.PI * 2); ctx.fill();
+      drawSyringe(ctx, f.x, f.y);
     }
+    // the instrument in your hand: tweezers on things and bugs, a steel curette on wax
     for (const c of this.chunks) {
-      if (c.held == null || (c.kind !== 'object' && c.kind !== 'bug')) continue;
-      ctx.save();
-      ctx.translate(c.x, c.y); ctx.rotate(-0.9);
-      for (const [col, w] of [['rgba(40,20,20,0.3)', 6], ['#c5cbd6', 4.5], ['#ffffff', 1.3]]) {
-        ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineJoin = 'round';
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(34, -9); ctx.lineTo(90, -4); ctx.moveTo(0, 0); ctx.lineTo(34, 9); ctx.lineTo(90, 4); ctx.stroke();
-      }
-      ctx.restore();
+      if (c.held == null) continue;
+      if (c.kind === 'object' || c.kind === 'bug') drawTweezers(ctx, c.x, c.y, -0.9);
+      else drawExtractor(ctx, c.x, c.y, 6);
     }
   }
 

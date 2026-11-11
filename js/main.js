@@ -1247,7 +1247,7 @@ function render() {
   if (G.salon) G.salon.draw(ctx);
   if (G.treat) G.treat.draw(ctx);
   G.sup.draw(ctx);
-  toolfx.draw(ctx, pointers);
+  toolfx.draw(ctx, pointers, G.tool);
   G.fx.drawAir(ctx);
   ctx.restore();
   drawSay(ctx);
