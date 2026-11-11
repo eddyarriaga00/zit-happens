@@ -504,10 +504,12 @@ export class Ear {
     ctx.beginPath(); ctx.moveTo(cx - Rd * 0.2, cy - Rd * 0.62); ctx.quadraticCurveTo(cx - Rd * 0.12, cy - Rd * 0.2, cx - Rd * 0.02, cy - Rd * 0.02); ctx.stroke();
     ctx.fillStyle = 'rgba(250,240,225,0.5)';
     ctx.beginPath(); ctx.arc(cx - Rd * 0.2, cy - Rd * 0.62, Math.max(1.6, Rd * 0.13), 0, Math.PI * 2); ctx.fill();
-    const cone = ctx.createLinearGradient(cx, cy, cx + Rd * 0.6, cy + Rd * 0.75);
-    cone.addColorStop(0, 'rgba(255,255,255,0.5)'); cone.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = cone;                                                                       // cone of light
-    ctx.beginPath(); ctx.moveTo(cx + Rd * 0.02, cy + Rd * 0.04); ctx.lineTo(cx + Rd * 0.12, cy + Rd * 0.9); ctx.lineTo(cx + Rd * 0.84, cy + Rd * 0.42); ctx.closePath(); ctx.fill();
+    // the light reflex: a soft glow low on the membrane, not a drawn shape
+    const lx = cx + Rd * 0.32, ly = cy + Rd * 0.42;
+    const cone = ctx.createRadialGradient(lx, ly, 0, lx, ly, Rd * 0.45);
+    cone.addColorStop(0, 'rgba(255,255,255,0.55)'); cone.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = cone;
+    ctx.beginPath(); ctx.arc(lx, ly, Rd * 0.45, 0, Math.PI * 2); ctx.fill();
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(230,30,50,${this.flash * 1.4})`;
       ctx.beginPath();
