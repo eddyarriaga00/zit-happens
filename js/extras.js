@@ -237,10 +237,21 @@ export class Strip {
       ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 7); ctx.fill();
       ctx.strokeStyle = 'rgba(120,70,50,0.35)'; ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.arc(q.x, q.y, q.r + 0.7, 0, 7); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';      // an oily glint on each plug
+      ctx.beginPath(); ctx.arc(q.x - q.r * 0.3, q.y - q.r * 0.35, q.r * 0.3, 0, 7); ctx.fill();
     }
     if (s === 'wet' || s === 'place') {
       ctx.fillStyle = 'rgba(255,255,255,0.13)';
       for (const c of this.cells) if (c.wet) { ctx.beginPath(); ctx.arc(c.x, c.y, 3.6, 0, 7); ctx.fill(); }
+      // beads of water standing on the wet skin
+      this.cells.forEach((c, i) => {
+        if (!c.wet || i % 6) return;
+        const j = Math.sin(i * 12.9898) * 43758.5453, r = 0.9 + (j - Math.floor(j)) * 1.1;
+        ctx.fillStyle = 'rgba(60,40,40,0.16)'; ctx.beginPath(); ctx.ellipse(c.x + 0.3, c.y + 0.5, r, r * 1.15, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(225,240,255,0.5)'; ctx.beginPath(); ctx.ellipse(c.x, c.y, r * 0.9, r * 1.05, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.arc(c.x - r * 0.3, c.y - r * 0.4, r * 0.28, 0, 7); ctx.fill();
+      });
+      ctx.fillStyle = 'rgba(255,255,255,0.13)';
       if (s === 'wet') {
         ctx.setLineDash([4, 4]); ctx.strokeStyle = `rgba(255,255,255,${0.5 + 0.3 * Math.sin(this.t * 4)})`; ctx.lineWidth = 1.2;
         ctx.stroke(this.path); ctx.setLineDash([]);
@@ -256,6 +267,15 @@ export class Strip {
       ctx.shadowColor = 'rgba(60,30,20,0.35)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 1.5;
       this.stripFill(ctx, false);
       ctx.shadowColor = 'transparent';
+      // the strip is a woven fabric: a fine crosshatch you can just make out
+      ctx.save(); ctx.clip(this.path);
+      ctx.strokeStyle = 'rgba(120,125,140,0.11)'; ctx.lineWidth = 0.35;
+      ctx.beginPath();
+      for (let d = -(y1 - y0); d < 2 * b + (y1 - y0); d += 2.2) {
+        ctx.moveTo(cx - b + d, y0); ctx.lineTo(cx - b + d - (y1 - y0), y1);
+        ctx.moveTo(cx - b + d - (y1 - y0), y0); ctx.lineTo(cx - b + d, y1);
+      }
+      ctx.stroke(); ctx.restore();
       // air pockets where it hasn't been pressed yet
       for (const c of this.cells) if (!c.press) {
         ctx.fillStyle = 'rgba(110,90,80,0.2)'; ctx.beginPath(); ctx.arc(c.x + 0.8, c.y + 1, 2.6, 0, 7); ctx.fill();
