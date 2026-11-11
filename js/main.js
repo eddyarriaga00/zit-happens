@@ -1365,7 +1365,7 @@ function showScreen(name) {
     const vd = dailyDef(), vdone = save.dailyDone === todayKey();
     if ($('vip-face').dataset.who !== vd.name) { $('vip-face').dataset.who = vd.name; $('vip-face').src = portraitURL(vd, { mood: 'happy', clear: true }, 120); }
     $('vip-title').textContent = vdone ? 'VIP walk-in' : `Today's VIP: ${vd.name}`;
-    $('vip-sub').textContent = vdone ? `${vd.name} is done for today ✓ · take another` : 'Full visit · 4 treatments · double tip';
+    $('vip-sub').textContent = vdone ? `${vd.name}'s done ✓ · see another client` : 'Full visit · 4 treatments · double tip';
     $('play-level').textContent = `Level ${save.level} · ${levelDef(save.level).name}`;
     $('menu-coins').textContent = `🪙 ${save.coins.toLocaleString()}`;
     $('hello').textContent = greeting();

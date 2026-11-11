@@ -575,3 +575,11 @@ button.tile:active i { transform: scale(1.15) rotate(-6deg); }
 /* ---------- v58: tool bar icons are little pictures of the real instruments ---------- */
 .tool svg.real { fill: initial; stroke: none; stroke-width: initial; width: 27px; height: 27px; filter: drop-shadow(0 1.5px 1.5px rgba(40, 20, 90, 0.25)); }
 .tool.active svg.real { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3)); }
+
+/* ---------- v60: How to play, grouped by mode ---------- */
+#howto .card { max-height: 100%; display: flex; flex-direction: column; }
+.howto { overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; min-height: 0; padding-right: 4px; }
+.howto h3 { margin: 14px 0 4px; font-size: 16px; color: var(--accent); }
+.howto h3:first-child { margin-top: 2px; }
+.howto ul.howto-list { margin: 0; padding-left: 18px; }
+.howto ul.howto-list li { margin: 5px 0; font-size: 14px; line-height: 1.38; }
