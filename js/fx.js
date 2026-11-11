@@ -266,8 +266,8 @@ export class FX {
       const p = t.t / t.life;
       const pop = p < 0.15 ? 0.6 + (p / 0.15) * 0.5 : 1.1 - Math.min(p, 0.3) * 0.33;
       ctx.globalAlpha = p > 0.7 ? 1 - (p - 0.7) / 0.3 : 1;
-      ctx.font = `900 ${t.size * pop}px ui-rounded, -apple-system, system-ui, sans-serif`;
-      ctx.lineWidth = 5;
+      ctx.font = `900 ${t.size * pop / (this.zoomK || 1)}px ui-rounded, -apple-system, system-ui, sans-serif`;
+      ctx.lineWidth = 5 / (this.zoomK || 1);
       ctx.strokeStyle = 'rgba(40,10,20,0.75)';
       ctx.lineJoin = 'round';
       const y = t.y - p * 50;

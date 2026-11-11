@@ -30,17 +30,19 @@ const tone = () => G.tone || SKIN_TONES[save.settings.skin] || SKIN_TONES[1];
 // (re)paint the close-up skin for the current patient, body area and screen size
 const FACE_ZONES = ['forehead', 'nose', 'cheek', 'chin'];
 const FACE_SCALE = 0.72;      // pimples are smaller when the whole face is on screen
+// the pimple modes sit her a little further back, ears and shoulders in view, because the camera leans in
+const faceFit = () => (G.mode === 'level' || G.mode === 'zen' ? 0.86 : 1);
 function paintSkin() {
   if (FACE_ZONES.includes(G.zone)) {
     // the whole face, with the breakout mostly in one area of it
-    const scene = renderFaceScene(G.W, G.H, G.dpr, tone(), G.seed, G.look, playTop(), playBottom());
+    const scene = renderFaceScene(G.W, G.H, Math.min(3, G.dpr * 1.5), tone(), G.seed, G.look, playTop(), playBottom(), faceFit());
     G.skin = scene.canvas;
     G.geo = scene.geo;
   } else {
     G.geo = null;
     G.skin = renderSkin(G.W, G.H, G.dpr, tone(), G.seed, G.zone, G.look);
   }
-  G.scale = G.baseScale * (G.geo ? FACE_SCALE : 1);
+  G.scale = G.baseScale * (G.geo ? FACE_SCALE * faceFit() : 1);
 }
 
 // ---- a reward for every level: tools first, then patches, upgrades, coins, pus styles
@@ -172,10 +174,11 @@ function resize() {
   const changed = W !== G.W || H !== G.H || dpr !== G.dpr;
   G.W = W; G.H = H; G.dpr = dpr;
   G.baseScale = Math.max(1.05, Math.min(2, Math.min(W, H) / 390 * 1.3)); // pimple size; bigger = easier to hit
-  G.scale = G.baseScale * (G.geo ? FACE_SCALE : 1);
+  G.scale = G.baseScale * (G.geo ? FACE_SCALE * faceFit() : 1);
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
   if (changed) paintSkin();
+  camReset();
   for (const p of G.pimples) {
     p.x = Math.min(Math.max(p.x, p.r * 2), W - p.r * 2);
     p.y = Math.min(Math.max(p.y, playTop() + p.r * 2), playBottom() - p.r * 2);
@@ -186,6 +189,64 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
 const playTop = () => G.safeTop + 80;
 const playBottom = () => G.H - G.safeBottom - 108;  // leave room for the tool bar
+
+// ---- camera: her whole face at rest; tap a spot to lean in close, like a real extraction
+const CAM_Z = 1.7;
+const cam = G.cam = { k: 1, x: 0, y: 0, tk: 1, tx: 0, ty: 0, idle: 0 };
+const camMid = () => (playTop() + playBottom()) / 2;
+const toWorld = (sx, sy) => [(sx - G.W / 2) / cam.k + cam.x, (sy - camMid()) / cam.k + cam.y];
+const toScreen = (x, y) => [(x - cam.x) * cam.k + G.W / 2, (y - cam.y) * cam.k + camMid()];
+function camReset() { cam.k = cam.tk = 1; cam.x = cam.tx = G.W / 2; cam.y = cam.ty = camMid(); cam.idle = 0; }
+function camIn(x, y) {
+  const k = CAM_Z, m = camMid();
+  cam.tk = k; cam.idle = 0;
+  // keep her face filling the view: no leaning in on the wall or her top
+  const g = G.geo;
+  if (g) {
+    x = Math.max(g.cx - g.hw * 1.12 + G.W / (2 * k), Math.min(g.cx + g.hw * 1.12 - G.W / (2 * k), x));
+    y = Math.max(g.cy - g.hh * 1.2 + (m - playTop()) / k, Math.min(g.cy + g.hh * 1.22 - (playBottom() - m) / k, y));
+  }
+  cam.tx = Math.max(G.W / (2 * k), Math.min(G.W - G.W / (2 * k), x));     // never show past the edge of the painting
+  cam.ty = Math.max(m / k, Math.min(G.H - (G.H - m) / k, y));
+}
+function camOut() { cam.tk = 1; cam.tx = G.W / 2; cam.ty = camMid(); cam.idle = 0; }
+const camCan = () => (G.mode === 'level' || G.mode === 'zen') && !!G.geo && !G.salon && !(G.treat && G.treat.active) && !G.allDone && !G.ended;
+const workLeft = () => G.pimples.some((p) => p.state !== 'done');
+function camUpdate(dt) {
+  if (!camCan()) { if (cam.tk !== 1) camOut(); }
+  else if (cam.tk > 1) {
+    // once everything in view is dealt with, step back so she can pick the next spot
+    if (pointers.size || G.tool === 'spray' || G.tool === 'patch') cam.idle = 0; else cam.idle += dt;
+    const vw = G.W / (2 * cam.tk) + 10, m = camMid();
+    const inView = (p) => Math.abs(p.x - cam.tx) < vw && p.y > cam.ty - m / cam.tk - 10 && p.y < cam.ty + (G.H - m) / cam.tk + 10;
+    if (cam.idle > 1.3 && !G.pimples.some((p) => p.state !== 'done' && inView(p))) camOut();
+  }
+  const e = Math.min(1, dt * 8);
+  cam.k += (cam.tk - cam.k) * e; cam.x += (cam.tx - cam.x) * e; cam.y += (cam.ty - cam.y) * e;
+  if (Math.abs(cam.k - cam.tk) < 0.003) { cam.k = cam.tk; cam.x = cam.tx; cam.y = cam.ty; }
+}
+// the pill at the bottom of the play area: an invitation at rest, a way back when leaned in
+const camPill = () => ({ x: G.W / 2, y: playBottom() - 30, w: 172, h: 34 });
+function drawCamPill(ctx) {
+  if (!camCan() || (cam.tk === 1 && (!workLeft() || G.tool === 'pad'))) return;
+  const b = camPill(), inn = cam.tk > 1;
+  const label = inn ? 'Step back' : 'Tap a spot to lean in';
+  ctx.save();
+  ctx.font = '800 13px ui-rounded, -apple-system, system-ui, sans-serif';
+  const w = ctx.measureText(label).width + (inn ? 46 : 30);
+  ctx.globalAlpha = inn ? 0.95 : 0.62 + 0.2 * Math.sin(G.time * 3);
+  ctx.fillStyle = inn ? 'rgba(255,255,255,0.94)' : 'rgba(30,22,50,0.55)';
+  ctx.beginPath(); ctx.roundRect(b.x - w / 2, b.y - b.h / 2, w, b.h, b.h / 2); ctx.fill();
+  ctx.fillStyle = inn ? '#3a2f66' : '#ffffff';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, b.x + (inn ? 8 : 0), b.y + 1);
+  if (inn) {     // a little "zoom out" glyph
+    ctx.strokeStyle = '#3a2f66'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    const gx = b.x - w / 2 + 19;
+    ctx.beginPath(); ctx.arc(gx, b.y - 1, 6, 0, Math.PI * 2); ctx.moveTo(gx + 4.5, b.y + 3.5); ctx.lineTo(gx + 8, b.y + 7); ctx.moveTo(gx - 3, b.y - 1); ctx.lineTo(gx + 3, b.y - 1); ctx.stroke();
+  }
+  ctx.restore();
+}
 
 // ---------------------------------------------------------------- spawning
 function placePimple(type) {
@@ -276,6 +337,7 @@ function randomPlan(level) {
 }
 
 function newScene(seed, def = null) {
+  camReset();
   G.def = def;
   G.tone = def && def.mix ? SKIN_TONES[def.skin] : null;
   G.zone = (G.mode === 'level' || G.mode === 'makeup' || G.mode === 'haircut' || G.mode === 'hair' || G.mode === 'strip' || G.mode === 'brows') && def ? def.zone : G.mode === 'zen' ? ALL_ZONES[Math.floor(Math.random() * ALL_ZONES.length)] : null;
@@ -851,17 +913,18 @@ canvas.addEventListener('pointerdown', (e) => {
   audio.unlock();
   if (G.mode === 'demo' || G.paused || G.ended) return;
   try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
-  const x = e.clientX, y = e.clientY;
-  (G.taps ||= []).push({ x, y, t: 0 });      // every touch answers back with a soft ring
+  const sx = e.clientX, sy = e.clientY;
+  (G.taps ||= []).push({ x: sx, y: sy, t: 0 });      // every touch answers back with a soft ring
+  const [x, y] = G.salon ? [sx, sy] : toWorld(sx, sy);      // the supplies live on the screen; the face lives under the camera
   if (G.salon) {
     pointers.set(e.pointerId, { kind: 'salon', x, y });
     G.salon.down(e.pointerId, x, y);
     return;
   }
-  const hit = G.sup.down(x, y, e.pointerId);   // a bottle, pack, jar, the bin, or a close-up
+  const hit = G.sup.down(sx, sy, e.pointerId);   // a bottle, pack, jar, the bin, or a close-up
   if (hit === 'grab') {
     // pulled out a fresh wipe/pad: this finger carries on wiping with it
-    G.sup.hand = { x, y };
+    G.sup.hand = { x: sx, y: sy };
     if (G.treat && G.treat.active) { pointers.set(e.pointerId, { kind: 'treat', x, y }); G.treat.holding++; G.treat.fresh = false; }
     else pointers.set(e.pointerId, { kind: 'wipe', x, y, big: true });
     return;
@@ -880,6 +943,16 @@ canvas.addEventListener('pointerdown', (e) => {
       wipeAt(x, y, 0);
     }
     return;
+  }
+  if (camCan()) {
+    const b = camPill();
+    if (cam.tk > 1) {
+      // leaned in: the pill, or a tap off her face, steps back
+      if ((Math.abs(sx - b.x) < b.w / 2 && Math.abs(sy - b.y) < b.h / 2 + 6) || !(G.geo.inHead(x, y) || pimpleAt(x, y))) { camOut(); audio.click(); return idle(e.pointerId, x, y); }
+    } else if (G.tool !== 'pad' && G.tool !== 'spray' && G.tool !== 'patch' && workLeft() && pointers.size === 0 && sy > playTop() - 30 && sy < playBottom() + 10) {
+      camIn(x, y); audio.click(); buzz('light');
+      return idle(e.pointerId, x, y);
+    }
   }
   toolDown(e.pointerId, x, y);
 });
@@ -1041,19 +1114,19 @@ function nearestPimple(x, y, reach) {
 function tryPinch(id, x, y) {
   for (const [oid, o] of pointers) {
     if ((o.kind !== 'touch' && o.kind !== 'wipe') || o.big) continue;
-    const d = Math.hypot(o.x - x, o.y - y);
+    const d = Math.hypot(o.x - x, o.y - y) * cam.k;      // finger distances are judged in screen px, however far in we are
     if (d > 2 * PINCH_REACH + 40 || d < 20) continue;
     // the pimple the first finger is on, or else whichever sits between the two fingers
     let p = o.kind === 'touch' ? o.p : null;
-    if (p && (p.held != null || !p.grabbable || Math.hypot(p.x - x, p.y - y) > PINCH_REACH + p.r)) p = null;
-    if (!p) p = nearestPimple((o.x + x) / 2, (o.y + y) / 2, 56);
+    if (p && (p.held != null || !p.grabbable || Math.hypot(p.x - x, p.y - y) > PINCH_REACH / cam.k + p.r)) p = null;
+    if (!p) p = nearestPimple((o.x + x) / 2, (o.y + y) / 2, 56 / cam.k);
     if (p) return makePinch(p, oid, id, o.x, o.y, x, y);
   }
   return false;
 }
 
 function makePinch(p, a, b, ax, ay, bx, by) {
-  const pin = { p, a, b, d0: Math.max(40, Math.hypot(ax - bx, ay - by)), last: null };
+  const pin = { p, a, b, d0: Math.max(40, Math.hypot(ax - bx, ay - by) * cam.k), last: null };
   p.guide = 0;
   p.press('pinch');
   pointers.set(a, { kind: 'pinch', pin, x: ax, y: ay });
@@ -1066,7 +1139,7 @@ function makePinch(p, a, b, ax, ay, bx, by) {
 function updatePinch(pin) {
   const A = pointers.get(pin.a), B = pointers.get(pin.b);
   if (!A || !B) return;
-  const d = Math.hypot(A.x - B.x, A.y - B.y);
+  const d = Math.hypot(A.x - B.x, A.y - B.y) * cam.k;
   // actively pinching inward gives a burst of extra pressure
   if (pin.last != null && d < pin.last) pin.p.pump = Math.min(1, pin.p.pump + (pin.last - d) * 0.03);
   pin.last = d;
@@ -1081,7 +1154,7 @@ function updatePinch(pin) {
 canvas.addEventListener('pointermove', (e) => {
   const ptr = pointers.get(e.pointerId);
   if (!ptr) return;
-  const x = e.clientX, y = e.clientY;
+  const [x, y] = ptr.kind === 'salon' ? [e.clientX, e.clientY] : toWorld(e.clientX, e.clientY);
   if (ptr.kind === 'pinch') { ptr.x = x; ptr.y = y; updatePinch(ptr.pin); return; }
   if (ptr.kind === 'tweeze') { ptr.p.fx = x; ptr.p.fy = y; }
   if (ptr.kind === 'salon') G.salon?.move(e.pointerId, x, y, ptr.x, ptr.y);
@@ -1103,7 +1176,7 @@ function endPointer(e) {
   pointers.delete(e.pointerId);
   if (ptr.kind === 'salon') G.salon?.up(e.pointerId);
   if (ptr.kind === 'treat') G.treat?.up();
-  if ((ptr.kind === 'treat' || (ptr.kind === 'wipe' && ptr.big)) && G.sup.dropAt(ptr.x, ptr.y)) { /* dropped it in the bin */ }
+  if ((ptr.kind === 'treat' || (ptr.kind === 'wipe' && ptr.big)) && G.sup.dropAt(...toScreen(ptr.x, ptr.y))) { /* dropped it in the bin */ }
   if (ptr.kind === 'treat' || ptr.kind === 'wipe') G.sup.hand = null;
   if (ptr.kind === 'ear') G.ear?.up(e.pointerId);
   if (ptr.kind === 'pinch') {
@@ -1154,7 +1227,7 @@ function wipeAt(x, y, speed, big = false) {
     // the Wipe tool needs a cotton pad from the jar, and pads fill up
     const pad = G.sup.useCloth('pads');
     if (!pad) return;
-    G.sup.hand = { x, y };
+    { const [hx, hy] = toScreen(x, y); G.sup.hand = { x: hx, y: hy }; }
     const k = 1 + 0.2 * up('pad');
     cleaned = G.fx.wipe(x, y, 58 * k, 0.75);       // a thumb-sized swipe, clean in a pass or two
     pad.dirt = Math.min(1, pad.dirt + cleaned / Math.max(60 * k, G.fx.messMade * 0.5 * k));   // about 2 pads per face   // ~3 pads per face
@@ -1223,6 +1296,7 @@ function update(dt) {
   }
 
   for (const p of G.pimples) p.update(dt, G);
+  camUpdate(dt);
   if (G.ear) G.ear.update(dt);
   if (G.salon) G.salon.update(dt);
   // the patient blinks now and then, and screws their eyes shut when it hurts
@@ -1264,7 +1338,10 @@ function update(dt) {
 function render() {
   const { dpr, W, H } = G;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (G.skin) ctx.drawImage(G.skin, 0, 0, W, H);
+  ctx.save();
+  if (cam.k !== 1) { ctx.translate(W / 2, camMid()); ctx.scale(cam.k, cam.k); ctx.translate(-cam.x, -cam.y); }
+  toolfx.k = G.fx.zoomK = cam.k;
+  if (G.skin && G.skin.width) ctx.drawImage(G.skin, 0, 0, W, H);
   // how shut her eyes are and what her face is doing this frame (the zoomed modes draw these too)
   G.lidK = Math.max(G.shut || 0, G.wince > 0 ? Math.min(1, G.wince * 6) : G.blinkA > 0 ? Math.sin(Math.PI * (1 - G.blinkA / 0.16)) : 0);
   G.moodK = G.mood && !(G.treat && G.treat.active) ? G.mood.k * Math.sin(Math.PI * Math.min(1, G.mood.t / G.mood.len)) ** 0.6 : 0;
@@ -1283,15 +1360,17 @@ function render() {
   if (G.ear) { G.ear.drawChunks(ctx); G.ear.drawTools(ctx); }
   if (G.salon) G.salon.draw(ctx);
   if (G.treat) G.treat.draw(ctx);
-  G.sup.draw(ctx);
   toolfx.draw(ctx, pointers, G.tool);
+  G.fx.drawAir(ctx);
+  ctx.restore();
+  ctx.restore();      // everything from here on is on the screen, not under the camera
+  G.sup.draw(ctx);
   if (G.taps) for (const tp of G.taps) {
     const k = tp.t / 0.35;
     ctx.strokeStyle = `rgba(255,255,255,${0.55 * (1 - k)})`; ctx.lineWidth = 2.5 * (1 - k) + 0.5;
     ctx.beginPath(); ctx.arc(tp.x, tp.y, 14 + 26 * k, 0, Math.PI * 2); ctx.stroke();
   }
-  G.fx.drawAir(ctx);
-  ctx.restore();
+  drawCamPill(ctx);
   drawSay(ctx);
   G.sup.drawCloseup(ctx);
 }

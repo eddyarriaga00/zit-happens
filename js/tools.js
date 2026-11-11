@@ -42,7 +42,7 @@ export class ToolFX {
         ctx.beginPath(); ctx.arc(p.x, p.y, 50, 0, Math.PI * 2); ctx.fill();
         // your gloved fingertip, pressing in toward the pimple
         const fa = Math.atan2(q.y - p.y, q.x - p.x);
-        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(fa);
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(fa); ctx.scale(1 / (this.k || 1), 1 / (this.k || 1));   // your finger stays finger-sized however far in the camera is
         ctx.fillStyle = 'rgba(30,15,15,0.16)'; ctx.beginPath(); ctx.roundRect(-76, -17, 100, 44, 22); ctx.fill();
         const gl = ctx.createLinearGradient(0, -22, 0, 22);
         gl.addColorStop(0, 'rgba(176,216,240,0.72)'); gl.addColorStop(0.5, 'rgba(120,176,220,0.7)'); gl.addColorStop(1, 'rgba(84,138,190,0.72)');

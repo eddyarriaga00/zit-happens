@@ -12,7 +12,7 @@ function tint(col, k) {   // k < 1 darker, k > 1 lighter. Takes #rrggbb or rgb(r
   return `rgb(${f(r)},${f(g)},${f(b)})`;
 }
 
-export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
+export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 1) {
   const c = document.createElement('canvas');
   c.width = Math.round(w * dpr);
   c.height = Math.round(h * dpr);
@@ -21,7 +21,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   let sd = (seed >>> 0) || 1;
   const R = () => { sd = (sd * 1664525 + 1013904223) >>> 0; return sd / 4294967296; };
 
-  const s = Math.min(w * 0.98, (bottom - top) / 1.36);    // head width
+  const s = Math.min(w * 0.98, (bottom - top) / 1.36) * fit;    // head width
   const hw = s / 2, hh = s * 0.66;
   const cx = w / 2, cy = top + (bottom - top) * 0.47;
   const X = (u) => cx + u * hw, Y = (v) => cy + v * hh;
