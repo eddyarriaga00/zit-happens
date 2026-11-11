@@ -75,13 +75,49 @@ export class Makeup {
     if (++this.tick % 5 === 0) { audio.wipe(0.3); buzz('light'); }
   }
 
-  down(id, x, y) { this.dab(x, y); }
+  down(id, x, y) { this.hand = { x, y }; this.dab(x, y); }
   move(id, x, y, px, py) {
+    this.hand = { x, y };
     const d = Math.hypot(x - px, y - py), n = Math.max(1, Math.ceil(d / 6));
     for (let i = 1; i <= n; i++) this.dab(px + (x - px) * i / n, py + (y - py) * i / n);
   }
-  up() {}
+  up() { this.hand = null; }
   update(dt) { this.hintT = Math.max(0, this.hintT - dt); }
+
+  /** What you are holding: a lipstick, a fluffy blush brush or a small shadow brush, tip at the finger. */
+  applicator(ctx, x, y) {
+    const col = this.color[this.product];
+    const lg = (x0, x1, stops) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); for (const [o, c] of stops) g.addColorStop(o, c); return g; };
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(0.62);                       // comes in from the upper right, clear of the finger
+    if (this.product === 'lips') {
+      ctx.fillStyle = 'rgba(30,15,15,0.2)'; ctx.beginPath(); ctx.roundRect(-7, -70, 20, 62, 4); ctx.fill();
+      ctx.fillStyle = col;                                                                   // the bullet, cut on a slant
+      ctx.beginPath(); ctx.moveTo(-6, -16); ctx.lineTo(-6, -6); ctx.quadraticCurveTo(-5, 0, 2, 1); ctx.lineTo(6, -8); ctx.lineTo(6, -16); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.roundRect(-4, -15, 2.5, 11, 1); ctx.fill();
+      ctx.fillStyle = lg(-8, 8, [[0, '#b98f2f'], [0.3, '#fbe6a2'], [0.6, '#e9c46a'], [1, '#9c7422']]);
+      ctx.beginPath(); ctx.roundRect(-8, -30, 16, 15, 2); ctx.fill();                          // gold collar
+      ctx.fillStyle = lg(-9, 9, [[0, '#3a3f49'], [0.35, '#5d646f'], [1, '#15171c']]);
+      ctx.beginPath(); ctx.roundRect(-9, -72, 18, 43, 3); ctx.fill();                          // the case
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(-6, -68, 2.5, 34);
+    } else {
+      const big = this.product === 'blush', hw2 = big ? 15 : 6, len = big ? 30 : 15;
+      ctx.fillStyle = 'rgba(30,15,15,0.18)'; ctx.beginPath(); ctx.roundRect(-1, -104, 9, 100, 4); ctx.fill();
+      // bristles: a soft dome dusted with the colour at the tip
+      const bg = ctx.createLinearGradient(0, -len, 0, 2);
+      bg.addColorStop(0, '#5b4636'); bg.addColorStop(0.55, '#8a6c56'); bg.addColorStop(1, col);
+      ctx.fillStyle = bg;
+      ctx.beginPath(); ctx.moveTo(-hw2 * 0.55, -len); ctx.quadraticCurveTo(-hw2 * 1.25, -len * 0.3, -hw2 * 0.5, 0); ctx.quadraticCurveTo(0, big ? 5 : 3, hw2 * 0.5, 0); ctx.quadraticCurveTo(hw2 * 1.25, -len * 0.3, hw2 * 0.55, -len); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(40,25,15,0.25)'; ctx.lineWidth = 0.6;
+      for (let k = -3; k <= 3; k++) { ctx.beginPath(); ctx.moveTo(k * hw2 * 0.16, -len); ctx.quadraticCurveTo(k * hw2 * 0.34, -len * 0.4, k * hw2 * 0.16, 0); ctx.stroke(); }
+      ctx.fillStyle = lg(-hw2 * 0.6, hw2 * 0.6, [[0, '#f4f6f9'], [0.45, '#aeb7c3'], [1, '#6b7482']]);
+      ctx.beginPath(); ctx.roundRect(-hw2 * 0.6, -len - 12, hw2 * 1.2, 13, 2); ctx.fill();     // steel ferrule
+      ctx.fillStyle = lg(-4, 4, [[0, '#4a4f59'], [0.4, '#262a31'], [1, '#111317']]);
+      ctx.beginPath(); ctx.moveTo(-hw2 * 0.5, -len - 11); ctx.lineTo(hw2 * 0.5, -len - 11); ctx.lineTo(2.2, -len - 78); ctx.lineTo(-2.2, -len - 78); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
 
   draw(ctx) {
     for (const name of ['blush', 'shadow', 'lips']) {
@@ -141,6 +177,7 @@ export class Makeup {
       }
       ctx.restore();
     }
+    if (this.hand) this.applicator(ctx, this.hand.x, this.hand.y);
     // show where the current product goes until it is mostly on
     const cur = this.areas[this.product];
     if (this.coverage(this.product) < 0.8) {
