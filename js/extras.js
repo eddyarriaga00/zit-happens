@@ -472,6 +472,7 @@ export class Brows {
   }
 
   pencil(x, y) {
+    this.hand = { x, y };
     const [fx, fy] = this.z.toFace(x, y);
     const zb = this.zones.find((b) => ((fx - b.x) / (b.rx + 6)) ** 2 + ((fy - b.y) / (b.ry + 6)) ** 2 < 1);
     if (!zb) return;
@@ -484,7 +485,7 @@ export class Brows {
     }
   }
 
-  up(id) { this.grabs.delete(id); }
+  up(id) { this.grabs.delete(id); this.hand = null; }
 
   update(dt) {
     this.t += dt; this.coolT -= dt; this.idle += dt;
@@ -570,5 +571,25 @@ export class Brows {
     ctx.restore();
     // tweezers at each finger holding a hair
     for (const gr of this.grabs.values()) drawTweezers(ctx, gr.x, gr.y, -2.1);
+    // the brow pencil in your hand while filling in: sharpened wood, a lead in her brow colour
+    if (this.stage === 'fill' && this.hand) {
+      ctx.save();
+      ctx.translate(this.hand.x, this.hand.y); ctx.rotate(0.62);
+      ctx.fillStyle = 'rgba(30,15,15,0.18)'; ctx.beginPath(); ctx.roundRect(-1, -108, 9, 104, 3); ctx.fill();
+      ctx.fillStyle = this.col;                                            // the lead
+      ctx.beginPath(); ctx.moveTo(0, 1); ctx.lineTo(-1.8, -6); ctx.lineTo(1.8, -6); ctx.closePath(); ctx.fill();
+      const wd = ctx.createLinearGradient(-4, 0, 4, 0);
+      wd.addColorStop(0, '#c99a66'); wd.addColorStop(0.4, '#f0cfa0'); wd.addColorStop(1, '#b0814f');
+      ctx.fillStyle = wd;                                                  // sharpened wood
+      ctx.beginPath(); ctx.moveTo(-1.8, -6); ctx.lineTo(1.8, -6); ctx.lineTo(4, -20); ctx.lineTo(-4, -20); ctx.closePath(); ctx.fill();
+      const bd = ctx.createLinearGradient(-4, 0, 4, 0);
+      bd.addColorStop(0, '#4a4f59'); bd.addColorStop(0.35, '#2b2f37'); bd.addColorStop(1, '#111317');
+      ctx.fillStyle = bd; ctx.beginPath(); ctx.roundRect(-4, -100, 8, 81, 1.5); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(-2.6, -98, 1.4, 76);
+      const gd = ctx.createLinearGradient(-4, 0, 4, 0);
+      gd.addColorStop(0, '#b98f2f'); gd.addColorStop(0.35, '#fbe6a2'); gd.addColorStop(1, '#9c7422');
+      ctx.fillStyle = gd; ctx.fillRect(-4.2, -92, 8.4, 6);
+      ctx.restore();
+    }
   }
 }
