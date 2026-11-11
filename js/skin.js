@@ -94,14 +94,16 @@ export function renderSkin(w, h, dpr, tone, seed, zone = null, look = null) {
   }
 
   // Pores
-  const pores = Math.floor((w * h) / 260);
+  // seen from a whole-face distance pores are a fine even grain, not dots; close-ups keep them big
+  const fine = !zone;
+  const pores = Math.floor((w * h) / (fine ? 110 : 260));
   for (let i = 0; i < pores; i++) {
-    const px = R() * w, py = R() * h, pr = 0.6 + R() * 1.1;
-    x.fillStyle = rgba(tone.pore, 0.18 + R() * 0.2);
+    const px = R() * w, py = R() * h, pr = fine ? 0.3 + R() * 0.5 : 0.6 + R() * 1.1;
+    x.fillStyle = rgba(tone.pore, fine ? 0.1 + R() * 0.12 : 0.18 + R() * 0.2);
     x.beginPath();
     x.ellipse(px, py, pr, pr * (0.7 + R() * 0.3), R() * 3, 0, Math.PI * 2);
     x.fill();
-    x.fillStyle = 'rgba(255,255,255,0.12)';
+    x.fillStyle = fine ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.12)';
     x.beginPath();
     x.arc(px - pr * 0.5, py - pr * 0.6, pr * 0.5, 0, Math.PI * 2);
     x.fill();
@@ -109,8 +111,8 @@ export function renderSkin(w, h, dpr, tone, seed, zone = null, look = null) {
 
   // A few freckles / old marks
   for (let i = 0; i < 12; i++) {
-    const fx = R() * w, fy = R() * h, fr = 1.5 + R() * 3;
-    x.fillStyle = rgba(tone.pore, 0.12 + R() * 0.12);
+    const fx = R() * w, fy = R() * h, fr = fine ? 0.8 + R() * 1.4 : 1.5 + R() * 3;
+    x.fillStyle = rgba(tone.pore, fine ? 0.1 + R() * 0.1 : 0.12 + R() * 0.12);
     x.beginPath();
     x.arc(fx, fy, fr, 0, Math.PI * 2);
     x.fill();
