@@ -61,8 +61,10 @@ export class Makeup {
       }
       return;
     }
-    // eyeshadow is laid down once per spot, so going over it again never pushes the first strokes out
-    const near = this.product === 'shadow' && a.dabs.some((q) => (q.x - x) ** 2 + (q.y - y) ** 2 < (r * 0.5) ** 2);
+    // each product is laid down once per spot, so going over one cheek again and again never pushes
+    // the first strokes (or the other cheek) out of the picture
+    const gap = r * (this.product === 'shadow' ? 0.5 : this.product === 'lips' ? 0.4 : 0.25);
+    const near = a.dabs.some((q) => (q.x - x) ** 2 + (q.y - y) ** 2 < gap * gap);
     if (!near) a.dabs.push({ x, y, r, c: this.color[this.product] });
     if (a.dabs.length > 420) a.dabs.shift();
     for (const [key, on] of a.cells) {
@@ -131,7 +133,7 @@ export class Makeup {
           const k = Math.max(0, Math.min(1, 1.15 - e));
           if (k <= 0) continue;
           const g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r);
-          g.addColorStop(0, hexA(d.c, (name === 'blush' ? 0.075 : 0.2) * k));
+          g.addColorStop(0, hexA(d.c, (name === 'blush' ? 0.06 : 0.2) * k));
           g.addColorStop(1, hexA(d.c, 0));
           ctx.fillStyle = g;
           ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
