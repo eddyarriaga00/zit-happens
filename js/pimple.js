@@ -24,7 +24,7 @@ export const TYPES = {
   cyst: {
     name: 'Cyst', r: [19, 24], fill: [1.4, 1.8], pus: [1.2, 1.6], drain: 0.85,
     head: '#f2e3a6', headRim: '#d9c16b', pusColor: '#e6d27c', stages: 3, popPts: 120,
-    wormW: 0.42, lenPerMl: 62, squirt: 22,
+    wormW: 0.42, lenPerMl: 62, squirt: 22, sac: true,
   },
   gold: {
     name: 'Golden', r: [12, 14], fill: [1.0, 1.1], pus: [1.0, 1.2], drain: 1.0,
@@ -49,7 +49,7 @@ export const TYPES = {
   boss: {
     name: 'The Big One', r: [33, 37], fill: [1.5, 1.8], pus: [1.6, 2.0], drain: 0.9,
     head: '#f2e3a6', headRim: '#d9c16b', pusColor: '#e6d27c', stages: 5, popPts: 200,
-    wormW: 0.3, lenPerMl: 55, squirt: 30,
+    wormW: 0.3, lenPerMl: 55, squirt: 30, sac: true,
   },
 };
 
@@ -122,7 +122,7 @@ export class Pimple {
   release(game) {
     this.held = null;
     this.boost = 1; this.pump = 0; this.pinch = null; this.tool = null;
-    if (this.T.hair) return;
+    if (this.T.hair || this.state === 'sac') return;
     if (this.state === 'popped') audio.oozeStop();
     if (this.state === 'empty') this.finish(game);
     else if (this.state === 'pressing' && this.pressure < 0.02) this.state = 'idle';
@@ -182,10 +182,59 @@ export class Pimple {
     else if (this.emptyT <= tuning.perfect) rating = 'perfect';
     else rating = 'nice';
     this.rating = rating;
+    this.detachWorm(game);
+    if (this.T.sac && game.canSac) {
+      // drained, but not finished: the sac that held it all is still in there, and it comes out with tweezers
+      this.state = 'sac';
+      this.pressure = 0;
+      this.hairLen = this.r * 2 + 36 * this.scale;
+      this.hairOut = 0; this.lastTick = 0;
+      this.hairAngle = -Math.PI / 2;
+      this.fx = this.x; this.fy = this.y;
+      game.onFinish(this, rating);
+      game.fx.text(this.x, this.y + this.r * 2.4, 'now tweeze the sac out', '#ffe7a8', 15);
+      return;
+    }
     this.state = 'done';
     this.heal = 0;
-    this.detachWorm(game);
     game.onFinish(this, rating);
+  }
+
+  updateSac(dt, game) {
+    if (this.held == null) { this.hairOut = Math.max(0, this.hairOut - dt * 0.5); this.lastTick = Math.min(this.lastTick, this.hairOut); return; }   // let go and it slips back in
+    const dx = this.fx - this.x, dy = this.fy - this.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 6) this.hairAngle = Math.atan2(dy, dx);
+    const target = Math.min(1, Math.max(0, (d - 4) / this.hairLen));
+    if (target > this.hairOut) {
+      // it stretches and clings: slow at first, then it gives all at once
+      this.hairOut = Math.min(target, this.hairOut + dt * (0.38 + this.hairOut * 0.5));
+      audio.squish(0.4 + this.hairOut * 0.6);
+      if (this.hairOut - this.lastTick > 0.1) { this.lastTick = this.hairOut; buzz('light'); }
+      if (this.hairOut >= 1) this.finishSac(game);
+    }
+  }
+
+  finishSac(game) {
+    const a = this.hairAngle, L = this.hairLen, r = this.r;
+    const pts = [];
+    for (let i = 0; i < 14; i++) {
+      const k = i / 13;
+      pts.push({ x: this.x + Math.cos(a) * (L * 0.75 + k * r * 1.5) - Math.sin(a) * Math.sin(k * 3 + this.seed) * r * 0.25, y: this.y + Math.sin(a) * (L * 0.75 + k * r * 1.5) + Math.cos(a) * Math.sin(k * 3 + this.seed) * r * 0.25 });
+    }
+    game.fx.wormSplat(pts, r * 0.5, '#efe3c6', null, 0);
+    game.fx.squirt(this.x, this.y, a, 7, { color: this.T.pusColor, speed: 130, spread: 0.9, size: Math.max(1.8, r * 0.14), lift: 100 });
+    const pts2 = this.type === 'boss' ? 150 : 80;
+    game.score += pts2;
+    game.fx.text(this.x, this.y - r * 2.4, `sac out! +${pts2}`, '#fff3b0', 20);
+    game.fx.sparkleBurst(this.x, this.y, 8);
+    audio.schlorp(); audio.pluck();
+    buzz('heavy');
+    game.shake = Math.max(game.shake || 0, 5);
+    this.held = null;
+    this.hairOut = 0;
+    this.state = 'done';
+    this.heal = 0;
   }
 
   update(dt, game) {
@@ -198,6 +247,7 @@ export class Pimple {
     }
     this.pump *= Math.pow(0.002, dt);
     this.guide = Math.max(0, (this.guide || 0) - dt);
+    if (this.state === 'sac') { this.updateSac(dt, game); return; }
     if (T.hair) { this.updateHair(dt, game); return; }
 
     if (this.state === 'pressing' || this.state === 'idle') {
@@ -336,6 +386,41 @@ export class Pimple {
     game.onFinish(this, 'perfect');
   }
 
+  // drained and slack, with the pale sac peeking out of the opening; it stretches after the tweezers
+  drawSac(ctx, x, y, r, t) {
+    const a = this.hairAngle, out = this.hairOut;
+    // the slack, sore mound
+    const m = ctx.createRadialGradient(x - r * 0.2, y - r * 0.25, r * 0.1, x, y, r * 0.95);
+    m.addColorStop(0, 'rgba(236,150,138,0.75)'); m.addColorStop(0.7, 'rgba(206,96,90,0.5)'); m.addColorStop(1, 'rgba(206,96,90,0)');
+    ctx.fillStyle = m; ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, Math.PI * 2); ctx.fill();
+    // the opening, tugged toward the pull
+    const tug = out * r * 0.12, ox = x + Math.cos(a) * tug, oy = y + Math.sin(a) * tug;
+    ctx.fillStyle = 'rgba(96,14,22,0.9)';
+    ctx.beginPath(); ctx.ellipse(ox, oy, r * 0.34, r * 0.27, a, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(250,200,190,0.5)'; ctx.lineWidth = Math.max(0.8, r * 0.05);
+    ctx.beginPath(); ctx.ellipse(ox, oy, r * 0.36, r * 0.29, a, Math.PI * 1.05, Math.PI * 1.8); ctx.stroke();
+    // the sac: a wet, pale little bag, thin where it is gripped and fat where it is still coming through
+    const L = Math.max(r * 0.42, out * this.hairLen) + (this.held == null ? Math.sin(t * 2.4 + this.seed) * r * 0.03 : 0);
+    const w0 = r * (0.24 - 0.1 * out), wm = r * (0.3 + 0.12 * (1 - out)), wt = r * 0.07;
+    ctx.save(); ctx.translate(ox, oy); ctx.rotate(a);
+    const g = ctx.createLinearGradient(0, -wm, 0, wm);
+    g.addColorStop(0, '#fbf5e4'); g.addColorStop(0.55, '#ecdcb4'); g.addColorStop(1, '#cdb682');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, -w0);
+    ctx.bezierCurveTo(L * 0.2, -wm * 1.25, L * 0.55, -wm, L, -wt);
+    ctx.quadraticCurveTo(L + wt * 1.6, 0, L, wt);
+    ctx.bezierCurveTo(L * 0.55, wm, L * 0.2, wm * 1.25, 0, w0);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,110,60,0.35)'; ctx.lineWidth = Math.max(0.6, r * 0.03); ctx.stroke();
+    // faint veins and a wet highlight
+    ctx.strokeStyle = 'rgba(186,70,66,0.3)'; ctx.lineWidth = Math.max(0.5, r * 0.025);
+    ctx.beginPath(); ctx.moveTo(L * 0.08, w0 * 0.4); ctx.quadraticCurveTo(L * 0.3, wm * 0.5, L * 0.6, wm * 0.1); ctx.moveTo(L * 0.3, wm * 0.42); ctx.lineTo(L * 0.42, wm * 0.62); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = Math.max(0.8, r * 0.06); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(L * 0.14, -wm * 0.55); ctx.quadraticCurveTo(L * 0.4, -wm * 0.7, L * 0.7, -wm * 0.3); ctx.stroke();
+    ctx.restore();
+  }
+
   drawHair(ctx, x, y, r) {
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#2a1a12';
@@ -407,6 +492,8 @@ export class Pimple {
       swell = 0.85 + 0.45 * (this.pusLeft / this.stagePus);
     } else if (this.state === 'empty') {
       swell = 0.8;
+    } else if (this.state === 'sac') {
+      swell = 0.7;
     } else if (this.state === 'done') {
       swell = lerp(0.75, 0.3, this.heal);
     }
@@ -447,6 +534,7 @@ export class Pimple {
       }
     }
 
+    if (this.state === 'sac') { this.drawSac(ctx, x, y, r0, t); return; }
     if (this.state === 'done') {
       // healing mark
       const a = 1 - this.heal;
@@ -639,7 +727,7 @@ export class Pimple {
   /** Progress ring shown while you're working on a pimple. */
   drawRing(ctx, t) {
     if (this.state === 'done' || this.state === 'spawn') return;
-    if (this.T.hair) {
+    if (this.T.hair || this.state === 'sac') {
       if (this.hairOut <= 0) return;
       const HR = this.r * 1.9 + 14;
       ctx.lineCap = 'round';

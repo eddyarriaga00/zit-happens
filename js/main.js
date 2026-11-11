@@ -141,6 +141,7 @@ const G = {
   stats: null,
   // callbacks used by pimples
   onPop, onDrain, onFinish, onEarPull, onSalonStage,
+  get canSac() { return G.mode !== 'demo' && toolUnlocked('tweezers'); },   // cysts leave a sac to tweeze out once she has tweezers
   ear: null,
   salon: null,           // the Makeup or Haircut mini-mode in play
   sup: null,             // the supplies on the tray (bottles, wipes, pads, bin)
@@ -203,7 +204,7 @@ function camIn(x, y) {
   // keep her face filling the view: no leaning in on the wall or her top
   const g = G.geo;
   if (g) {
-    x = Math.max(g.cx - g.hw * 1.12 + G.W / (2 * k), Math.min(g.cx + g.hw * 1.12 - G.W / (2 * k), x));
+    x = Math.max(g.cx - g.hw * 1.3 + G.W / (2 * k), Math.min(g.cx + g.hw * 1.3 - G.W / (2 * k), x));
     y = Math.max(g.cy - g.hh * 1.2 + (m - playTop()) / k, Math.min(g.cy + g.hh * 1.22 - (playBottom() - m) / k, y));
   }
   cam.tx = Math.max(G.W / (2 * k), Math.min(G.W - G.W / (2 * k), x));     // never show past the edge of the painting
@@ -281,6 +282,7 @@ function placePimple(type) {
     }
     if (ok) {
       const p = new Pimple(type, x, y, G.scale);
+      if (G.rx && G.mode === 'level' && !p.T.hair) { p.stagePus *= G.rx.pus || 1; p.fillTime *= G.rx.fill || 1; }
       G.pimples.push(p);
       if (G.stats) G.stats.total++;
       return p;
@@ -338,6 +340,7 @@ function randomPlan(level) {
 
 function newScene(seed, def = null) {
   camReset();
+  G.rx = null;
   G.def = def;
   G.tone = def && def.mix ? SKIN_TONES[def.skin] : null;
   G.zone = (G.mode === 'level' || G.mode === 'makeup' || G.mode === 'haircut' || G.mode === 'hair' || G.mode === 'strip' || G.mode === 'brows') && def ? def.zone : G.mode === 'zen' ? ALL_ZONES[Math.floor(Math.random() * ALL_ZONES.length)] : null;
@@ -376,6 +379,7 @@ function startLevel(n) {
   newScene(n * 7919 + 13, levelDef(n));
   const plan = levelPlan(n);
   G.plan = plan;
+  G.rx = rxFor(G.def, n);
   if (save.settings.steps) {
     // full treatment: wash first, the pimples come up during the steam
     G.treat = new Treatment(G);
@@ -410,6 +414,22 @@ function addDirt() {
   }
 }
 
+// ---- every patient has a skin type: it changes how her spots behave and what you prescribe for her
+const SKIN_TYPES = {
+  sensitive: { name: 'Sensitive', note: 'Bleeds easily. Let go the moment a spot runs dry.', steam: false, finish: 'soothe', rx: ['Cleanse', 'Extract', 'Wipe', 'Cooling gel'] },
+  oily: { name: 'Oily', note: 'Extra juicy: more comes out of every spot, and it makes more mess.', pus: 1.3, steam: true, finish: 'mask', rx: ['Cleanse', 'Steam', 'Extract', 'Wipe', 'Charcoal mask'] },
+  dry: { name: 'Dry', note: 'Tight skin: every spot takes a longer, steadier squeeze.', fill: 1.25, steam: true, finish: 'soothe', rx: ['Cleanse', 'Steam', 'Extract', 'Wipe', 'Hydrating gel'] },
+  normal: { name: 'Combination', note: 'Nothing unusual. A good, honest breakout.', steam: true, finish: 'soothe', rx: ['Cleanse', 'Steam', 'Extract', 'Wipe', 'Cooling gel'] },
+};
+function rxFor(def, n) {
+  const type = !def ? 'normal' : def.sensitive ? 'sensitive' : ((def.mix && def.mix.black) || 0) >= 3 ? 'oily' : n % 3 === 0 ? 'dry' : 'normal';
+  const rx = { type, ...SKIN_TYPES[type] };
+  if (type === 'normal' && n % 2 === 0) { rx.finish = 'mask'; rx.rx = [...rx.rx.slice(0, 4), 'Charcoal mask']; }
+  return rx;
+}
+// step numbers shift when a patient skips the steam
+const stepNo = (k) => ({ pop: 3, wipe: 4, fin: 5, all: 5 })[k] - (G.rx && !G.rx.steam ? 1 : 0);
+
 const STEP_BONUS = 100;
 function onStepDone(phase) {
   G.score += STEP_BONUS;
@@ -424,6 +444,15 @@ function onStepDone(phase) {
   } else if (phase === 'rinse') {
     G.fx.reset();
     G.treat.wet();
+    if (G.rx && !G.rx.steam) {
+      // sensitive skin: steam would only inflame it, so it's straight to the extractions
+      G.treat.start('pop');
+      G.plan.types.forEach((t, i) => G.spawnQueue.push({ t: G.time + 0.4 + i * 0.12, type: t }));
+      queueBreakouts();
+      refreshTools();
+      toast(`No steam for sensitive skin. Step 2: Pop! ${toolHint(G.level)}`, 3400);
+      return;
+    }
     G.treat.start('steam');
     toast('Step 2: Switch the steamer on, then press and hold ♨️', 3400);
   } else if (phase === 'steam') {
@@ -454,10 +483,10 @@ function afterWipe() {
   G.cleanAtWipe = G.fx.cleanliness();
   G.fx.fading = true;        // any last traces melt away as you move on
   // even-numbered patients get the peel-off charcoal mask, the others the cooling gel
-  const peel = G.level % 2 === 0;
+  const peel = G.rx ? G.rx.finish === 'mask' : G.level % 2 === 0;
   G.treat.start(peel ? 'mask' : 'soothe');
   refreshTools();
-  toast(peel ? 'Step 5: Open the charcoal mask, scoop it on, spread it 🖤' : 'Step 5: Open the gel, squeeze some out, spread it 🌿', 3400);
+  toast(peel ? `Step ${stepNo('fin')}: Open the charcoal mask, scoop it on, spread it 🖤` : `Step ${stepNo('fin')}: Open the gel, squeeze some out, spread it 🌿`, 3400);
 }
 
 function startZen() {
@@ -832,7 +861,7 @@ function checkLevelDone() {
       $('btn-finish').textContent = G.treat ? 'Next step →' : 'All done ✨ Finish';
       $('btn-finish').classList.remove('hidden');
       document.querySelector('#tools [data-tool="pad"]').click();   // hand them the cotton pads
-      toast(G.treat ? 'Step 4: Open the cotton pads and wipe up ✨' : 'All popped! Grab a cotton pad and wipe up ✨', 3200);
+      toast(G.treat ? `Step ${stepNo('wipe')}: Open the cotton pads and wipe up ✨` : 'All popped! Grab a cotton pad and wipe up ✨', 3200);
     }
   }
 }
@@ -947,8 +976,8 @@ canvas.addEventListener('pointerdown', (e) => {
   if (camCan()) {
     const b = camPill();
     if (cam.tk > 1) {
-      // leaned in: the pill, or a tap off her face, steps back
-      if ((Math.abs(sx - b.x) < b.w / 2 && Math.abs(sy - b.y) < b.h / 2 + 6) || !(G.geo.inHead(x, y) || pimpleAt(x, y))) { camOut(); audio.click(); return idle(e.pointerId, x, y); }
+      // leaned in: the pill steps back (a finger beside a pimple at the edge of her face must not)
+      if (Math.abs(sx - b.x) < b.w / 2 && Math.abs(sy - b.y) < b.h / 2 + 6) { camOut(); audio.click(); return idle(e.pointerId, x, y); }
     } else if (G.tool !== 'pad' && G.tool !== 'spray' && G.tool !== 'patch' && workLeft() && pointers.size === 0 && sy > playTop() - 30 && sy < playBottom() + 10) {
       camIn(x, y); audio.click(); buzz('light');
       return idle(e.pointerId, x, y);
@@ -979,11 +1008,11 @@ function toolDown(id, x, y) {
   if (tool === 'patch') { patchAt(x, y); return idle(id, x, y); }
   if (tool === 'needle') {
     toolfx.stab(x, y);
-    if (p) hint(p, p.T.hair ? 'use the tweezers' : p.lance(G) ? 'lanced — now squeeze' : 'already open');
+    if (p) hint(p, p.T.hair || p.state === 'sac' ? 'use the tweezers' : p.lance(G) ? 'lanced — now squeeze' : 'already open');
     return idle(id, x, y);
   }
   if (tool === 'tweezers') {
-    if (p && p.T.hair) {
+    if (p && (p.T.hair || p.state === 'sac')) {
       p.held = id; p.fx = x; p.fy = y;
       buzz('light');
       pointers.set(id, { kind: 'tweeze', p, x, y });
@@ -992,10 +1021,10 @@ function toolDown(id, x, y) {
     if (p) return autoTool('finger', id, x, y);
     return idle(id, x, y);
   }
-  if (p && p.T.hair) {
+  if (p && (p.T.hair || p.state === 'sac')) {
     // only a lone first finger swaps tools: a second finger landing on a hair mid-pinch must not
     if (pointers.size === 0) return autoTool('tweezers', id, x, y);
-    hint(p, 'ingrown hair — use tweezers'); return idle(id, x, y);
+    hint(p, p.T.hair ? 'ingrown hair — use tweezers' : 'tweeze the sac out'); return idle(id, x, y);
   }
   if (tool === 'extractor') {
     if (!p) { pointers.set(id, { kind: 'wipe', x, y }); wipeAt(x, y, 0); return; }
@@ -1104,7 +1133,7 @@ const PINCH_REACH = 150;      // how far from the pimple a finger can be and sti
 function nearestPimple(x, y, reach) {
   let best = null, bestD = Infinity;
   for (const p of G.pimples) {
-    if (!p.grabbable || p.held != null || p.T.hair) continue;
+    if (!p.grabbable || p.held != null || p.T.hair || p.state === 'sac') continue;
     const d = Math.hypot(p.x - x, p.y - y);
     if (d < reach + p.r && d < bestD) { best = p; bestD = d; }
   }
@@ -1422,9 +1451,9 @@ function updateHud() {
     const left = G.pimples.filter((p) => p.state !== 'done').length + G.spawnQueue.length;
     if (G.treat) {
       const t = G.treat, pct = `${Math.round(t.progress * 100)}%`;
-      const label = t.phase === 'lather' ? `1/5 Lather ${pct}` : t.phase === 'rinse' ? `1/5 Rinse ${pct}`
-        : t.phase === 'steam' ? `2/5 Steam ${pct}` : t.phase === 'soothe' ? `5/5 Soothe ${pct}` : t.phase === 'mask' ? `5/5 Mask ${pct}` : t.phase === 'dry' ? `5/5 Dry ${pct}` : t.phase === 'peel' ? `5/5 Peel ${pct}`
-        : G.allDone ? `4/5 Wipe ${Math.round(G.fx.cleanliness() * 100)}%` : `3/5 Pop · ${left} left${timeLeft()}`;
+      const label = t.phase === 'lather' ? `1/${stepNo('all')} Lather ${pct}` : t.phase === 'rinse' ? `1/${stepNo('all')} Rinse ${pct}`
+        : t.phase === 'steam' ? `2/${stepNo('all')} Steam ${pct}` : t.phase === 'soothe' ? `${stepNo('fin')}/${stepNo('all')} Soothe ${pct}` : t.phase === 'mask' ? `${stepNo('fin')}/${stepNo('all')} Mask ${pct}` : t.phase === 'dry' ? `${stepNo('fin')}/${stepNo('all')} Dry ${pct}` : t.phase === 'peel' ? `${stepNo('fin')}/${stepNo('all')} Peel ${pct}`
+        : G.allDone ? `${stepNo('wipe')}/${stepNo('all')} Wipe ${Math.round(G.fx.cleanliness() * 100)}%` : `${stepNo('pop')}/${stepNo('all')} Pop · ${left} left${timeLeft()}`;
       setText('hud-sub', label);
     } else {
       setText('hud-sub', G.allDone ? `${Math.round(G.fx.cleanliness() * 100)}% clean` : `${left} left${timeLeft()}`);
@@ -1532,13 +1561,15 @@ function openIntro(n) {
   const t = SKIN_TONES[def.skin] || SKIN_TONES[1];
   const best = Math.min(3, save.stars[n] || 0);
   const reward = save.rewards[n] ? null : rewardFor(n);
-  const tags = [ZONE_NAMES[def.zone] || '', def.sensitive ? 'Sensitive skin' : '', def.mix && def.mix.boss ? 'Boss pimple' : '', timeGoal(def) ? 'Timed' : '', def.endless ? 'Endless' : ''].filter(Boolean);
+  const rx = rxFor(def, n);
+  const tags = [ZONE_NAMES[def.zone] || '', `${rx.name} skin`, def.mix && def.mix.boss ? 'Boss pimple' : '', timeGoal(def) ? 'Timed' : '', def.endless ? 'Endless' : ''].filter(Boolean);
   $('intro-body').innerHTML = `
     <div class="patient">
       <img class="portrait" alt="" src="${portraitURL(def, { mood: 'worried', zone: def.zone, ring: true }, 150)}">
       <div><div class="p-name">${def.name}, ${def.age}</div><div class="p-level">Level ${n} ${'★'.repeat(best)}${'☆'.repeat(3 - best)}</div></div>
     </div>
     <p class="blurb">“${def.blurb}”</p>
+    <div class="rx"><b>℞ ${rx.name} skin</b><span>${rx.note}</span>${save.settings.steps ? `<span class="rx-steps">${rx.rx.join(' → ')}</span>` : ''}</div>
     ${reward ? `<div class="reward"><b>🎁 Reward: ${reward.name}</b><span>${reward.desc}</span></div>` : ''}
     ${tags.length ? `<div class="tags">${tags.map((x) => `<span>${x}</span>`).join('')}</div>` : ''}
     <ul class="goals">
