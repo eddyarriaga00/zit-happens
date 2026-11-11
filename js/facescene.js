@@ -157,17 +157,44 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   x.lineTo(X(0.55), Y(1.2));
   x.quadraticCurveTo(X(1.7), Y(1.28), X(2.2), h + 10);
   x.closePath(); x.fill();
+  // the top is cloth, not a flat shape: it rounds over the shoulders, falls into shadow lower
+  // down, and creases where it pulls toward the neck
+  x.save(); x.clip();
+  const drape = x.createLinearGradient(0, Y(1.2), 0, Math.max(h, Y(2.2)));
+  drape.addColorStop(0, 'rgba(255,255,255,0.16)'); drape.addColorStop(0.35, 'rgba(255,255,255,0)'); drape.addColorStop(1, 'rgba(0,0,0,0.22)');
+  x.fillStyle = drape; x.fillRect(0, Y(1.1), w, h);
+  for (const d of [-1, 1]) {
+    soft(X(d * 1.25), Y(1.42), hw * 0.55, hh * 0.14, 'rgba(255,255,255,0.16)');        // the round of the shoulder
+    soft(X(d * 0.75), Y(1.7), hw * 0.3, hh * 0.4, 'rgba(0,0,0,0.1)');                  // hollow beside the chest
+    for (let i = 0; i < 4; i++) {                                                      // creases fanning from the neckline
+      const u0 = d * (0.62 + i * 0.14), u1 = d * (0.95 + i * 0.3), v1 = 1.75 + i * 0.12 + R() * 0.1;
+      x.strokeStyle = 'rgba(0,0,0,0.09)'; x.lineWidth = 3;
+      x.beginPath(); x.moveTo(X(u0), Y(1.27 + i * 0.02)); x.quadraticCurveTo(X((u0 + u1) / 2 + d * 0.1), Y(1.45 + i * 0.05), X(u1), Y(v1)); x.stroke();
+      x.strokeStyle = 'rgba(255,255,255,0.1)'; x.lineWidth = 1.5;
+      x.beginPath(); x.moveTo(X(u0 + d * 0.03), Y(1.27 + i * 0.02)); x.quadraticCurveTo(X((u0 + u1) / 2 + d * 0.14), Y(1.45 + i * 0.05), X(u1 + d * 0.04), Y(v1)); x.stroke();
+    }
+  }
+  x.restore();
   x.fillStyle = tone.shade;
   x.beginPath();
   x.moveTo(X(-0.5), Y(0.55)); x.lineTo(X(-0.56), Y(1.24));
   x.quadraticCurveTo(cx, Y(1.5), X(0.56), Y(1.24));
   x.lineTo(X(0.5), Y(0.55));
   x.closePath(); x.fill();
+  x.save();                                                                                // the neck is a column: lit down the middle, darker at its sides
+  x.beginPath(); x.moveTo(X(-0.5), Y(0.55)); x.lineTo(X(-0.56), Y(1.24)); x.quadraticCurveTo(cx, Y(1.5), X(0.56), Y(1.24)); x.lineTo(X(0.5), Y(0.55)); x.closePath(); x.clip();
+  soft(cx, Y(1.16), hw * 0.26, hh * 0.3, rgba(tone.base, 0.5));
+  for (const d of [-1, 1]) soft(X(d * 0.52), Y(1.0), hw * 0.12, hh * 0.4, 'rgba(0,0,0,0.16)');
+  x.restore();
   // open neckline: skin down to a soft V, with the hollow of the throat
   x.fillStyle = tone.shade;
   x.beginPath(); x.moveTo(X(-0.58), Y(1.2)); x.quadraticCurveTo(cx, Y(1.78), X(0.58), Y(1.2)); x.closePath(); x.fill();
   x.strokeStyle = 'rgba(0,0,0,0.14)'; x.lineWidth = 5;
   x.beginPath(); x.moveTo(X(-0.6), Y(1.2)); x.quadraticCurveTo(cx, Y(1.8), X(0.6), Y(1.2)); x.stroke();
+  // a stitched hem round the neckline
+  x.strokeStyle = 'rgba(255,255,255,0.22)'; x.lineWidth = 1.2; x.setLineDash([3, 3]);
+  x.beginPath(); x.moveTo(X(-0.66), Y(1.215)); x.quadraticCurveTo(cx, Y(1.9), X(0.66), Y(1.215)); x.stroke();
+  x.setLineDash([]);
   for (const d of [-1, 1]) {
     soft(X(d * 0.3), Y(1.18), hw * 0.07, hh * 0.3, rgba(tone.pore, 0.2));              // neck tendons
     soft(X(d * 1.1), Y(1.55), hw * 0.5, hh * 0.12, 'rgba(255,255,255,0.14)');           // light on the shoulders
