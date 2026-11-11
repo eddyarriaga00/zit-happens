@@ -32,6 +32,20 @@ export class Treatment {
       }
     }
     this.cells = Math.max(1, this.cells);
+    // masks and gel are kept off the eyes, brows and lips, so those cells never need covering
+    this.hole = new Uint8Array(n);
+    this.holeN = 0;
+    if (G.geo && G.geo.eyes) {
+      const g = G.geo, lb = g.lipsBox, lx = (lb[0] + lb[2]) / 2, ly = (lb[1] + lb[3]) / 2;
+      const inE = (x, y, ox, oy, rx, ry) => ((x - ox) / rx) ** 2 + ((y - oy) / ry) ** 2 < 1;
+      for (let i = 0; i < n; i++) {
+        if (!this.mask[i]) continue;
+        const x = (i % this.cols + 0.5) * CELL, y = (Math.floor(i / this.cols) + 0.5) * CELL;
+        const h = y < g.hairlineY + g.hh * 0.04 || inE(x, y, lx, ly, (lb[2] - lb[0]) * 0.56, (lb[3] - lb[1]) * 0.66)
+          || g.eyes.some((e) => inE(x, y, e.x, e.y - e.ry * 0.2, e.rx * 1.3, e.ry * 2.0) || inE(x, y, e.x, g.browY - g.hh * 0.012, g.hw * 0.31, g.hh * 0.045));
+        if (h) { this.hole[i] = 1; this.holeN++; }
+      }
+    }
     this.phase = 'pop';
     this.progress = 0;
     this.holding = 0;
@@ -55,11 +69,18 @@ export class Treatment {
     this.progress = 0;
     this.done = false;
     this.holding = 0;
-    if (phase === 'peel') this.peelStart = Math.max(0.01, this.mean(this.gel));
+    if (phase === 'peel') this.peelStart = Math.max(0.01, this.filmMean());
     if (phase === 'rinse') {
       this.foamStart = Math.max(0.01, this.mean(this.foam));
       this.foamSum = this.foamStart * this.cells;
     }
+  }
+
+  /** How much of the face the gel or mask covers, ignoring the parts it is kept off. */
+  filmMean() {
+    let s = 0;
+    for (let i = 0; i < this.gel.length; i++) if (!this.hole[i]) s += this.gel[i];
+    return s / Math.max(1, this.cells - this.holeN);
   }
 
   mean(arr) {
@@ -151,9 +172,9 @@ export class Treatment {
 
     if (this.phase === 'lather') this.progress = this.mean(this.foam) / GOALS.lather;
     else if (this.phase === 'rinse') this.progress = (1 - this.mean(this.foam) / this.foamStart) / GOALS.rinse;
-    else if (this.phase === 'soothe') this.progress = this.mean(this.gel) / GOALS.soothe;
-    else if (this.phase === 'mask') this.progress = this.mean(this.gel) / GOALS.mask;
-    else if (this.phase === 'peel') this.progress = (1 - this.mean(this.gel) / this.peelStart) / GOALS.peel;
+    else if (this.phase === 'soothe') this.progress = this.filmMean() / GOALS.soothe;
+    else if (this.phase === 'mask') this.progress = this.filmMean() / GOALS.mask;
+    else if (this.phase === 'peel') this.progress = (1 - this.filmMean() / this.peelStart) / GOALS.peel;
     else if (this.phase === 'dry') { this.progress += dt / 4.5 + this.fan; this.fan = 0; }
     else if (this.phase === 'steam') {
       if (this.holding > 0 && !G.sup.ready('steamer')) G.sup.nag('steamer', 'switch the steamer on');
@@ -305,7 +326,7 @@ export class Treatment {
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const i = row * cols + col;
-          if (!this.mask[i] || arr[i] > 0.3) continue;
+          if (!this.mask[i] || arr[i] > 0.3 || (arr === gel && this.hole[i])) continue;
           const x = (col + 0.5) * CELL, y = (row + 0.5) * CELL;
           ctx.moveTo(x + CELL * 0.42, y);
           ctx.arc(x, y, CELL * 0.42, 0, Math.PI * 2);
