@@ -316,11 +316,30 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   }
   soft(cx, Y(1.5), hw * 0.07, hh * 0.05, rgba(tone.pore, 0.35));
 
+  // ---- the shape of her face. Real faces sort into a handful of outlines by comparing four things:
+  // the width at the temples, at the cheekbones and at the jaw, and the length. A woman's jaw turns
+  // in a long soft curve, not a corner, and her chin is narrower than her mouth.
+  //   T temple width, C cheekbone width, full how far the cheek holds its width, jaw/jv the angle of
+  //   the jaw, a/b/bv how it turns there, cw the breadth of the chin, chinV where it ends,
+  //   hol the hollow under the cheekbone
+  const SHAPES = {
+    oval:    { T: 1.0,   C: 0.965, full: 0,     jaw: 0.66, jv: 0.70, a: 0.20, b: 0.17, bv: 0.21, cw: 0.30, chinV: 1.035, hol: 0.2 },
+    round:   { T: 1.0,   C: 0.985, full: 0.02,  jaw: 0.76, jv: 0.68, a: 0.16, b: 0.15, bv: 0.25, cw: 0.42, chinV: 1.0,   hol: 0.07 },
+    square:  { T: 1.0,   C: 0.965, full: 0.01,  jaw: 0.80, jv: 0.74, a: 0.08, b: 0.20, bv: 0.19, cw: 0.42, chinV: 1.025, hol: 0.16 },
+    heart:   { T: 1.0,   C: 0.965, full: -0.02, jaw: 0.59, jv: 0.68, a: 0.24, b: 0.17, bv: 0.23, cw: 0.21, chinV: 1.05,  hol: 0.27 },
+    diamond: { T: 0.93,  C: 0.98,  full: -0.03, jaw: 0.60, jv: 0.70, a: 0.23, b: 0.17, bv: 0.21, cw: 0.24, chinV: 1.04,  hol: 0.3 },
+    oblong:  { T: 0.985, C: 0.95,  full: 0.01,  jaw: 0.70, jv: 0.76, a: 0.15, b: 0.17, bv: 0.22, cw: 0.30, chinV: 1.085, hol: 0.22 },
+  };
+  const shape = SHAPES[look.shape] ? look.shape : look.fixed ? 'oval'
+    : ['oval', 'oval', 'oval', 'round', 'round', 'heart', 'heart', 'square', 'diamond', 'oblong'][((seed >>> 13) ^ (seed >>> 22)) % 10];
+  const SH = SHAPES[shape];
+  const earX = SH.C + 0.025;
+
   // ---- ears: rim, inner fold, the dark bowl, a soft lobe
   for (const d of [-1, 1]) {
     const ew = hw * 0.17, eh = hh * 0.215;
     x.save();
-    x.translate(X(d * 0.99), Y(0.03)); x.scale(d, 1); x.rotate(0.08);
+    x.translate(X(d * earX), Y(0.03)); x.scale(d, 1); x.rotate(0.08);
     const ear = new Path2D();
     ear.moveTo(-ew * 0.3, -eh * 0.95);
     ear.bezierCurveTo(ew * 0.75, -eh * 1.2, ew * 1.15, -eh * 0.2, ew * 0.62, eh * 0.42);
@@ -344,16 +363,23 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     x.restore();
   }
 
-  // ---- the head: an oval that narrows through the cheeks to a small chin
-  const jaw = (look.fem ? 0.66 : 0.74) + vr(1) * 0.11;
+  // ---- the head, in her own shape
+  const jaw = SH.jaw + (look.fem ? 0 : 0.08) + vr(1) * 0.07;
+  const chinW = Math.max(0.14, SH.cw + vr(9) * 0.05), chinV = SH.chinV;
   const head = new Path2D();
   head.moveTo(cx, Y(-1));
-  head.bezierCurveTo(X(0.74), Y(-1.02), X(1.0), Y(-0.6), X(0.965), Y(-0.06));         // skull down to the cheekbone
-  head.bezierCurveTo(X(0.95), Y(0.26), X(0.86), Y(0.5), X(jaw), Y(0.7));              // cheek to the angle of the jaw
-  head.bezierCurveTo(X(jaw - 0.17), Y(0.91), X(0.3), Y(1.035), cx, Y(1.035));            // along the jaw to the chin
-  head.bezierCurveTo(X(-0.3), Y(1.035), X(-(jaw - 0.17)), Y(0.91), X(-jaw), Y(0.7));
-  head.bezierCurveTo(X(-0.86), Y(0.5), X(-0.95), Y(0.26), X(-0.965), Y(-0.06));
-  head.bezierCurveTo(X(-1.0), Y(-0.6), X(-0.74), Y(-1.02), cx, Y(-1));
+  for (const d of [1, -1]) {
+    const pts = [
+      [0.74, -1.02, SH.T, -0.6, SH.C, -0.06],                                       // skull down to the cheekbone
+      [SH.C - 0.015 + SH.full, 0.26, jaw + SH.a, 0.5, jaw, SH.jv],                  // cheek to the angle of the jaw
+      [jaw - SH.b, SH.jv + SH.bv, chinW, chinV, 0, chinV],                          // along the jaw to the chin
+    ];
+    if (d > 0) for (const q of pts) head.bezierCurveTo(X(q[0]), Y(q[1]), X(q[2]), Y(q[3]), X(q[4]), Y(q[5]));
+    else for (let i = 2; i >= 0; i--) {                                             // and back up the other side
+      const q = pts[i], e = i ? pts[i - 1] : [0, 0, 0, 0, 0, -1];
+      head.bezierCurveTo(X(-q[2]), Y(q[3]), X(-q[0]), Y(q[1]), X(-e[4]), Y(e[5]));
+    }
+  }
   head.closePath();
 
   // highlights on dark skin are warm and subtle; white patches there read as chalk
@@ -378,13 +404,14 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     side.addColorStop(0, sh(0.55)); side.addColorStop(0.14, sh(0.16)); side.addColorStop(0.32, sh(0)); side.addColorStop(0.6, sh(0.03));
     side.addColorStop(0.82, sh(0.3)); side.addColorStop(1, sh(0.75));
     x.fillStyle = side; x.fillRect(X(-1.1), Y(-1.1), hw * 2.2, hh * 2.3);
-    const under = x.createLinearGradient(0, Y(0.5), 0, Y(1.05));
+    const under = x.createLinearGradient(0, Y(0.5), 0, Y(chinV + 0.015));
     under.addColorStop(0, sh(0)); under.addColorStop(0.65, sh(0.1)); under.addColorStop(1, sh(0.5));
-    x.fillStyle = under; x.fillRect(X(-1.1), Y(0.5), hw * 2.2, hh * 0.6);
+    x.fillStyle = under; x.fillRect(X(-1.1), Y(0.5), hw * 2.2, hh * 0.7);
     for (const d of [-1, 1]) {
       const far = d > 0 ? 1 : 0;
       soft(X(d * 0.9), Y(-0.34), hw * 0.22, hh * 0.36, sh(0.26));                    // temples
-      soft(X(d * 0.76), Y(0.5), hw * 0.3, hh * 0.3, sh(0.2 + far * 0.1));             // hollow under the cheekbone
+      soft(X(d * 0.76), Y(0.5), hw * 0.3, hh * 0.3, sh(SH.hol + far * 0.1));           // hollow under the cheekbone
+      soft(X(d * (chinW + 0.16)), Y(chinV - 0.15), hw * 0.11, hh * 0.07, sh(0.1));       // the chin stands out from the jaw beside it
       soft(X(d * ex), Y(ey - 0.03), hw * 0.31, hh * 0.15, sh(0.3));                   // eye sockets
       soft(X(d * (ex - 0.21)), Y(ey - 0.02), hw * 0.11, hh * 0.12, sh(0.36));         // deepest beside the bridge
       soft(X(d * ex), Y(ey - 0.125), hw * 0.27, hh * 0.05, sh(0.24));                 // under the brow
@@ -403,7 +430,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // blood under the skin: cheeks, nose, chin and ears run warmer than the forehead
   for (const d of [-1, 1]) soft(X(d * 0.56), Y(0.27), hw * 0.32, hh * 0.21, rgba(tone.blush, 0.24));
   soft(cx, Y(0.3), hw * 0.16, hh * 0.1, rgba(tone.blush, 0.26));
-  soft(cx, Y(0.86), hw * 0.2, hh * 0.09, rgba(tone.blush, 0.12));
+  soft(cx, Y(chinV - 0.175), hw * 0.2, hh * 0.09, rgba(tone.blush, 0.12));
   // where the light lands
   soft(X(-0.1), Y(-0.46), hw * 0.52, hh * 0.2, hi(0.2));                              // forehead
   soft(X(-0.06), Y(-0.38), hw * 0.2, hh * 0.08, hi(0.12));
@@ -414,7 +441,9 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     soft(X(d * 0.52 - 0.06), Y(0.13), hw * 0.21, hh * 0.085, hi(d < 0 ? 0.2 : 0.11));  // cheekbones
     soft(X(d * (ex + 0.02)), Y(ey - 0.125), hw * 0.15, hh * 0.022, hi(0.16));           // brow bone
   }
-  soft(X(-0.02), Y(0.85), hw * 0.15, hh * 0.07, hi(0.17));                            // chin
+  soft(X(-0.02), Y(chinV - 0.185), hw * Math.min(0.17, 0.07 + chinW * 0.27), hh * 0.07, hi(0.17));    // chin
+  if (shape === 'round') for (const d of [-1, 1]) soft(X(d * 0.6 - 0.05), Y(0.36), hw * 0.2, hh * 0.13, hi(d < 0 ? 0.1 : 0.05));   // full cheeks catch the light lower down
+  if (shape === 'square' || shape === 'oblong') soft(X(-(jaw - 0.14)), Y(SH.jv - 0.05), hw * 0.1, hh * 0.08, hi(0.08));          // the angle of the jaw
 
   // skin is not airbrushed: faint mottling, pores that are denser on the nose and inner cheeks,
   // and on some fair faces a scatter of freckles over the nose
@@ -742,7 +771,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     x.beginPath(); x.moveTo(X(d * 0.22), Y(noseY - 0.01)); x.quadraticCurveTo(X(d * 0.35), Y(noseY + 0.07), X(d * 0.4), Y(mouthY - 0.06)); x.stroke();
     x.strokeStyle = rgba(tone.pore, 0.1 * old); x.lineWidth = s * 0.0035; x.stroke();
   }
-  mul(() => { soft(cx, Y(1.03), hw * 0.75, hh * 0.1, sh(0.3)); });
+  mul(() => { soft(cx, Y(chinV - 0.005), hw * 0.75, hh * 0.1, sh(0.3)); });
   x.save();
   x.clip(head);
   for (let i = 0; i < 2600; i++) {
@@ -757,7 +786,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const metal = (seed >>> 7) % 2 ? ['#fff3c4', '#e9c46a', '#a9822a'] : ['#ffffff', '#cfd6df', '#7f8794'];
   if (jewel) {
     for (const d of [-1, 1]) {
-      const lx = X(d * 1.035), ly = Y(0.19), r = hw * 0.028;
+      const lx = X(d * (earX + 0.045)), ly = Y(0.19), r = hw * 0.028;
       if (jewel === 3) {                                   // a small hoop
         x.strokeStyle = metal[2]; x.lineWidth = r * 0.75;
         x.beginPath(); x.ellipse(lx, ly + r * 2.2, r * 1.3, r * 2.2, 0, 0, Math.PI * 2); x.stroke();
@@ -830,7 +859,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     forehead: () => [X((R() * 2 - 1) * 0.6), Y(-0.42 + (R() * 2 - 1) * 0.15)],
     nose: () => [X((R() * 2 - 1) * 0.14), Y(0.12 + (R() * 2 - 1) * 0.2)],
     cheek: () => { const d = R() < 0.5 ? -1 : 1; return [X(d * (0.55 + (R() * 2 - 1) * 0.24)), Y(0.3 + (R() * 2 - 1) * 0.2)]; },
-    chin: () => [X((R() * 2 - 1) * 0.4), Y(0.84 + (R() * 2 - 1) * 0.11)],
+    chin: () => [X((R() * 2 - 1) * Math.min(0.4, chinW + 0.08)), Y(chinV - 0.19 + (R() * 2 - 1) * 0.1)],
   };
   const anyPoint = () => {
     for (let i = 0; i < 60; i++) {
@@ -847,7 +876,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     if (k < 0.35) return { x: X(j() * 0.2), y: Y(ey - 0.2 + j() * 0.06), a: -Math.PI / 2 + j() };
     if (k < 0.6) { const d = Math.random() < 0.5 ? -1 : 1; return { x: X(d * (ex + j() * 0.3)), y: Y(ey - 0.11 + j() * 0.03), a: Math.PI / 2 + j() * 0.6 }; }
     if (k < 0.82) return { x: X(j() * 0.5), y: Y(mouthY - 0.085 + j() * 0.03), a: Math.PI / 2 + j() * 0.8 };
-    return { x: X(j() * 0.5), y: Y(0.86 + j() * 0.1), a: Math.PI / 2 + j() };
+    return { x: X(j() * 0.5), y: Y(chinV - 0.175 + j() * 0.1), a: Math.PI / 2 + j() };
   };
   // everything that is hair: the top of the head above the hairline, the volume around
   // the skull, and the lengths hanging at the sides
@@ -875,7 +904,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   below.lineTo(X(1.4), Y(1.4)); below.closePath();
   const clipSkin = (ctx) => { ctx.clip(head); ctx.clip(below); };
   const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint,
-    lipsPath, inLips, lipsBox, cheeks, lids, onHair, clipSkin, headPath: head, eyeCol: look.eye, eyePaths, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
+    lipsPath, inLips, lipsBox, cheeks, lids, onHair, clipSkin, headPath: head, shape, eyeCol: look.eye, eyePaths, hairlineY: Y(hairline), browY: Y(ey - 0.2), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
   return { canvas: c, geo };
 }
 
