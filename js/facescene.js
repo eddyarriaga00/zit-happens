@@ -95,6 +95,10 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const style = look.style || 'short';
   const hasHair = style !== 'bald';
   const hairline = style === 'bald' ? -2 : style === 'balding' ? -2 : style === 'buzz' ? -0.7 : -0.68;      // a proper forehead
+  // the line the hair grows from. Drawn back for a ponytail or a bun it is an even arch, highest in the middle;
+  // worn down it sits lower on the side the hair sweeps toward.
+  const tiedBack = style === 'pony' || style === 'bun';
+  const hl = (u) => hairline + (tiedBack ? -0.03 + 0.17 * u * u : 0.05 * Math.abs(u) + (style === 'buzz' ? 0 : 0.1 * Math.max(0, u * 0.9)));
   x.lineCap = 'round';
   x.lineJoin = 'round';
 
@@ -133,6 +137,33 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     x.strokeStyle = 'rgba(0,0,0,0.2)'; x.lineWidth = 1.1;
     x.beginPath(); x.moveTo(x0 + wd, y0); x.quadraticCurveTo(mx + wd * 0.8, my, x1, y1); x.stroke();
   };
+  // a ringlet: a corkscrew of hair hanging down. The turns that face us catch the light.
+  const ringlet = (px, py, len, amp, wl, wd, drift) => {
+    const ph = R() * 6.3, n = Math.max(8, Math.round(len / wl * 10));
+    const pt = (i) => { const t = i / n, k = t * len / wl * Math.PI * 2 + ph; return [px + drift * t + Math.sin(k) * amp * (0.55 + 0.45 * t), py + t * len, Math.cos(k)]; };
+    const path = (i0, i1) => { x.beginPath(); for (let i = i0; i <= i1; i++) { const [qx, qy] = pt(i); if (i === i0) x.moveTo(qx, qy); else x.lineTo(qx, qy); } x.stroke(); };
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    x.strokeStyle = 'rgba(0,0,0,0.22)'; x.lineWidth = wd * 1.7; path(0, n);
+    x.strokeStyle = hairLo; x.lineWidth = wd * 1.15; path(0, n);
+    x.strokeStyle = hair; x.lineWidth = wd * 0.8; path(0, n);
+    x.strokeStyle = hairHi; x.lineWidth = wd * 0.34;
+    for (let i = 0; i < n; i++) if (pt(i)[2] > 0.25) path(i, i + 1);       // the near side of each turn
+    x.strokeStyle = shine(0.16); x.lineWidth = Math.max(0.5, wd * 0.14);
+    for (let i = 0; i < n; i++) if (pt(i)[2] > 0.7) path(i, i + 1);
+    x.lineCap = 'butt';
+  };
+  // a coil seen end on: a curl sitting on the head
+  const coil = (px, py, r) => {
+    const a0 = R() * 6.3, turns = 1.25 + R() * 0.7, n = 22, dir = R() < 0.5 ? 1 : -1;
+    const path = (i0, i1, ox, oy) => { x.beginPath(); for (let i = i0; i <= i1; i++) { const t = i / n, a = a0 + dir * t * turns * Math.PI * 2, rr = r * (1 - 0.72 * t); const qx = px + ox + Math.cos(a) * rr, qy = py + oy + Math.sin(a) * rr * 0.9; if (i === i0) x.moveTo(qx, qy); else x.lineTo(qx, qy); } x.stroke(); };
+    soft(px + r * 0.12, py + r * 0.2, r * 1.25, r * 1.25, 'rgba(0,0,0,0.3)');
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    x.strokeStyle = hairLo; x.lineWidth = r * 0.5; path(0, n, 0, 0);
+    x.strokeStyle = hair; x.lineWidth = r * 0.34; path(0, n, 0, 0);
+    x.strokeStyle = hairHi; x.lineWidth = r * 0.13;
+    for (let i = 0; i < n; i++) { const a = a0 + dir * (i + 0.5) / n * turns * Math.PI * 2; if (Math.sin(a) < -0.2 && Math.cos(a) < 0.6) path(i, i + 1, -r * 0.04, -r * 0.05); }   // lit from above left
+    x.lineCap = 'butt';
+  };
   // hair isn't one flat colour: darker at the roots and underneath, lit across the crown
   const hairFill = x.createLinearGradient(0, Y(-1.15), 0, Y(1.4));
   hairFill.addColorStop(0, hairLo); hairFill.addColorStop(0.16, hair); hairFill.addColorStop(0.45, hair); hairFill.addColorStop(1, tint(hair, 0.55));
@@ -164,17 +195,27 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     x.quadraticCurveTo(cx, Y(fb + 0.18), X(-wide * 0.9), Y(fb));
     x.bezierCurveTo(X(-wide * 1.02), Y(fb - 0.6), X(-wide * 1.04), Y(0.25), X(-1.1), Y(-0.3));
     x.closePath(); x.fill();
-    strands(700, () => {
-      const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1;
-      return [X(u * 0.7), Y(-0.9), X(u), Y(0.6 + R() * 1.2), d * (style === 'curly' ? 30 * Math.sin(R() * 9) : 18), hairCol()];
-    }, 0.9);
-    for (let i = 0; i < 40; i++) {         // long locks falling past the shoulders
-      const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1;
-      lock(X(u * 0.78), Y(-0.5), X(u) + d * R() * 8, Y(0.9 + R() * 0.9), d * (style === 'curly' ? 26 * Math.sin(R() * 9) : 16), hw * (0.05 + R() * 0.04));
+    if (style === 'curly') {
+      // a soft mass first, then corkscrews over it, the back ones darker and thinner
+      for (let i = 0; i < 26; i++) soft(X((R() * 2 - 1) * wide * 0.9), Y(-0.2 + R() * (fb + 0.1)), hw * 0.3, hh * 0.22, 'rgba(0,0,0,0.16)');
+      for (let i = 0; i < 64; i++) {
+        const u = (i < 40 ? (R() * 2 - 1) : (R() < 0.5 ? -1 : 1) * (0.8 + R() * 0.25)) * wide * 0.94, d = Math.sign(u) || 1;
+        const v0 = -0.55 + R() * 0.7 + (i < 40 ? 0 : 0.2), v1 = Math.min(fb + 0.1, v0 + 0.7 + R() * 0.9);
+        ringlet(X(u * 0.86), Y(v0), (v1 - v0) * hh, hw * (0.045 + R() * 0.035), hh * (0.13 + R() * 0.06), hw * (0.05 + R() * 0.03), d * hw * 0.1 * R());
+      }
+    } else {
+      strands(700, () => {
+        const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1;
+        return [X(u * 0.7), Y(-0.9), X(u), Y(0.6 + R() * 1.2), d * (style === 'curly' ? 30 * Math.sin(R() * 9) : 18), hairCol()];
+      }, 0.9);
+      for (let i = 0; i < 40; i++) {         // long locks falling past the shoulders
+        const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1;
+        lock(X(u * 0.78), Y(-0.5), X(u) + d * R() * 8, Y(0.9 + R() * 0.9), d * (style === 'curly' ? 26 * Math.sin(R() * 9) : 16), hw * (0.05 + R() * 0.04));
+      }
+      strands(140, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1; return [X(u * 0.8), Y(-0.4), X(u), Y(0.9 + R() * 0.9), d * 16, 'rgba(0,0,0,0.2)']; }, 3);
+      strands(900, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1; return [X(u * 0.75), Y(-0.6), X(u), Y(0.7 + R() * 1.2), d * (style === 'curly' ? 30 * Math.sin(R() * 9) : 18), hairCol()]; }, 0.6);
+      strands(360, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1, v = 0.25 + R() * 0.2; return [X(u * 0.97), Y(v), X(u), Y(v + 0.22), d * 3, shine(0.2)]; }, 0.9);
     }
-    strands(140, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1; return [X(u * 0.8), Y(-0.4), X(u), Y(0.9 + R() * 0.9), d * 16, 'rgba(0,0,0,0.2)']; }, 3);
-    strands(900, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1; return [X(u * 0.75), Y(-0.6), X(u), Y(0.7 + R() * 1.2), d * (style === 'curly' ? 30 * Math.sin(R() * 9) : 18), hairCol()]; }, 0.6);
-    strands(360, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1, v = 0.25 + R() * 0.2; return [X(u * 0.97), Y(v), X(u), Y(v + 0.22), d * 3, shine(0.2)]; }, 0.9);
   }
   if (style === 'pony') {
     x.fillStyle = hairFill; x.beginPath(); x.ellipse(X(1.04), Y(0.0), hw * 0.24, hh * 0.78, -0.16, 0, Math.PI * 2); x.fill();
@@ -205,7 +246,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       }, 0.8);
       // flyaways breaking the outline
       strands(46, () => {
-        const a = Math.PI + R() * Math.PI, px = cx + Math.cos(a) * hw * k, py = Y(-0.3) + Math.sin(a) * hh * 0.87;
+        const a = Math.PI + 0.45 + R() * (Math.PI - 0.9), px = cx + Math.cos(a) * hw * k, py = Y(-0.3) + Math.sin(a) * hh * 0.87;     // over the crown only: at the sides they read as spikes
         const fs = s / 380;     // flyaways scale with the head, so small portraits don't get a spiky halo
         return [px, py, px + (Math.cos(a) * (6 + R() * 16) + (R() - 0.5) * 12) * fs, py + Math.sin(a) * (6 + R() * 14) * fs, (R() - 0.5) * 12 * fs, rgba(hair, 0.55)];
       }, Math.max(0.3, 0.7 * Math.min(1, s / 380)));
@@ -403,7 +444,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // hair growing from the hairline: no blunt fringe. It leaves a parting and sweeps over the
   // skull to the sides, or is drawn straight back for a ponytail or a bun.
   if (hasHair && style !== 'balding') {
-    const edge = (u) => hairline + 0.05 * Math.abs(u) + 0.012 * Math.sin(u * 9 + seed % 7) + (style === 'buzz' ? 0 : 0.1 * Math.max(0, u * 0.9));
+    const edge = (u) => hl(u) + 0.012 * Math.sin(u * 9 + seed % 7);
     mul(() => { for (let u = -0.9; u <= 0.9; u += 0.12) soft(X(u), Y(edge(u) + 0.05), hw * 0.16, hh * 0.07, sh(0.3)); });   // the hair shades the top of the forehead
     x.fillStyle = style === 'buzz' ? rgba(hair, 0.82) : hairFill;
     x.beginPath(); x.moveTo(X(-1.2), Y(-1.2)); x.lineTo(X(1.2), Y(-1.2));
@@ -423,9 +464,15 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       const at = back
         ? (u0, t, q) => { const v0 = eC(u0), k = q * q * 0.2 + q * 0.8; return [X(u0 * (1 - k * 0.8)), Y(v0 + (-1.08 - v0) * k)]; }
         : (sgn, t, q) => { const u = part + (sgn * 1.06 - part) * q; return [X(u), Y(eC(u) * (1 - t) + skull(u) * t - Math.sin(q * Math.PI) * 0.035 * (1 - t))]; };
+      const wavy = style === 'curly', seg = wavy ? 18 : 7;
       const run = (a, t, q0, q1, col, lw) => {
+        const ph = wavy ? R() * 6.3 : 0, fr = wavy ? 26 + R() * 14 : 0;
         x.strokeStyle = col; x.lineWidth = lw; x.beginPath();
-        for (let i = 0; i <= 7; i++) { const [px, py] = at(a, t, q0 + (q1 - q0) * i / 7); if (i) x.lineTo(px, py); else x.moveTo(px, py); }
+        for (let i = 0; i <= seg; i++) {
+          const q = q0 + (q1 - q0) * i / seg; let [px, py] = at(a, t, q);
+          if (wavy) py += Math.sin(q * fr + ph) * hh * 0.012 * Math.min(1, q * 5);
+          if (i) x.lineTo(px, py); else x.moveTo(px, py);
+        }
         x.stroke();
       };
       const pick = () => (back ? R() * 2.1 - 1.05 : (R() < (1 - part) / 2 ? 1 : -1));
@@ -435,7 +482,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       for (let i = 0; i < 520; i++) { const q = 0.3 + R() * 0.16; run(pick(), 0.15 + R() * 0.8, q, q + 0.1 + R() * 0.08, shine(0.2), 0.85); }   // shine follows the curve of the skull
       for (let i = 0; i < 260; i++) { const q = 0.66 + R() * 0.1; run(pick(), 0.2 + R() * 0.7, q, q + 0.07, shine(0.1), 0.8); }
       // roots sit in the shade of the hair above them, so the hairline reads as roots, not as cut ends
-      mul(() => { for (let u = -1; u <= 1; u += 0.1) soft(X(u), Y(eC(u) - 0.05), hw * 0.16, hh * 0.085, sh(0.42)); });
+      mul(() => { for (let u = -1; u <= 1; u += 0.1) soft(X(u), Y(eC(u) - 0.05), hw * 0.16, hh * 0.085, sh(back ? 0.38 : 0.42)); });
       if (!back) {
         // the parting: a thin line of scalp with the roots lifting away on either side
         x.strokeStyle = 'rgba(0,0,0,0.16)'; x.lineWidth = 2;
@@ -443,9 +490,16 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
         x.strokeStyle = rgba(tone.shade, 0.4); x.lineWidth = 0.8;
         x.beginPath(); x.moveTo(X(part), Y(eC(part) + 0.005)); x.quadraticCurveTo(X(part * 0.95), Y(-0.9), X(part * 0.8), Y(-1.06)); x.stroke();
       }
+      if (back) {
+        // pulled tight, the scalp shows between the roots: slivers of skin running up into the hair
+        strands(420, () => {
+          const u = R() * 1.9 - 0.95, v = edge(u) + 0.01, len = hh * (0.025 + R() * 0.05), a = -Math.PI / 2 - u * 0.5 + (R() - 0.5) * 0.3;
+          return [X(u), Y(v), X(u) + Math.cos(a) * len, Y(v) + Math.sin(a) * len, 0, rgba(tone.base, 0.2 + R() * 0.3)];
+        }, 0.8);
+      }
       // a real hairline is not an edge: fine roots thin out onto the forehead, with a few baby hairs
       strands(900, () => {
-        const u = R() * 1.9 - 0.95, v = edge(u) - 0.02 + R() * 0.05, len = hh * (0.03 + R() * 0.04);
+        const u = R() * 1.9 - 0.95, v = edge(u) - 0.02 + R() * 0.05, len = hh * (0.03 + R() * 0.04) * (back ? 1.7 : 1);
         const a = back ? -Math.PI / 2 - u * 0.5 + (R() - 0.5) * 0.4 : (u > part ? -0.5 : Math.PI + 0.5) + (R() - 0.5) * 0.5;
         return [X(u), Y(v), X(u) + Math.cos(a) * len, Y(v) + Math.sin(a) * len, 0, rgba(hair, 0.28 + R() * 0.3)];
       }, 0.6);
@@ -459,19 +513,21 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   x.restore();
 
 
-  // curls piled on top
+  // curls: coils sitting all over the crown, getting bigger toward the outside, with ringlets
+  // falling in front of the ears
   if (style === 'curly') {
-    for (let i = 0; i < 46; i++) {
-      const a = Math.PI + R() * Math.PI, d = 0.86 + R() * 0.32;
-      const px = cx + Math.cos(a) * hw * 1.05 * d, py = Y(-0.3) + Math.sin(a) * hh * 0.84 * d, r = hw * (0.1 + R() * 0.07);
-      x.fillStyle = hairLo;
-      x.beginPath(); x.arc(px, py, r, 0, Math.PI * 2); x.fill();
-      soft(px + r * 0.2, py + r * 0.25, r * 0.9, r * 0.9, 'rgba(0,0,0,0.25)');
-      for (let j = 0; j < 9; j++) {
-        const rr = r * (0.25 + R() * 0.75), a0 = R() * 6.3;
-        x.strokeStyle = j % 3 === 0 ? hairHi : hair; x.lineWidth = 0.9 + R() * 0.8;
-        x.beginPath(); x.arc(px + (R() - 0.5) * r * 0.2, py + (R() - 0.5) * r * 0.2, rr, a0, a0 + 1.6 + R() * 2.4); x.stroke();
-      }
+    const cs = [];
+    for (let i = 0; i < 150; i++) {
+      const a = Math.PI + R() * Math.PI, d = 0.5 + R() * 0.68;
+      const uu = Math.cos(a) * 1.05 * d, py = Y(-0.3) + Math.sin(a) * hh * 0.84 * d, vv = (py - Y(0)) / (Y(1) - Y(0));
+      if (Math.abs(uu) < 0.97 && vv > hl(uu) - 0.05) continue;    // not on the forehead
+      cs.push([X(uu), py, hw * (0.05 + d * 0.05 + R() * 0.03), d]);
+    }
+    cs.sort((p, q) => q[3] - p[3]);            // the outline first, the crown over it
+    for (const [px, py, r] of cs) coil(px, py, r);
+    for (const d of [-1, 1]) for (let i = 0; i < 5; i++) {
+      const u = d * (0.98 + R() * 0.3), v0 = -0.35 + R() * 0.35;
+      ringlet(X(u), Y(v0), hh * (0.55 + R() * 0.55), hw * (0.05 + R() * 0.03), hh * (0.13 + R() * 0.05), hw * (0.055 + R() * 0.025), d * hw * 0.08);
     }
   }
 
@@ -724,7 +780,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // ---- where things are, for the game
   const ell = (px, py, ox, oy, rx, ry) => ((px - ox) / rx) ** 2 + ((py - oy) / ry) ** 2 < 1;
   const inHead = (px, py) => x.isPointInPath(head, px * dpr, py * dpr);
-  const edgeV = (u) => (hasHair && style !== 'balding' ? hairline + 0.05 * Math.abs(u) + (style === 'buzz' ? 0 : 0.1 * Math.max(0, u * 0.9)) + 0.03 : -0.92);
+  const edgeV = (u) => (hasHair && style !== 'balding' ? hl(u) + 0.03 : -0.92);
   const blocked = (px, py, r = 0) => {
     const u = (px - cx) / hw, v = (py - cy) / hh;
     for (const [ox, oy] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) if (!inHead(px + ox * 1.3, py + oy * 1.3)) return true;
@@ -795,14 +851,16 @@ export function drawLids(ctx, geo, closed) {
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.moveTo(ax, ay);
     // as it closes, the lid also covers the open eye's upper lashes, which would otherwise float above it
-    const up = 1.38 + 0.85 * Math.max(0, (closed - 0.5) * 2);
-    ctx.lineTo(ax - d * rx * 0.06 * closed, ay - ry * 0.5 * closed);
-    ctx.quadraticCurveTo(e.x - d * rx * 0.2, e.y - ry * up, bx + d * rx * 0.1 * closed, by - ry * 0.55 * closed);
+    const c3 = Math.min(1, closed * 3), up = 1.38 + 1.3 * c3;
+    ctx.lineTo(ax - d * rx * 0.06 * c3, ay - ry * 0.6 * c3);
+    ctx.quadraticCurveTo(e.x - d * rx * 0.1, e.y - ry * up, bx + d * rx * 0.14 * c3, by - ry * 0.9 * c3);
     ctx.lineTo(bx, by);
     ctx.quadraticCurveTo(mx, my, ax, ay);
     ctx.fill();
     ctx.globalCompositeOperation = 'multiply';          // the lid sits in the shade of the socket, like the skin round it
-    ctx.fillStyle = 'rgba(158,98,86,0.34)'; ctx.fill();
+    const mg = ctx.createLinearGradient(0, e.y - ry * 2.5, 0, e.y + ry * 0.4);       // fading out upward, so the lid has no top edge
+    mg.addColorStop(0, 'rgba(158,98,86,0.08)'); mg.addColorStop(0.55, 'rgba(158,98,86,0.3)'); mg.addColorStop(1, 'rgba(158,98,86,0.36)');
+    ctx.fillStyle = mg; ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
     if (closed > 0.5) {
       const hl = ctx.createRadialGradient(e.x, e.y - ry * 0.1, 0, e.x, e.y - ry * 0.1, rx * 0.6);
