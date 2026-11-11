@@ -460,21 +460,54 @@ export class Ear {
       ctx.stroke();
     }
 
-    // eardrum
-    const e = ctx.createRadialGradient(cx - Rd * 0.3, cy - Rd * 0.3, 1, cx, cy, Rd);
-    e.addColorStop(0, '#f1d5cf');
-    e.addColorStop(0.6, '#c99a93');
-    e.addColorStop(1, '#7d4a45');
+    // the canal wall: soft folds running inward, a moist sheen on the lit side, fine vessels
+    for (let i = 0; i < 9; i++) {
+      const a = i * 0.7 + 0.2, r0 = R * 0.98, r1 = R * (0.42 + (i % 3) * 0.08);
+      ctx.strokeStyle = i % 2 ? 'rgba(40,8,8,0.16)' : 'rgba(255,190,170,0.1)';
+      ctx.lineWidth = 5 + (i % 3) * 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      ctx.quadraticCurveTo(cx + Math.cos(a + 0.25) * (r0 + r1) / 2, cy + Math.sin(a + 0.25) * (r0 + r1) / 2, cx + Math.cos(a + 0.12) * r1, cy + Math.sin(a + 0.12) * r1);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,225,215,0.2)'; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.9, -2.6, -1.7); ctx.stroke();
+    ctx.strokeStyle = 'rgba(150,30,40,0.3)'; ctx.lineWidth = 0.8;
+    for (let i = 0; i < 5; i++) {
+      const a = 0.9 + i * 1.23, r0 = R * 0.95, r1 = R * 0.6;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      ctx.quadraticCurveTo(cx + Math.cos(a + 0.2) * R * 0.8, cy + Math.sin(a + 0.2) * R * 0.8, cx + Math.cos(a - 0.1) * r1, cy + Math.sin(a - 0.1) * r1);
+      ctx.stroke();
+    }
+
+    // eardrum: a pearly, slightly see-through membrane with its rim, the little bone behind it and the cone of light
+    ctx.fillStyle = 'rgba(20,4,4,0.5)';
+    ctx.beginPath(); ctx.arc(cx, cy, Rd * 1.12, 0, Math.PI * 2); ctx.fill();
+    const e = ctx.createRadialGradient(cx - Rd * 0.25, cy - Rd * 0.3, 1, cx, cy, Rd);
+    e.addColorStop(0, '#f4e3dc');
+    e.addColorStop(0.5, '#d9b3aa');
+    e.addColorStop(0.85, '#a8736b');
+    e.addColorStop(1, '#6e3d39');
     ctx.fillStyle = e;
     ctx.beginPath();
     ctx.arc(cx, cy, Rd, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Rd * 0.5, cy + Rd * 0.6);
-    ctx.stroke();
+    ctx.strokeStyle = 'rgba(235,205,195,0.55)'; ctx.lineWidth = Math.max(1.2, Rd * 0.07);     // the pale ring it is stretched on
+    ctx.beginPath(); ctx.arc(cx, cy, Rd * 0.95, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(170,60,60,0.45)'; ctx.lineWidth = 0.7;                             // vessels creeping in from the rim
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.05 + 0.4;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * Rd * 0.95, cy + Math.sin(a) * Rd * 0.95);
+      ctx.quadraticCurveTo(cx + Math.cos(a + 0.3) * Rd * 0.7, cy + Math.sin(a + 0.3) * Rd * 0.7, cx + Math.cos(a + 0.1) * Rd * 0.5, cy + Math.sin(a + 0.1) * Rd * 0.5);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(250,240,225,0.75)'; ctx.lineWidth = Math.max(2, Rd * 0.13); ctx.lineCap = 'round';   // handle of the hammer bone
+    ctx.beginPath(); ctx.moveTo(cx - Rd * 0.2, cy - Rd * 0.62); ctx.lineTo(cx + Rd * 0.04, cy + Rd * 0.06); ctx.stroke();
+    ctx.fillStyle = 'rgba(250,240,225,0.8)';
+    ctx.beginPath(); ctx.arc(cx - Rd * 0.2, cy - Rd * 0.62, Math.max(1.6, Rd * 0.11), 0, Math.PI * 2); ctx.fill();
+    const cone = ctx.createLinearGradient(cx, cy, cx + Rd * 0.6, cy + Rd * 0.75);
+    cone.addColorStop(0, 'rgba(255,255,255,0.75)'); cone.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = cone;                                                                       // cone of light
+    ctx.beginPath(); ctx.moveTo(cx + Rd * 0.05, cy + Rd * 0.08); ctx.lineTo(cx + Rd * 0.3, cy + Rd * 0.85); ctx.lineTo(cx + Rd * 0.72, cy + Rd * 0.55); ctx.closePath(); ctx.fill();
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(230,30,50,${this.flash * 1.4})`;
       ctx.beginPath();
