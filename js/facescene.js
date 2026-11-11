@@ -56,6 +56,19 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
       x.stroke();
     }
   };
+  // a lock: a tapered ribbon of hair, dark at the root, lit along its length, dark again at the tip
+  const lock = (x0, y0, x1, y1, bend, wd) => {
+    const mx = (x0 + x1) / 2 + bend, my = (y0 + y1) / 2;
+    const g = x.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, hairLo); g.addColorStop(0.3, hair); g.addColorStop(0.55, hairHi); g.addColorStop(0.8, hair); g.addColorStop(1, hairLo);
+    x.fillStyle = g;
+    x.beginPath(); x.moveTo(x0 - wd, y0);
+    x.quadraticCurveTo(mx - wd * 0.8, my, x1, y1);
+    x.quadraticCurveTo(mx + wd * 0.8, my, x0 + wd, y0);
+    x.closePath(); x.fill();
+    x.strokeStyle = 'rgba(0,0,0,0.2)'; x.lineWidth = 1.1;
+    x.beginPath(); x.moveTo(x0 + wd, y0); x.quadraticCurveTo(mx + wd * 0.8, my, x1, y1); x.stroke();
+  };
   // hair isn't one flat colour: darker at the roots and underneath, lit across the crown
   const hairFill = x.createLinearGradient(0, Y(-1.15), 0, Y(1.4));
   hairFill.addColorStop(0, hairLo); hairFill.addColorStop(0.16, hair); hairFill.addColorStop(0.45, hair); hairFill.addColorStop(1, tint(hair, 0.55));
@@ -85,6 +98,10 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
       const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1;
       return [X(u * 0.7), Y(-0.9), X(u), Y(0.6 + R() * 1.2), d * (style === 'curly' ? 30 * Math.sin(R() * 9) : 18), hairCol()];
     }, 0.9);
+    for (let i = 0; i < 40; i++) {         // long locks falling past the shoulders
+      const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1;
+      lock(X(u * 0.78), Y(-0.5), X(u) + d * R() * 8, Y(0.9 + R() * 0.9), d * (style === 'curly' ? 26 * Math.sin(R() * 9) : 16), hw * (0.05 + R() * 0.04));
+    }
     strands(140, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1; return [X(u * 0.8), Y(-0.4), X(u), Y(0.9 + R() * 0.9), d * 16, 'rgba(0,0,0,0.2)']; }, 3);
     strands(900, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1; return [X(u * 0.75), Y(-0.6), X(u), Y(0.7 + R() * 1.2), d * (style === 'curly' ? 30 * Math.sin(R() * 9) : 18), hairCol()]; }, 0.6);
     strands(360, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1, v = 0.25 + R() * 0.2; return [X(u * 0.97), Y(v), X(u), Y(v + 0.22), d * 3, 'rgba(255,255,255,0.1)']; }, 0.9);
@@ -274,8 +291,13 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
       const part = -0.3;
       const eC = (u) => edge(Math.max(-1, Math.min(1, u)));
       const fringe = (u, v0, v1, bendK, col) => [X(part + (u - part) * (0.35 + 0.65 * v0)), Y(-1.04 + (eC(u) + 1.04) * v0), X(part + (u - part) * (0.35 + 0.65 * v1)), Y(-1.04 + (eC(u) + 1.04) * v1), (u - part) * hw * 0.22 * bendK, col];
+      for (let i = 0; i < 56; i++) {       // the fringe is built from overlapping locks, then strands on top
+        const j = (i * 17) % 56, u = -1.05 + 2.1 * (j + R()) / 56;
+        const q = fringe(u, 0, 1 + R() * 0.05, 1, '');
+        lock(q[0], q[1], q[2], q[3], q[4], hw * (0.05 + R() * 0.04));
+      }
       strands(260, () => fringe(R() * 2.1 - 1.05, 0, 1 - R() * 0.1, 1, 'rgba(0,0,0,0.16)'), 2.6);          // depth between locks
-      strands(2600, () => fringe(R() * 2.1 - 1.05, 0, 1 - R() * 0.12, 1, hairCol()), 0.7);
+      strands(1500, () => fringe(R() * 2.1 - 1.05, 0, 1 - R() * 0.12, 1, rgba(hair, 0.55)), 0.6);
       strands(900, () => { const v = 0.22 + R() * 0.14; return fringe(R() * 2.1 - 1.05, v, v + 0.1 + R() * 0.08, 0.25, 'rgba(255,245,225,0.085)'); }, 0.9);   // shine band
       strands(500, () => { const v = 0.6 + R() * 0.1; return fringe(R() * 2.1 - 1.05, v, v + 0.07, 0.15, 'rgba(255,255,255,0.07)'); }, 0.8);
       // the ends: uneven, wispy, a few falling past the line

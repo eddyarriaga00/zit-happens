@@ -40,6 +40,18 @@ export class ToolFX {
         g.addColorStop(1, 'rgba(150,50,40,0)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(p.x, p.y, 50, 0, Math.PI * 2); ctx.fill();
+        // your gloved fingertip, pressing in toward the pimple
+        const fa = Math.atan2(q.y - p.y, q.x - p.x);
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(fa);
+        ctx.fillStyle = 'rgba(30,15,15,0.16)'; ctx.beginPath(); ctx.roundRect(-76, -17, 100, 44, 22); ctx.fill();
+        const gl = ctx.createLinearGradient(0, -22, 0, 22);
+        gl.addColorStop(0, 'rgba(176,216,240,0.72)'); gl.addColorStop(0.5, 'rgba(120,176,220,0.7)'); gl.addColorStop(1, 'rgba(84,138,190,0.72)');
+        ctx.fillStyle = gl; ctx.beginPath(); ctx.roundRect(-80, -21, 104, 42, 21); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-66, -12); ctx.lineTo(6, -12); ctx.stroke();
+        ctx.strokeStyle = 'rgba(60,110,160,0.35)'; ctx.lineWidth = 1;
+        for (const k of [-34, -30]) { ctx.beginPath(); ctx.moveTo(k, -16); ctx.quadraticCurveTo(k + 3, 0, k, 16); ctx.stroke(); }   // creases at the knuckle
+        ctx.restore();
         // skin bunching up toward the pimple
         const a = Math.atan2(q.y - p.y, q.x - p.x);
         const d = Math.hypot(q.x - p.x, q.y - p.y);

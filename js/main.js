@@ -851,6 +851,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (G.mode === 'demo' || G.paused || G.ended) return;
   try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   const x = e.clientX, y = e.clientY;
+  (G.taps ||= []).push({ x, y, t: 0 });      // every touch answers back with a soft ring
   if (G.salon) {
     pointers.set(e.pointerId, { kind: 'salon', x, y });
     G.salon.down(e.pointerId, x, y);
@@ -885,6 +886,13 @@ canvas.addEventListener('pointerdown', (e) => {
 function hint(p, msg) { G.fx.text(p.x, p.y - p.r * 2.4, msg, '#ffe7a8', 15); }
 const idle = (id, x, y) => pointers.set(id, { kind: 'none', x, y });
 
+// the right tool jumps into your hand when you touch something that needs it
+const TOOL_TIPS = { finger: 'Fingers: two fingers either side, then squeeze', extractor: 'Loop: press it over a blackhead', needle: 'Needle: tap a cyst or milia to lance it', tweezers: 'Tweezers: grab a hair and pull', pad: 'Wipe: swipe to clean up', spray: 'Spray: tap to disinfect', patch: 'Patch: tap a popped spot to cover it' };
+function autoTool(name, id, x, y) {
+  if (!toolUnlocked(name) || G.tool === name) return idle(id, x, y);
+  document.querySelector(`#tools [data-tool="${name}"]`).click();
+  return toolDown(id, x, y);
+}
 function toolDown(id, x, y) {
   const p = pimpleAt(x, y);
   const tool = G.tool;
@@ -907,16 +915,15 @@ function toolDown(id, x, y) {
       pointers.set(id, { kind: 'tweeze', p, x, y });
       return;
     }
-    if (p) hint(p, 'tweezers are for hairs');
+    if (p) return autoTool('finger', id, x, y);
     return idle(id, x, y);
   }
-  if (p && p.T.hair) { hint(p, 'ingrown hair — use tweezers'); return idle(id, x, y); }
+  if (p && p.T.hair) return autoTool('tweezers', id, x, y);
   if (tool === 'extractor') {
     if (!p) { pointers.set(id, { kind: 'wipe', x, y }); wipeAt(x, y, 0); return; }
     if (p.type !== 'black') {
-      hint(p, 'the Loop is for blackheads — pinch this one');
       p.guide = 1.8;
-      return idle(id, x, y);
+      return autoTool('finger', id, x, y);
     }
     p.boost = (p.type === 'black' ? 5 : 2) * (1 + 0.25 * up('loop'));
     p.clean = true;
@@ -1218,6 +1225,7 @@ function update(dt) {
   G.sup.sync();
   G.sup.update(dt);
   toolfx.update(dt);
+  if (G.taps) { for (const tp of G.taps) tp.t += dt; G.taps = G.taps.filter((tp) => tp.t < 0.35); }
   if (G.treat) { G.treat.update(dt); G.treat.updatePuffs(dt); }
   G.fx.update(dt);
   G.shake *= Math.pow(0.001, dt);
@@ -1248,6 +1256,11 @@ function render() {
   if (G.treat) G.treat.draw(ctx);
   G.sup.draw(ctx);
   toolfx.draw(ctx, pointers, G.tool);
+  if (G.taps) for (const tp of G.taps) {
+    const k = tp.t / 0.35;
+    ctx.strokeStyle = `rgba(255,255,255,${0.55 * (1 - k)})`; ctx.lineWidth = 2.5 * (1 - k) + 0.5;
+    ctx.beginPath(); ctx.arc(tp.x, tp.y, 14 + 26 * k, 0, Math.PI * 2); ctx.stroke();
+  }
   G.fx.drawAir(ctx);
   ctx.restore();
   drawSay(ctx);
@@ -1257,7 +1270,10 @@ function render() {
 // ---------------------------------------------------------------- HUD & screens
 let hudCache = {};
 function setText(id, v) {
-  if (hudCache[id] !== v) { hudCache[id] = v; $(id).textContent = v; }
+  if (hudCache[id] !== v) {
+    hudCache[id] = v; $(id).textContent = v;
+    if (id === 'hud-score') { const el = $(id); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  }
 }
 function timeLeft() {
   const t = timeGoal(G.def);
@@ -1528,6 +1544,7 @@ document.querySelectorAll('#tools .tool').forEach((b) => b.addEventListener('cli
   audio.click();
   buzz('light');
   G.tool = b.dataset.tool;
+  if (currentScreen === null && TOOL_TIPS[G.tool]) toast(TOOL_TIPS[G.tool], 1700);
   document.querySelectorAll('#tools .tool').forEach((o) => o.classList.toggle('active', o === b));
 }));
 
