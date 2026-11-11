@@ -4,6 +4,7 @@
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
 import { drawTweezers } from './tools.js';
+import { drawLids, drawMood } from './facescene.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -26,6 +27,8 @@ class Zoom {
     ctx.translate(-this.fx, -this.fy);
     ctx.imageSmoothingQuality = 'high';
     if (G.skin) ctx.drawImage(G.skin, 0, 0, G.W, G.H);
+    // she is alive in close-up too: blinking, wincing, smiling
+    if (G.geo) { drawLids(ctx, G.geo, G.lidK || 0); drawMood(ctx, G.geo, G.moodK || 0); }
   }
 }
 
@@ -162,6 +165,7 @@ export class Strip {
       if (fast && this.warnT <= 0) {
         this.warnT = 0.9; this.ouches++;
         this.G.fx.text(x, y - 40, 'ow! slower', '#ffb3c1', 18);
+        this.G.wince = 0.5; this.G.mood = { k: -1, t: 0, len: 1.6 };
         audio.ouch(); buzz('heavy');
       }
       if (this.peel >= 0.985) this.finish();
@@ -172,6 +176,7 @@ export class Strip {
     this.peel = 1; this.peelId = null; this.stage = 'show'; this.showT = 0;
     for (const q of this.plugs) if (q.state === 'in') q.state = 'out';
     audio.sparkle(); buzz('medium');
+    this.G.mood = { k: 1, t: 0, len: 3 };
     this.toast(`${this.out} plugs on the strip!`, 2600);
   }
 
@@ -432,6 +437,7 @@ export class Brows {
       this.coolT = 0.7; this.mistakes++;
       this.bald.push({ x: fx, y: fy });
       this.G.fx.text(x, y - 34, 'not the brow!', '#ffb3c1', 17);
+      this.G.wince = 0.5; this.G.mood = { k: -1, t: 0, len: 1.6 };
       audio.ouch(); buzz('heavy');
     }
   }
@@ -454,6 +460,7 @@ export class Brows {
       const a = Math.atan2(y - gr.sy, x - gr.sx);
       this.fly.push({ x: h.x, y: h.y, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60 - 30, rot: h.a, vr: rnd(-8, 8), len: h.len, t: 0 });
       audio.pluck(); buzz('medium');
+      this.G.wince = 0.14; this.G.mood = this.left ? { k: -0.4, t: 0, len: 0.6 } : { k: 1, t: 0, len: 2.5 };
       this.G.fx.text(x, y - 30, this.left ? 'plink!' : 'all out!', '#fff', 15);
       if (!this.left) {
         this.stage = 'fill';

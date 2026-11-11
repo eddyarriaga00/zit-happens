@@ -1255,8 +1255,10 @@ function render() {
   const { dpr, W, H } = G;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (G.skin) ctx.drawImage(G.skin, 0, 0, W, H);
-  if (G.geo) drawLids(ctx, G.geo, Math.max(G.shut || 0, G.wince > 0 ? Math.min(1, G.wince * 6) : G.blinkA > 0 ? Math.sin(Math.PI * (1 - G.blinkA / 0.16)) : 0));
-  if (G.geo && G.mood && !(G.treat && G.treat.active)) drawMood(ctx, G.geo, G.mood.k * Math.sin(Math.PI * Math.min(1, G.mood.t / G.mood.len)) ** 0.6);
+  // how shut her eyes are and what her face is doing this frame (the zoomed modes draw these too)
+  G.lidK = Math.max(G.shut || 0, G.wince > 0 ? Math.min(1, G.wince * 6) : G.blinkA > 0 ? Math.sin(Math.PI * (1 - G.blinkA / 0.16)) : 0);
+  G.moodK = G.mood && !(G.treat && G.treat.active) ? G.mood.k * Math.sin(Math.PI * Math.min(1, G.mood.t / G.mood.len)) ** 0.6 : 0;
+  if (G.geo) { drawLids(ctx, G.geo, G.lidK); drawMood(ctx, G.geo, G.moodK); }
   else if (!G.skin) { ctx.fillStyle = '#eec1a2'; ctx.fillRect(0, 0, W, H); }   // back and shoulder scenes have no face geometry but do have painted skin
 
   ctx.save();
