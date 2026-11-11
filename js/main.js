@@ -918,7 +918,11 @@ function toolDown(id, x, y) {
     if (p) return autoTool('finger', id, x, y);
     return idle(id, x, y);
   }
-  if (p && p.T.hair) return autoTool('tweezers', id, x, y);
+  if (p && p.T.hair) {
+    // only a lone first finger swaps tools: a second finger landing on a hair mid-pinch must not
+    if (pointers.size === 0) return autoTool('tweezers', id, x, y);
+    hint(p, 'ingrown hair — use tweezers'); return idle(id, x, y);
+  }
   if (tool === 'extractor') {
     if (!p) { pointers.set(id, { kind: 'wipe', x, y }); wipeAt(x, y, 0); return; }
     if (p.type !== 'black') {
