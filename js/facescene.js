@@ -464,8 +464,16 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
   x.shadowColor = 'transparent'; x.shadowBlur = 0;
   soft(cx - mw * 0.1, my + hh * 0.05, mw * 0.5, hh * 0.025, 'rgba(255,255,255,0.32)');
   for (const d of [-1, 1]) soft(cx + d * mw * 1.04, my + hh * 0.006, hw * 0.035, hh * 0.022, 'rgba(60,20,20,0.35)');   // corners of the mouth
-  x.strokeStyle = 'rgba(70,22,26,0.6)'; x.lineWidth = 1.3;
-  x.beginPath(); x.moveTo(cx - mw * 1.03, my + hh * 0.008); x.quadraticCurveTo(cx, my + hh * 0.014, cx + mw * 1.03, my + hh * 0.008); x.stroke();
+  // where the lips meet: a soft wavy line, darkest in the middle, fading into the corners
+  const seam = (k) => {
+    x.beginPath(); x.moveTo(cx - mw * 1.02 * k, my + hh * 0.004);
+    x.quadraticCurveTo(cx - mw * 0.5 * k, my - hh * 0.003, cx - mw * 0.13, my + hh * 0.011);
+    x.quadraticCurveTo(cx, my + hh * 0.019, cx + mw * 0.13, my + hh * 0.011);
+    x.quadraticCurveTo(cx + mw * 0.5 * k, my - hh * 0.003, cx + mw * 1.02 * k, my + hh * 0.004);
+    x.stroke();
+  };
+  x.strokeStyle = 'rgba(70,22,26,0.3)'; x.lineWidth = 1; seam(1);
+  x.strokeStyle = 'rgba(60,18,22,0.5)'; x.lineWidth = 1.5; seam(0.62);
   // lip texture: faint short creases fanning from the centre, kept inside the lips
   x.save(); x.clip(lower);
   x.lineWidth = 0.6;
