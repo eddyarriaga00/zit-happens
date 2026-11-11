@@ -714,11 +714,26 @@ export class Ear {
       this.blob(ctx, c, r);
       ctx.fill();
       // lumps + gloss
-      ctx.fillStyle = 'rgba(70,35,5,0.22)';
-      ctx.beginPath();
-      ctx.arc(r * 0.25, r * 0.2, r * 0.28, 0, Math.PI * 2);
-      ctx.arc(-r * 0.3, r * 0.35, r * 0.16, 0, Math.PI * 2);
-      ctx.fill();
+      // wax is lumpy and slightly see-through: soft dimples, dark flecks, light glowing through the rim
+      ctx.save();
+      this.blob(ctx, c, r); ctx.clip();
+      const sd = c.r * 12.9898, rn = (i) => { const v = Math.sin(sd + i * 78.233) * 43758.5453; return v - Math.floor(v); };
+      for (let i = 0; i < 5; i++) {
+        const dx = (rn(i) - 0.5) * r * 1.3, dy = (rn(i + 9) - 0.5) * r * 1.3, dr = r * (0.16 + rn(i + 20) * 0.2);
+        const dg = ctx.createRadialGradient(dx, dy, 0, dx, dy, dr);
+        dg.addColorStop(0, 'rgba(70,35,5,0.3)'); dg.addColorStop(1, 'rgba(70,35,5,0)');
+        ctx.fillStyle = dg; ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,225,150,0.16)';
+        ctx.beginPath(); ctx.arc(dx - dr * 0.5, dy - dr * 0.55, dr * 0.5, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(45,22,6,0.5)';
+      for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc((rn(i + 30) - 0.5) * r * 1.5, (rn(i + 40) - 0.5) * r * 1.5, 0.4 + rn(i + 50) * 0.6, 0, Math.PI * 2); ctx.fill(); }
+      ctx.strokeStyle = 'rgba(255,205,105,0.3)'; ctx.lineWidth = r * 0.22;
+      this.blob(ctx, c, r); ctx.stroke();
+      const lo = ctx.createLinearGradient(0, -r, 0, r);
+      lo.addColorStop(0.45, 'rgba(60,25,5,0)'); lo.addColorStop(1, 'rgba(60,25,5,0.3)');
+      ctx.fillStyle = lo; ctx.fillRect(-r * 1.3, -r * 1.3, r * 2.6, r * 2.6);
+      ctx.restore();
       if (c.kind === 'hard' && !c.soft) {
         // dry and cracked, no shine; it fizzes while the drops work
         ctx.strokeStyle = 'rgba(20,10,4,0.55)'; ctx.lineWidth = 1.2;
@@ -733,6 +748,7 @@ export class Ear {
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.beginPath();
         ctx.ellipse(-r * 0.3, -r * 0.38, r * 0.3, r * 0.14, -0.5, 0, Math.PI * 2);
+        ctx.ellipse(r * 0.28, -r * 0.5, r * 0.08, r * 0.05, 0.3, 0, Math.PI * 2);
         ctx.fill();
       }
       // deeper = darker
