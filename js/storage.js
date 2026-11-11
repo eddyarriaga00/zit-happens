@@ -35,6 +35,7 @@ const DEFAULTS = {
   visits: 0,        // VIP clients seen all the way through
   fiveStars: 0,
   reviews: [],      // newest first: { n, s, t }
+  regulars: {},     // VIP clients who have been before: name -> { v: visits, s: her last rating }
   dailyDone: '',    // day today's VIP was finished
   lastDay: '',      // YYYY-MM-DD of the last day played
   streak: 0,

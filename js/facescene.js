@@ -448,10 +448,11 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     mul(() => { for (let u = -0.9; u <= 0.9; u += 0.12) soft(X(u), Y(edge(u) + 0.05), hw * 0.16, hh * 0.07, sh(0.3)); });   // the hair shades the top of the forehead
     x.fillStyle = style === 'buzz' ? rgba(hair, 0.82) : hairFill;
     x.beginPath(); x.moveTo(X(-1.2), Y(-1.2)); x.lineTo(X(1.2), Y(-1.2));
-    x.lineTo(X(1.2), Y(-0.12));
-    x.quadraticCurveTo(X(0.9), Y(edge(0.9) + 0.12), X(0.8), Y(edge(0.8)));
+    const side = tiedBack ? -0.3 : -0.12, dip = tiedBack ? 0.03 : 0.12;      // tied back, the temples are pulled clear instead of hanging as a flap
+    x.lineTo(X(1.2), Y(side));
+    x.quadraticCurveTo(X(0.9), Y(edge(0.9) + dip), X(0.8), Y(edge(0.8)));
     for (let i = 16; i >= -16; i--) x.lineTo(X(i / 20), Y(edge(i / 20)));
-    x.quadraticCurveTo(X(-0.9), Y(edge(-0.9) + 0.12), X(-1.2), Y(-0.12));
+    x.quadraticCurveTo(X(-0.9), Y(edge(-0.9) + dip), X(-1.2), Y(side));
     x.closePath(); x.fill();
     if (style === 'buzz') {
       strands(1500, () => { const u = R() * 2 - 1, v = -1 + R() * (edge(u) + 1.02); return [X(u), Y(v), X(u) + 1, Y(v) + 3, 0, rgba(hair, 0.5)]; }, 1);
@@ -482,7 +483,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       for (let i = 0; i < 520; i++) { const q = 0.3 + R() * 0.16; run(pick(), 0.15 + R() * 0.8, q, q + 0.1 + R() * 0.08, shine(0.2), 0.85); }   // shine follows the curve of the skull
       for (let i = 0; i < 260; i++) { const q = 0.66 + R() * 0.1; run(pick(), 0.2 + R() * 0.7, q, q + 0.07, shine(0.1), 0.8); }
       // roots sit in the shade of the hair above them, so the hairline reads as roots, not as cut ends
-      mul(() => { for (let u = -1; u <= 1; u += 0.1) soft(X(u), Y(eC(u) - 0.05), hw * 0.16, hh * 0.085, sh(back ? 0.38 : 0.42)); });
+      mul(() => { for (let u = -1; u <= 1; u += 0.1) if (!back || Math.abs(u) < 0.82) soft(X(u), Y(eC(u) - 0.05), hw * 0.16, hh * 0.085, sh(back ? 0.38 : 0.42)); });
       if (!back) {
         // the parting: a thin line of scalp with the roots lifting away on either side
         x.strokeStyle = 'rgba(0,0,0,0.16)'; x.lineWidth = 2;

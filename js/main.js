@@ -715,14 +715,22 @@ const STAGE_NAMES = { pop: 'Pimples', strip: 'Pore strip', brows: 'Brows', ear: 
 const todayKey = () => new Date().toLocaleDateString('en-CA');
 const dailyDef = () => LEVELS[Math.floor(Date.now() / 864e5) % LEVELS.length];
 const vipTitle = (base) => (G.chain ? `${G.chain.def.name} · ${G.chain.i + 1}/${G.chain.stages.length} ${STAGE_NAMES[G.chain.stages[G.chain.i]]}` : base);
+const STAGE_ICONS = { pop: '🤏', strip: '👃', brows: '👁️', ear: '👂', makeup: '💄' };
+const regular = (name) => ((save.regulars ||= {})[name] || { v: 0, s: 0 });
+// where the visit stands: every treatment in order, the finished ones with their stars, the next one ringed
+const visitStrip = (c, next) => `<div class="visit-strip">${c.stages.map((k, i) => `<span class="vs ${i < c.stars.length ? 'done' : i === next ? 'next' : ''}"><b>${STAGE_ICONS[k]}</b><small>${STAGE_NAMES[k]}</small><i>${i < c.stars.length ? '★'.repeat(c.stars[i]) : ''}</i></span>`).join('')}</div>`;
 function startVisit(daily) {
-  const base = daily ? dailyDef() : LEVELS[Math.floor(Math.random() * LEVELS.length)];
+  // half the walk-ins are people who have been before
+  const known = Object.keys(save.regulars ||= {}).map((n) => LEVELS.find((l) => l.name === n)).filter(Boolean);
+  const base = daily ? dailyDef() : known.length && Math.random() < 0.5 ? known[Math.floor(Math.random() * known.length)] : LEVELS[Math.floor(Math.random() * LEVELS.length)];
   const def = { ...base, zone: FACE_ZONES.includes(base.zone) ? base.zone : 'cheek', later: 0 };
   const extra = ['strip', 'brows', 'ear'].sort(() => Math.random() - 0.5).slice(0, 2);
   G.chain = { def, seed: Math.floor(Math.random() * 1e9), stages: ['pop', ...extra, 'makeup'], i: 0, stars: [], daily };
   startVisitStage();
   audio.doorbell();
-  G.say = { text: `Hi ${myName()}! The full works please`, t: 4.5 };
+  const was = regular(def.name);
+  G.say = { text: !was.v ? `Hi ${myName()}! The full works please` : was.s >= 5 ? `${myName()}! I've told everyone about you` : was.s <= 2 ? 'Okay... one more chance. Be gentle!' : `Hi again ${myName()}! Same as last time?`, t: 4.5 };
+  if (was.v) toast(`${def.name} is back: visit ${was.v + 1} 💜`, 3200);
 }
 function startVisitStage() {
   const c = G.chain, kind = c.stages[c.i];
@@ -740,13 +748,17 @@ function startVisitStage() {
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
-  toast(`${c.def.name} is here for the full works: pimples first 🤏`, 3200);
+  if (!regular(c.def.name).v) toast(`${c.def.name} is here for the full works: pimples first 🤏`, 3200);
 }
 function visitNext() {
   const c = G.chain;
   if (c.review) return startVisit(false);
   c.i++;
-  if (c.i < c.stages.length) startVisitStage(); else showReview();
+  if (c.i >= c.stages.length) return showReview();
+  startVisitStage();
+  // she stays in the chair and says what she wants next, so it feels like one appointment
+  const ask = { strip: ['Now my nose, it\'s so clogged', 'Pore strip next please!'], brows: ['Could you tidy my brows?', 'Brows next, they\'re a mess'], ear: ['My ears feel blocked too...', 'Ears next, be careful!'], makeup: ['Now make me pretty!', 'Makeup time, my favourite'] }[c.stages[c.i]];
+  if (ask && !G.say) G.say = { text: ask[Math.floor(Math.random() * ask.length)], t: 4 };
 }
 const REVIEWS = {
   5: ['Best visit of my life. {me} has magic hands!', 'I walked out of {salon} glowing. Booking again tomorrow.', 'Gentle, fast and SO satisfying. Five stars, obviously.', 'My skin has never looked this good. Thank you {me}!'],
@@ -762,7 +774,9 @@ function showReview() {
   const five = Math.max(1, Math.min(5, Math.round((avg - 1) * 2) + 1));
   const pool = REVIEWS[five];
   const text = pool[Math.floor(Math.random() * pool.length)].replace('{me}', myName()).replace('{salon}', mySalon());
-  const tip = Math.round((40 + 45 * five) * (c.daily ? 2 : 1));
+  const was = regular(c.def.name), loyal = Math.min(0.5, was.v * 0.1);      // regulars tip better, up to half as much again
+  const tip = Math.round((40 + 45 * five) * (c.daily ? 2 : 1) * (1 + loyal));
+  save.regulars[c.def.name] = { v: was.v + 1, s: five };
   save.coins += tip;
   save.visits++;
   if (five === 5) save.fiveStars++;
@@ -772,8 +786,8 @@ function showReview() {
   store.save(save);
   $('res-title').textContent = five === 5 ? 'Five-star visit!' : five === 4 ? 'She loved it' : five === 3 ? 'Not bad at all' : 'Could be better';
   [...$('res-stars').children].forEach((el, i) => el.classList.toggle('on', i < Math.round(avg)));
-  $('res-grid').innerHTML = [stat(`<span class="five">${'★'.repeat(five)}<i>${'★'.repeat(5 - five)}</i></span>`, 'her rating'), stat(`+${tip} 🪙`, c.daily ? 'VIP tip ×2' : 'her tip')].join('');
-  $('res-goals').innerHTML = `<div class="before-after"><figure><img class="portrait small" alt="" src="${portraitURL(c.def, { mood: 'worried', zone: c.def.zone }, 120)}"><figcaption>before</figcaption></figure><span>→</span><figure><img class="portrait small" alt="" src="${portraitURL(c.def, { mood: 'happy', clear: true }, 120)}"><figcaption>after</figcaption></figure></div>
+  $('res-grid').innerHTML = [stat(`<span class="five">${'★'.repeat(five)}<i>${'★'.repeat(5 - five)}</i></span>`, 'her rating'), stat(`+${tip} 🪙`, (c.daily ? 'VIP tip ×2' : 'her tip') + (loyal ? ` · regular +${Math.round(loyal * 100)}%` : ''))].join('');
+  $('res-goals').innerHTML = `${visitStrip(c, -1)}<div class="visit-nth">${was.v ? `Visit ${was.v + 1} · she's a regular now` : 'Her first visit'}</div><div class="before-after"><figure><img class="portrait small" alt="" src="${portraitURL(c.def, { mood: 'worried', zone: c.def.zone }, 120)}"><figcaption>before</figcaption></figure><span>→</span><figure><img class="portrait small" alt="" src="${portraitURL(c.def, { mood: 'happy', clear: true }, 120)}"><figcaption>after</figcaption></figure></div>
   <div class="review">“${esc(text)}”<small>${esc(c.def.name)}</small></div>${awardsHtml(checkAwards())}`;
   $('btn-next').firstChild.textContent = 'Next VIP client';
   audio.fanfare();
@@ -1486,16 +1500,23 @@ function showScreen(name) {
   currentScreen = name;
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== name);
   refreshTools();
-  if (name === 'results' && G.chain && !G.chain.review) {
+  const midVisit = name === 'results' && G.chain && !G.chain.review;
+  if (name === 'results') { $('results').classList.toggle('visit', !!midVisit); $('btn-res-menu').textContent = midVisit ? 'End visit early' : 'Main menu'; }
+  if (midVisit) {
+    // between treatments: not a full results screen, just where the visit stands and what's next
     const c = G.chain, nxt = c.stages[c.i + 1];
-    if (c.stars.length === c.i) c.stars.push($('res-stars').querySelectorAll('.on').length);
-    $('btn-next').firstChild.textContent = nxt ? `Next: ${STAGE_NAMES[nxt]} →` : 'See her review 💌';
+    if (c.stars.length === c.i) c.stars.push(Math.max(1, $('res-stars').querySelectorAll('.on').length));
+    const st = c.stars[c.i];
+    $('res-title').textContent = st >= 3 ? '“Ooh, that felt amazing!”' : st === 2 ? '“Nice, much better.”' : '“Ow... okay, carry on.”';
+    $('res-goals').querySelectorAll('.visit-strip').forEach((e) => e.remove());
+    $('res-goals').insertAdjacentHTML('afterbegin', visitStrip(c, c.i + 1));
+    $('btn-next').firstChild.textContent = nxt ? `Next up: ${STAGE_NAMES[nxt]} →` : 'See her review 💌';
   }
   if (name === 'menu') {
     const vd = dailyDef(), vdone = save.dailyDone === todayKey();
     if ($('vip-face').dataset.who !== vd.name) { $('vip-face').dataset.who = vd.name; $('vip-face').src = portraitURL(vd, { mood: 'happy', clear: true }, 120); }
     $('vip-title').textContent = vdone ? 'VIP walk-in' : `Today's VIP: ${vd.name}`;
-    $('vip-sub').textContent = vdone ? `${vd.name}'s done ✓ · see another client` : 'Full visit · 4 treatments · double tip';
+    $('vip-sub').textContent = vdone ? `${vd.name}'s done ✓ · see another client` : regular(vd.name).v ? `Regular · visit ${regular(vd.name).v + 1} · double tip` : 'Full visit · 4 treatments · double tip';
     $('play-level').textContent = `Level ${save.level} · ${levelDef(save.level).name}`;
     $('menu-coins').textContent = `🪙 ${save.coins.toLocaleString()}`;
     $('hello').textContent = greeting();
