@@ -236,8 +236,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     soft(X(d * 0.5 - 0.06), Y(0.14), hw * 0.2, hh * 0.1, 'rgba(255,255,255,0.13)'); // cheekbones
     soft(X(d * 0.17), Y(0.2), hw * 0.08, hh * 0.22, rgba(tone.pore, 0.22));         // sides of the nose
     if (look.age >= 35) {                                                           // smile lines
-      x.strokeStyle = rgba(tone.pore, look.age >= 55 ? 0.16 : 0.08); x.lineWidth = s * 0.012;
-      x.beginPath(); x.moveTo(X(d * 0.24), Y(0.36)); x.quadraticCurveTo(X(d * 0.42), Y(0.5), X(d * 0.4), Y(0.68)); x.stroke();
+      x.strokeStyle = rgba(tone.pore, look.age >= 55 ? 0.09 : 0.04); x.lineWidth = s * 0.014;      // a soft fold, not a drawn line
+      x.beginPath(); x.moveTo(X(d * 0.23), Y(0.35)); x.quadraticCurveTo(X(d * 0.37), Y(0.44), X(d * 0.39), Y(0.56)); x.stroke();
     }
   }
   for (const d of [-1, 1]) {
@@ -511,7 +511,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom) {
     soft(X(d * 0.62), Y(0.09), hw * 0.2, hh * 0.06, 'rgba(255,255,255,0.06)');            // cheekbone catches the light
     soft(X(d * 0.8), Y(0.42), hw * 0.16, hh * 0.22, rgba(tone.shade, 0.16));              // hollow of the cheek
     soft(X(d * 0.86), Y(-0.3), hw * 0.14, hh * 0.2, rgba(tone.shade, 0.14));              // temples
-    const lines = (look.age || 25) >= 40 ? 1 : 0.35;                                       // deeper with age
+    const lines = (look.age || 25) >= 55 ? 0.9 : (look.age || 25) >= 40 ? 0.55 : 0.3;                                       // deeper with age
     x.strokeStyle = rgba(tone.pore, 0.1 * lines); x.lineWidth = 3.2;                               // smile lines
     x.beginPath(); x.moveTo(X(d * 0.21), Y(noseY - 0.01)); x.quadraticCurveTo(X(d * 0.34), Y(noseY + 0.07), X(d * 0.38), Y(mouthY - 0.07)); x.stroke();
     x.strokeStyle = rgba(tone.pore, 0.07 * lines); x.lineWidth = 1.4; x.stroke();
