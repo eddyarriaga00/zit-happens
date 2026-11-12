@@ -324,11 +324,11 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   //   hol the hollow under the cheekbone
   const SHAPES = {
     oval:    { T: 1.0,   C: 0.965, full: 0,     jaw: 0.66, jv: 0.70, a: 0.20, b: 0.17, bv: 0.21, cw: 0.30, chinV: 1.035, hol: 0.2 },
-    round:   { T: 1.0,   C: 0.985, full: 0.02,  jaw: 0.72, jv: 0.68, a: 0.17, b: 0.15, bv: 0.25, cw: 0.38, chinV: 1.005,   hol: 0.07 },
-    square:  { T: 1.0,   C: 0.965, full: 0.01,  jaw: 0.76, jv: 0.74, a: 0.09, b: 0.20, bv: 0.19, cw: 0.42, chinV: 1.025, hol: 0.16 },
+    round:   { T: 1.0,   C: 0.985, full: 0.02,  jaw: 0.70, jv: 0.66, a: 0.18, b: 0.15, bv: 0.22, cw: 0.30, chinV: 1.0,   hol: 0.07 },
+    square:  { T: 1.0,   C: 0.965, full: 0.01,  jaw: 0.74, jv: 0.66, a: 0.11, b: 0.14, bv: 0.20, cw: 0.27, chinV: 1.03, hol: 0.16 },
     heart:   { T: 1.0,   C: 0.965, full: -0.02, jaw: 0.59, jv: 0.68, a: 0.24, b: 0.17, bv: 0.23, cw: 0.21, chinV: 1.05,  hol: 0.27 },
     diamond: { T: 0.93,  C: 0.98,  full: -0.03, jaw: 0.60, jv: 0.70, a: 0.23, b: 0.17, bv: 0.21, cw: 0.24, chinV: 1.04,  hol: 0.3 },
-    oblong:  { T: 0.985, C: 0.95,  full: 0.01,  jaw: 0.70, jv: 0.76, a: 0.15, b: 0.17, bv: 0.22, cw: 0.30, chinV: 1.085, hol: 0.22 },
+    oblong:  { T: 0.985, C: 0.95,  full: 0.01,  jaw: 0.68, jv: 0.72, a: 0.15, b: 0.17, bv: 0.22, cw: 0.28, chinV: 1.085, hol: 0.22 },
   };
   const shape = SHAPES[look.shape] ? look.shape : look.fixed ? 'oval'
     : ['oval', 'oval', 'oval', 'round', 'round', 'heart', 'heart', 'square', 'diamond', 'oblong'][((seed >>> 13) ^ (seed >>> 22)) % 10];
@@ -364,8 +364,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   }
 
   // ---- the head, in her own shape
-  const jaw = SH.jaw + (look.fem ? 0 : 0.08) + vr(1) * 0.07;
-  const chinW = Math.max(0.14, SH.cw + vr(9) * 0.05), chinV = SH.chinV;
+  const jaw = SH.jaw + (look.fem ? 0 : 0.08) + vr(1) * 0.05;
+  const chinW = Math.max(0.14, SH.cw + vr(9) * 0.03), chinV = SH.chinV;
   // the outline is not one smooth egg. Coming down from the skull it dips in at the temple, swells over
   // the cheekbone, falls in a little beneath it, then turns at the jaw
   const segs = [
