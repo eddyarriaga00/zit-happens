@@ -231,11 +231,11 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     soft(X(-0.12), Y(-1.36), hw * 0.2, hh * 0.07, 'rgba(255,255,255,0.14)');
   }
   if (hasHair && style !== 'balding') {     // volume around the skull
-    const k = style === 'buzz' ? 1.02 : 1.09;
+    const k = style === 'buzz' ? 1.02 : tiedBack ? 1.04 : 1.09;      // pulled back, it lies close to the skull
     x.fillStyle = hairFill;
     x.beginPath(); x.ellipse(cx, Y(-0.3), hw * k, hh * (style === 'buzz' ? 0.76 : 0.87), 0, Math.PI, Math.PI * 2); x.fill();
     soft(X(-0.15), Y(-1.04), hw * 0.8, hh * 0.09, shine(0.26));     // light on the crown
-    x.beginPath(); x.ellipse(cx, Y(-0.31), hw * k, hh * 0.4, 0, 0, Math.PI); x.fill();     // it tucks in behind the ears
+    x.beginPath(); x.ellipse(cx, Y(-0.31), hw * k, hh * (tiedBack ? 0.22 : 0.4), 0, 0, Math.PI); x.fill();     // it tucks in behind the ears
     if (style !== 'buzz') {
       // strands combed over the crown from the parting, so the top isn't a flat helmet
       strands(1100, () => {
@@ -365,7 +365,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
 
   // ---- the head, in her own shape
   const jaw = SH.jaw + (look.fem ? 0 : 0.08) + vr(1) * 0.05;
-  const chinW = Math.max(0.14, SH.cw + vr(9) * 0.03), chinV = SH.chinV;
+  const chinW = Math.max(0.14, SH.cw + vr(9) * 0.03), chinV = SH.chinV - 0.025;      // a third of the way from nose to chin is the mouth
   // the outline is not one smooth egg. Coming down from the skull it dips in at the temple, swells over
   // the cheekbone, falls in a little beneath it, then turns at the jaw
   const segs = [
@@ -408,8 +408,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const sh = (a) => `rgba(158,98,86,${a})`;
   const mul = (fn) => { x.save(); x.globalCompositeOperation = 'multiply'; fn(); x.restore(); };
   const ey = -0.06, ex = 0.42;                      // eye line / spacing (head units)
-  const erx = hw * (0.225 + vr(2) * 0.022), ery = hh * (0.073 + vr(3) * 0.014);
-  const mouthY = 0.6, noseY = 0.36;
+  const erx = hw * (0.24 + vr(2) * 0.022), ery = hh * (0.078 + vr(3) * 0.014);
+  const mouthY = 0.62, noseY = 0.36;
   const old = (look.age || 25) >= 55 ? 1 : (look.age || 25) >= 40 ? 0.55 : (look.age || 25) >= 32 ? 0.25 : 0.08;
 
   x.save();
@@ -536,12 +536,18 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     mul(() => { for (let u = -0.9; u <= 0.9; u += 0.12) soft(X(u), Y(edge(u) + 0.05), hw * 0.16, hh * 0.07, sh(0.3)); });   // the hair shades the top of the forehead
     x.fillStyle = style === 'buzz' ? rgba(hair, 0.82) : hairFill;
     x.beginPath(); x.moveTo(X(-1.2), Y(-1.2)); x.lineTo(X(1.2), Y(-1.2));
-    const side = tiedBack ? -0.3 : -0.12, dip = tiedBack ? 0.03 : 0.12;      // tied back, the temples are pulled clear instead of hanging as a flap
+    const side = tiedBack ? -0.2 : -0.12, dip = 0.12;
     x.lineTo(X(1.2), Y(side));
-    x.quadraticCurveTo(X(0.9), Y(edge(0.9) + dip), X(0.8), Y(edge(0.8)));
+    // tied back, the hair hugs the skull: the hairline runs down the temple to in front of the ear,
+    // and nothing stands out from the head as a flap
+    if (tiedBack) x.quadraticCurveTo(X(0.85), Y(-0.27), X(0.8), Y(edge(0.8))); else x.quadraticCurveTo(X(0.9), Y(edge(0.9) + dip), X(0.8), Y(edge(0.8)));
     for (let i = 16; i >= -16; i--) x.lineTo(X(i / 20), Y(edge(i / 20)));
-    x.quadraticCurveTo(X(-0.9), Y(edge(-0.9) + dip), X(-1.2), Y(side));
-    x.closePath(); x.fill();
+    if (tiedBack) x.quadraticCurveTo(X(-0.85), Y(-0.27), X(-1.2), Y(side)); else x.quadraticCurveTo(X(-0.9), Y(edge(-0.9) + dip), X(-1.2), Y(side));
+    x.closePath();
+    x.save();
+    if (tiedBack) { const sk = new Path2D(); sk.ellipse(cx, Y(-0.3), hw * 1.06, hh * 0.8, 0, 0, Math.PI * 2); x.clip(sk); }
+    x.fill();
+    x.restore();
     if (style === 'buzz') {
       strands(1500, () => { const u = R() * 2 - 1, v = -1 + R() * (edge(u) + 1.02); return [X(u), Y(v), X(u) + 1, Y(v) + 3, 0, rgba(hair, 0.5)]; }, 1);
     } else {
@@ -626,7 +632,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   for (const d of [-1, 1]) {
     const bu = (k) => d * (ex - 0.27 + k * 0.57);
     const bv = (k) => ey - 0.2 - Math.sin(Math.min(1, k / 0.66) * Math.PI / 2) * (0.05 + vr(7) * 0.03) + Math.max(0, k - 0.66) * 0.16;
-    const bt = (k) => hh * (look.fem ? 0.027 : 0.036) * (1 + vr(6) * 0.5) * (k < 0.14 ? 0.7 + k * 2.1 : 1 - (k - 0.14) * 0.92);
+    const bt = (k) => hh * (look.fem ? 0.032 : 0.036) * (1 + vr(6) * 0.5) * (k < 0.14 ? 0.7 + k * 2.1 : 1 - (k - 0.14) * 0.92);
     x.save();
     x.shadowColor = browHair; x.shadowBlur = hh * 0.02;
     x.fillStyle = browHair.replace('rgb(', 'rgba(').replace(')', ',0.3)');
