@@ -172,7 +172,45 @@ function wigFor(style, hairHex) {
     }
     const a2 = new Uint8ClampedArray(n);
     for (let i = 0; i < n; i++) a2[i] = Math.max(0, Math.min(1, (src[i] / 255 - 0.3) / 0.4)) * 255;
-    wdef.base = { al: a2, li };
+    // her forehead as this hairstyle frames it: on each row above her brows, the run of skin between the
+    // hair on either side. Its light and shade are kept (as a grey picture), so the same forehead can be
+    // given to any girl in her own skin colour.
+    const yB = Math.round(WIG_H * 0.352), mid = Math.round(WIG_W * 0.5025), reach = Math.round(WIG_W * 0.3);
+    const fc = document.createElement('canvas'); fc.width = WIG_W; fc.height = WIG_H;
+    const fq = fc.getContext('2d'), fo = fq.createImageData(WIG_W, WIG_H), fd = fo.data;
+    const lum = (i) => (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 765;
+    const spans = [];
+    const lums = [];
+    for (let y = 0; y < yB; y++) {
+      if (a2[y * WIG_W + mid] > 128) { spans.push(null); continue; }
+      let xl = mid, xr2 = mid;
+      while (xl > mid - reach && a2[y * WIG_W + xl - 1] <= 128) xl--;
+      while (xr2 < mid + reach && a2[y * WIG_W + xr2 + 1] <= 128) xr2++;
+      // a row that runs out to the backdrop on either side is above her head, not her forehead
+      const open = (xx) => { const i = y * WIG_W + xx, r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2]; return b > g + 6 && r > 225; };
+      if ((xl === mid - reach && open(xl)) || (xr2 === mid + reach && open(xr2))) { spans.push(null); continue; }
+      spans.push([xl, xr2]);
+      for (let xx = xl; xx <= xr2; xx += 3) lums.push(lum(y * WIG_W + xx));
+    }
+    lums.sort((p, q2) => p - q2);
+    const ref = lums[Math.floor(lums.length * 0.55)] || 1;      // ordinary forehead skin counts as full brightness; only the shaded rim darkens
+    spans.forEach((sp, y) => {
+      if (!sp) return;
+      for (let xx = Math.max(0, sp[0] - 6); xx <= Math.min(WIG_W - 1, sp[1] + 6); xx++) {
+        // a few pixels under the hair on each side too, so no gap can open along the hairline
+        const i = y * WIG_W + xx, inside = xx >= sp[0] && xx <= sp[1];
+        const v = inside ? Math.max(0.78, Math.min(1, lum(i) / ref)) : 0.84;
+        // shade the way skin shades (a little warmer as it darkens, never grey); fade out at the bottom
+        // edge, and at a side where the row ran out to its limit instead of ending at hair
+        fd[i * 4] = v * 255; fd[i * 4 + 1] = v ** 1.18 * 255; fd[i * 4 + 2] = v ** 1.3 * 255;
+        let a = Math.min(1, (yB - y) / 12);
+        if (sp[0] === mid - reach) a *= Math.max(0, Math.min(1, (xx - sp[0]) / 22));
+        if (sp[1] === mid + reach) a *= Math.max(0, Math.min(1, (sp[1] - xx) / 22));
+        fd[i * 4 + 3] = 255 * a;
+      }
+    });
+    fq.putImageData(fo, 0, 0);
+    wdef.base = { al: a2, li, forehead: fc };
   }
   const { al, li } = wdef.base, n = WIG_W * WIG_H;
   const hv = parseInt(hairHex.slice(1), 16), hr = hv >> 16, hg = (hv >> 8) & 255, hb = hv & 255;
@@ -184,7 +222,7 @@ function wigFor(style, hairHex) {
     o[i * 4] = hr * body + spec; o[i * 4 + 1] = hg * body + spec; o[i * 4 + 2] = hb * body + spec; o[i * 4 + 3] = al[i];
   }
   q.putImageData(out, 0, 0);
-  const wig = { canvas: cv, alpha: al };
+  const wig = { canvas: cv, alpha: al, forehead: wdef.base.forehead };
   if (wdef.tints.size > 12) wdef.tints.clear();
   wdef.tints.set(hairHex, wig);
   return wig;
@@ -1172,6 +1210,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       // neck are laid in, feathered at the edges so they melt into the hair and skin drawn around them
       const D = (W) => { const cv = document.createElement('canvas'); cv.width = c.width; cv.height = c.height; const cx2 = cv.getContext('2d'); cx2.setTransform(dpr, 0, 0, dpr, 0, 0); return [cv, cx2]; };
       const wig = hasHair ? wigFor(style, hair) : null;      // her painted hairstyle, when there is one
+      let foreheadBlend = null;
       // her drawn hair is made to sit with the painting: the fine strands are softened into painted
       // masses, then given the gloss and depth a painter would add
       {
@@ -1209,7 +1248,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
         // under painted hair the face starts lower, and lower still toward her temples, where the
         // portrait has her own hair pulled back under the band
         sx.beginPath(); sx.moveTo(X(-1.3), Y(1.6));
-        for (let i = -26; i <= 26; i++) { const u = i / 20; sx.lineTo(X(u), Y(hairline + 0.13 + 0.5 * Math.max(0, Math.abs(u) - 0.4) ** 1.3)); }
+        for (let i = -26; i <= 26; i++) { const u = i / 20; sx.lineTo(X(u), Y(hairline + 0.13 + 0.62 * Math.max(0, Math.abs(u) - 0.4) ** 1.3)); }
         sx.lineTo(X(1.3), Y(1.6)); sx.closePath(); sx.fill();
       } else sx.fillRect(0, Y(hairline + 0.055), w, h);
       sx.restore();
@@ -1234,14 +1273,26 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
         // the headband in her portrait hid the top of her forehead; with painted hair it shows, so the
         // skin just under the band is carried upward to meet the new hairline
         const v0 = hairline + 0.2, sy = (Y(v0) - y0) / k;
-        // (through a few-pixel-wide copy, so it is a smooth wash of her skin and not streaks of every freckle)
+        // her own skin, taken from just under the band (through a few-pixel-wide copy, so it is a smooth
+        // wash and not streaks of every freckle), shaded like the forehead in the hair painting and cut
+        // to the exact opening that hairstyle leaves
         const tiny = document.createElement('canvas'); tiny.width = 7; tiny.height = 1;
         const sx0 = (X(-0.8) - x0) / k, sx1 = (X(0.8) - x0) / k;
         tiny.getContext('2d').drawImage(im, sx0, sy, sx1 - sx0, Math.max(2, ih * 0.012), 0, 0, 7, 1);
-        xr.save(); xr.setTransform(dpr, 0, 0, dpr, 0, 0); xr.clip(head);
-        xr.imageSmoothingEnabled = true; xr.imageSmoothingQuality = 'high';
-        xr.drawImage(tiny, 0.5, 0, 6, 1, X(-1.1), Y(-1.05), X(1.1) - X(-1.1), Y(hairline + 0.5) - Y(-1.05));
-        xr.restore();
+        const wk = (2 * ex * hw) / ((WIG.eR - WIG.eL) * WIG_W) * WIG.fit;
+        const wx = cx - (WIG.eL + WIG.eR) / 2 * WIG_W * wk, wy = Y(ey) - WIG.eyeY * WIG_H * wk;
+        const [fh, fx2] = D();
+        fx2.imageSmoothingEnabled = true; fx2.imageSmoothingQuality = 'high';
+        fx2.drawImage(tiny, 0.5, 0, 6, 1, X(-1.2), wy, X(1.2) - X(-1.2), WIG_H * wk);
+        fx2.globalCompositeOperation = 'multiply'; fx2.drawImage(wig.forehead, wx, wy, WIG_W * wk, WIG_H * wk);
+        fx2.globalCompositeOperation = 'destination-in'; fx2.drawImage(wig.forehead, wx, wy, WIG_W * wk, WIG_H * wk);
+        xr.save(); xr.setTransform(1, 0, 0, 1, 0, 0); xr.drawImage(fh, 0, 0); xr.restore();
+        // kept for after her face is laid in: the same forehead, fading out downward, so the join
+        // between it and her painted face is a soft blend and not a line
+        const fade = fx2.createLinearGradient(0, Y(hairline + 0.1), 0, Y(hairline + 0.3));
+        fade.addColorStop(0, '#000'); fade.addColorStop(1, 'rgba(0,0,0,0)');
+        fx2.globalCompositeOperation = 'destination-in'; fx2.fillStyle = fade; fx2.fillRect(0, 0, w, h);
+        foreheadBlend = fh;
       }
       const [lay, lx] = D();
       lx.imageSmoothingQuality = 'high';
@@ -1251,6 +1302,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       xr.setTransform(1, 0, 0, 1, 0, 0); xr.drawImage(lay, 0, 0); xr.setTransform(dpr, 0, 0, dpr, 0, 0);
       // her painted hairstyle, tinted, over the drawn one and the edges of her face
       if (wig) {
+        if (foreheadBlend) { xr.save(); xr.setTransform(1, 0, 0, 1, 0, 0); xr.drawImage(foreheadBlend, 0, 0); xr.restore(); }
         xr.setTransform(dpr, 0, 0, dpr, 0, 0);
         const wk = (2 * ex * hw) / ((WIG.eR - WIG.eL) * WIG_W) * WIG.fit;
         const wx = cx - (WIG.eL + WIG.eR) / 2 * WIG_W * wk, wy = Y(ey) - WIG.eyeY * WIG_H * wk;
