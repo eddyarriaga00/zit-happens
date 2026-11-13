@@ -136,13 +136,18 @@ export class Ear {
     buzz('light');
   }
 
-  at(x, y, pad = 12) {
+  /** What is under the finger. `want` picks out the things this tool can handle when lumps overlap. */
+  at(x, y, pad = 12, want = null) {
+    let other = null;
     for (let i = this.chunks.length - 1; i >= 0; i--) {
       const c = this.chunks[i];
       if (c.state === 'out' || c.held != null) continue;
-      if (Math.hypot(c.x - x, c.y - y) < c.r * this.scaleOf(c) + pad) return c;
+      if (Math.hypot(c.x - x, c.y - y) < c.r * this.scaleOf(c) + pad) {
+        if (!want || want(c)) return c;
+        other = other || c;
+      }
     }
-    return null;
+    return other;
   }
 
   grab(c, id, x, y) {
@@ -159,7 +164,9 @@ export class Ear {
       this.flush = { id, x, y };
       return true;
     }
-    const c = this.at(x, y, tool === 'tweezers' ? 20 : 12);
+    const hardThing = (k) => k.kind === 'object' || k.kind === 'bug';
+    const c = this.at(x, y, tool === 'tweezers' ? 20 : 12,
+      tool === 'tweezers' ? hardThing : tool === 'drops' ? (k) => k.kind === 'hard' && !k.soft : (k) => !hardThing(k));
     if (tool === 'drops') {
       // a drop of oil: softens hard wax after a moment
       this.spray.push({ x, y: y - 60, ty: y, t: 0, drop: true });

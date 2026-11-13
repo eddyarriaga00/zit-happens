@@ -6,6 +6,12 @@
 
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
+import { SKIN_TONES } from './skin.js';
+
+// Painted partings (fair scalp with brown hair, medium and deep with black hair). The parting runs
+// straight down the middle of each picture; part: its half-width as a share of the picture's width.
+const SCALP_ART = { files: ['body/scalp1.jpg', 'body/scalp2.jpg', 'body/scalp3.jpg'], hair: ['#5a3122', '#16110f', '#16110f'], part: 0.036 };
+if (typeof Image !== 'undefined') SCALP_ART.imgs = SCALP_ART.files.map((src) => { const im = new Image(); im.src = src; return im; });
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -35,6 +41,10 @@ export class Scalp {
     this.skin = G.tone && G.tone.base ? G.tone : { base: '#eec1a2', shade: '#d69f80', pore: '#a8705a', blush: '#e88e7f' };
     this.bw = Math.min(21, W * 0.055);           // half-width of bare scalp along the part
     this.wob = rnd(0, 6);
+    const ti = SKIN_TONES.indexOf(G.tone), ai = ti < 0 ? 0 : ti <= 1 ? 0 : ti <= 3 ? 1 : 2;
+    const art = SCALP_ART.imgs && SCALP_ART.imgs[ai];
+    this.art = art && art.complete && art.naturalWidth ? art : null;
+    if (this.art) this.hair = SCALP_ART.hair[ai];   // strands drawn over the lice match the painting
     this.paintLayer();
 
     // dandruff: most of it on the bare part, some caught in the hair near the roots
@@ -84,7 +94,7 @@ export class Scalp {
   }
 
   /** Where the part runs at height y. */
-  px(y) { return this.G.W / 2 + Math.sin(y * 0.011 + this.wob) * 7 + Math.sin(y * 0.031) * 2; }
+  px(y) { return this.art ? this.G.W / 2 : this.G.W / 2 + Math.sin(y * 0.011 + this.wob) * 7 + Math.sin(y * 0.031) * 2; }
 
   // ------------------------------------------------------------- the painted scalp and hair
   paintLayer() {
@@ -103,6 +113,15 @@ export class Scalp {
     for (let i = ys.length - 1; i >= 0; i--) { const y = ys[i]; band.lineTo(this.px(y) + bw * (1.08 + Math.cos(y * 0.08) * 0.06), y); }
     band.closePath();
     this.band = band;
+    if (this.art) {
+      // the painting, scaled so its parting is as wide as the strip the flakes and lice live on
+      const im = this.art, k = Math.max(bw * 1.08 / (SCALP_ART.part * im.naturalWidth), W / im.naturalWidth, H / im.naturalHeight);
+      x.imageSmoothingQuality = 'high';
+      x.drawImage(im, W / 2 - im.naturalWidth * k / 2, H / 2 - im.naturalHeight * k / 2, im.naturalWidth * k, im.naturalHeight * k);
+      this.paintClips(x);
+      this.layer = c;
+      return;
+    }
     x.save();
     x.clip(band);
     x.fillStyle = sk.base; x.fillRect(0, 0, W, H);
@@ -162,7 +181,14 @@ export class Scalp {
       x.fillStyle = g; x.fillRect(Math.min(a, b), y, 80, 6.5);
     }
     x.restore();
-    // pastel snap clips holding the sections back: a flat teardrop of metal with an open centre
+    this.paintClips(x);
+    this.layer = c;
+  }
+
+  /** Pastel snap clips holding the sections back, and a soft vignette. */
+  paintClips(x) {
+    const G = this.G, W = G.W, H = G.H, bw = this.bw;
+    // a flat teardrop of metal with an open centre
     const clips = [['#ffc2d8', '#ff86b3'], ['#d9c8ff', '#a58df3'], ['#b4ecdc', '#62c7aa'], ['#ffe0ad', '#f4b45e']];
     [[-1, 0.2], [1, 0.36], [-1, 0.62], [1, 0.8]].forEach(([s, f], i) => {
       const y = this.top + (this.bot - this.top) * f, cxp = this.px(y) + s * (bw + 66), [c1, c2] = clips[i];
@@ -183,7 +209,6 @@ export class Scalp {
     const v = x.createRadialGradient(W / 2, H * 0.48, Math.min(W, H) * 0.3, W / 2, H * 0.48, Math.max(W, H) * 0.75);
     v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(60,20,40,0.28)');
     x.fillStyle = v; x.fillRect(0, 0, W, H);
-    this.layer = c;
   }
 
   // ------------------------------------------------------------- state

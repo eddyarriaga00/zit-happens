@@ -13,9 +13,9 @@ everything else live up to them. Items are in the order I intend to do them; eac
       bare skin via a colour-based skin map. Could add two more tones later.
 - [x] **Ear Wax** (v116): painted outer ear in three skin tones (body/ear1-3.jpg); the canal, wax and
       tools stay drawn and sit in the painted hollow. Hair colour no longer varies per patient.
-- [ ] **Scalp**: paint the parted scalp; keep flakes, lice and nits drawn.
-- [ ] **Hair Salon hair**: painted hair pieces per style in a neutral shade, tinted to any dye colour,
-      instead of code-drawn strands.
+- [x] **Scalp** (v117): painted parting in three tones (body/scalp1-3.jpg); flakes, lice, nits and clips stay drawn.
+- [x] **Hair Salon hair** (v117): five painted styles in silver (hair/*.jpg), keyed out by colour and tinted
+      to any dye. Still open: a painted fringe for the cut stage, hair that changes length when cut.
 - [ ] **Menu and thumbnails**: crop portraits properly for the round thumbnails and the VIP card.
 
 ## 2. Make the painted faces feel alive

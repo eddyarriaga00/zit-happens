@@ -137,6 +137,59 @@ function paintEye(ctx, px, py, d, erx, ery, col, gx, gy) {
   ctx.restore();
 }
 
+// Painted salon hair: one picture per style in plain silver, on the same girl as faces/girl1.jpg so the
+// eyes line up. Only the hair is taken from it (it is the one thing in the picture with no colour),
+// tinted to whatever shade she has or asks for, and laid over the hair drawn in code.
+const WIG = { eyeY: 0.370, eL: 0.365, eR: 0.640, fit: 1, styles: {} };
+if (typeof Image !== 'undefined') for (const st of ['long', 'pony', 'bun', 'curly', 'short']) { const im = new Image(); im.src = `hair/${st}.jpg`; WIG.styles[st] = { img: im, tints: new Map() }; }
+const WIG_W = 512, WIG_H = 768;
+function wigFor(style, hairHex) {
+  const wdef = WIG.styles[style];
+  if (!wdef || !wdef.img.complete || !wdef.img.naturalWidth || typeof hairHex !== 'string' || !/^#[0-9a-f]{6}$/i.test(hairHex)) return null;
+  if (wdef.tints.has(hairHex)) return wdef.tints.get(hairHex);
+  if (!wdef.base) {
+    // once per style: how much each pixel is hair (0..255) and how light it is
+    const cv = document.createElement('canvas'); cv.width = WIG_W; cv.height = WIG_H;
+    const q = cv.getContext('2d', { willReadFrequently: true }); q.drawImage(wdef.img, 0, 0, WIG_W, WIG_H);
+    const d = q.getImageData(0, 0, WIG_W, WIG_H).data, n = WIG_W * WIG_H;
+    const al = new Uint8ClampedArray(n), li = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      const sat = mx ? (mx - mn) / mx : 0, L = (r + g + b) / 765;
+      const lim = 0.125 + 0.4 * Math.max(0, 0.72 - L);        // hair in shadow picks up a little colour
+      // nothing inside her face counts (the whites of her eyes are grey too)
+      const fx = (i % WIG_W) / WIG_W - 0.5025, fy = Math.floor(i / WIG_W) / WIG_H - 0.45;
+      const face = (fx / 0.2) ** 2 + (fy / 0.21) ** 2 < 1;
+      al[i] = face ? 0 : Math.max(0, Math.min(1, (lim - sat) / 0.055)) * 255;
+      li[i] = Math.max(0, Math.min(1, (L - 0.3) / 0.65));
+    }
+    // the picture is a JPEG, whose colour comes in little blocks: smooth the hair mask (two box blurs),
+    // then firm its edge up again. A lone grey pixel in skin or cloth disappears on the way.
+    let src = Float32Array.from(al), tmp = new Float32Array(n);
+    for (let pass = 0; pass < 2; pass++) {
+      for (let y = 0; y < WIG_H; y++) for (let x = 0; x < WIG_W; x++) { let sum = 0, c = 0; for (let k = -2; k <= 2; k++) { const xx = x + k; if (xx >= 0 && xx < WIG_W) { sum += src[y * WIG_W + xx]; c++; } } tmp[y * WIG_W + x] = sum / c; }
+      for (let y = 0; y < WIG_H; y++) for (let x = 0; x < WIG_W; x++) { let sum = 0, c = 0; for (let k = -2; k <= 2; k++) { const yy = y + k; if (yy >= 0 && yy < WIG_H) { sum += tmp[yy * WIG_W + x]; c++; } } src[y * WIG_W + x] = sum / c; }
+    }
+    const a2 = new Uint8ClampedArray(n);
+    for (let i = 0; i < n; i++) a2[i] = Math.max(0, Math.min(1, (src[i] / 255 - 0.3) / 0.4)) * 255;
+    wdef.base = { al: a2, li };
+  }
+  const { al, li } = wdef.base, n = WIG_W * WIG_H;
+  const hv = parseInt(hairHex.slice(1), 16), hr = hv >> 16, hg = (hv >> 8) & 255, hb = hv & 255;
+  const cv = document.createElement('canvas'); cv.width = WIG_W; cv.height = WIG_H;
+  const q = cv.getContext('2d'), out = q.createImageData(WIG_W, WIG_H), o = out.data;
+  const dark = 1 - (hr + hg + hb) / 765;                 // dark hair gets a stronger sheen
+  for (let i = 0; i < n; i++) {
+    const t = li[i], body = 0.4 + 0.72 * t, spec = (40 + 60 * dark) * t * t * t * t;
+    o[i * 4] = hr * body + spec; o[i * 4 + 1] = hg * body + spec; o[i * 4 + 2] = hb * body + spec; o[i * 4 + 3] = al[i];
+  }
+  q.putImageData(out, 0, 0);
+  const wig = { canvas: cv, alpha: al };
+  if (wdef.tints.size > 12) wdef.tints.clear();
+  wdef.tints.set(hairHex, wig);
+  return wig;
+}
+
 export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 1) {
   const c = document.createElement('canvas');
   c.width = Math.round(w * dpr);
@@ -172,6 +225,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const shine = (a) => `rgba(${hch.map((v) => Math.round(v + (255 - v) * 0.55)).join(',')},${(a * Math.min(1, 0.25 + hlum * 1.6)).toFixed(3)})`;
   const style = look.style || 'short';
   const hasHair = style !== 'bald';
+  // a painted hairstyle replaces the drawn one outright (salon only)
+  const drawHair = hasHair && !(photo && look.photoFace && wigFor(style, hair));
   const hairline = style === 'bald' ? -2 : style === 'balding' ? -2 : style === 'buzz' ? -0.66 : -0.68;      // a proper forehead
   // the line the hair grows from. Drawn back for a ponytail or a bun it is an even arch, highest in the middle;
   // worn down it sits lower on the side the hair sweeps toward.
@@ -265,7 +320,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   }
 
   // ---- hair behind the head
-  if (style === 'long' || style === 'curly') {
+  if (hasHair && (style === 'long' || style === 'curly')) {      // kept under a painted style too: it fills in behind her ears
     const wide = style === 'curly' ? 1.5 : 1.22;
     x.fillStyle = hairFill;
     const fb = style === 'curly' ? 1.3 : 1.8;
@@ -297,11 +352,11 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       strands(360, () => { const u = (R() * 2 - 1) * wide * 0.95, d = Math.sign(u) || 1, v = 0.25 + R() * 0.2; return [X(u * 0.97), Y(v), X(u), Y(v + 0.22), d * 3, shine(0.2)]; }, 0.9);
     }
   }
-  if (style === 'pony') {
+  if (drawHair && style === 'pony') {
     x.fillStyle = hairFill; x.beginPath(); x.ellipse(X(1.04), Y(0.0), hw * 0.24, hh * 0.78, -0.16, 0, Math.PI * 2); x.fill();
     strands(520, () => { const k = R() * 2 - 1, L = R(); return [X(0.9 + k * 0.1), Y(-0.7), X(1.1 + k * 0.2 * (1 - L * 0.85)), Y(0.25 + L * 0.8), k * 14 + 10, hairCol()]; }, 0.8);     // it tapers to a point
   }
-  if (style === 'bun') {
+  if (drawHair && style === 'bun') {
     x.fillStyle = hairFill; x.beginPath(); x.arc(cx, Y(-1.22), hw * 0.42, 0, Math.PI * 2); x.fill();
     x.lineWidth = 0.8;
     for (let i = 0; i < 260; i++) {      // strands wound round the bun
@@ -310,7 +365,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     }
     soft(X(-0.12), Y(-1.36), hw * 0.2, hh * 0.07, 'rgba(255,255,255,0.14)');
   }
-  if (hasHair && style !== 'balding') {     // volume around the skull
+  if (drawHair && style !== 'balding') {     // volume around the skull
     const k = style === 'buzz' ? 1.02 : tiedBack ? 1.04 : 1.09;      // pulled back, it lies close to the skull
     x.fillStyle = hairFill;
     x.beginPath(); x.ellipse(cx, Y(-0.3), hw * k, hh * (style === 'buzz' ? 0.76 : 0.87), 0, Math.PI, Math.PI * 2); x.fill();
@@ -638,7 +693,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
 
   // hair growing from the hairline: no blunt fringe. It leaves a parting and sweeps over the
   // skull to the sides, or is drawn straight back for a ponytail or a bun.
-  if (hasHair && style !== 'balding') {
+  if (drawHair && style !== 'balding') {
     const edge = (u) => hl(u) + 0.012 * Math.sin(u * 9 + seed % 7);
     mul(() => { for (let u = -0.9; u <= 0.9; u += 0.12) soft(X(u), Y(edge(u) + 0.05), hw * 0.16, hh * 0.07, sh(0.3)); });   // the hair shades the top of the forehead
     x.fillStyle = style === 'buzz' ? rgba(hair, 0.82) : hairFill;
@@ -723,7 +778,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
 
   // face-framing locks: worn down, the hair falls from the parting over the temples and on down past
   // the cheeks, so her face sits inside her hair the way it does in makeover-game art
-  if (hasHair && (style === 'long' || style === 'short')) {
+  if (drawHair && (style === 'long' || style === 'short')) {
     const len = style === 'long' ? 1.3 : 0.8;
     // a lock that follows the head: out from the parting over the top, round the temple, then down
     const lockC = (p0, p1, p2, p3, wd) => {
@@ -756,7 +811,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   }
 
   // pulled back, a few soft wisps always slip loose at the temples and curl down beside the face
-  if (hasHair && tiedBack) {
+  if (drawHair && tiedBack) {
     x.lineCap = 'round';
     for (const d of [-1, 1]) for (let i = 0; i < 3; i++) {
       const u0 = d * (0.66 + i * 0.09 + R() * 0.04), v0 = hl(u0) + 0.01, L = 0.85 + R() * 0.3 - i * 0.12;
@@ -775,7 +830,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
 
   // curls: coils sitting all over the crown, getting bigger toward the outside, with ringlets
   // falling in front of the ears
-  if (style === 'curly') {
+  if (drawHair && style === 'curly') {
     const cs = [];
     for (let i = 0; i < 150; i++) {
       const a = Math.PI + R() * Math.PI, d = 0.5 + R() * 0.68;
@@ -1116,6 +1171,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       // in the salon her hair is drawn live (washed, cut, dyed, restyled), so only her painted face and
       // neck are laid in, feathered at the edges so they melt into the hair and skin drawn around them
       const D = (W) => { const cv = document.createElement('canvas'); cv.width = c.width; cv.height = c.height; const cx2 = cv.getContext('2d'); cx2.setTransform(dpr, 0, 0, dpr, 0, 0); return [cv, cx2]; };
+      const wig = hasHair ? wigFor(style, hair) : null;      // her painted hairstyle, when there is one
       // her drawn hair is made to sit with the painting: the fine strands are softened into painted
       // masses, then given the gloss and depth a painter would add
       {
@@ -1125,14 +1181,14 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
         xr.save();
         xr.globalCompositeOperation = 'soft-light'; xr.lineCap = 'round';
         const arc = (ox, oy, rx, ry, a0, a1, lw, al, col = '255,255,255') => { xr.strokeStyle = `rgba(${col},${al})`; xr.lineWidth = lw; xr.beginPath(); xr.ellipse(ox, oy, rx, ry, 0, a0, a1); xr.stroke(); };
-        if (hasHair && style !== 'buzz' && style !== 'curly') {
+        if (hasHair && style !== 'buzz' && style !== 'curly' && !wig) {
           xr.save();
           const dome = new Path2D(); dome.ellipse(cx, Y(-0.3), hw * 1.06, hh * 0.85, 0, Math.PI, Math.PI * 2); xr.clip(dome);
           for (const [lw, al] of [[0.2, 0.14], [0.13, 0.2], [0.07, 0.3], [0.03, 0.4]]) arc(X(-0.06), Y(-0.2), hw * 0.86, hh * 0.6, Math.PI * 1.18, Math.PI * 1.8, hh * lw, al);   // a band of shine over the crown
           for (const [lw, al] of [[0.3, 0.16], [0.18, 0.2]]) arc(cx, Y(-0.3), hw * 1.06, hh * 0.85, Math.PI * 1.02, Math.PI * 1.98, hh * lw, al, '20,8,12');                        // the head turns away at its edge
           xr.restore();
         }
-        if (style === 'long' || style === 'short') {
+        if (!wig && (style === 'long' || style === 'short')) {
           const y1 = style === 'long' ? 1.05 : 0.5;
           for (const d of [-1, 1]) for (const [lw, al] of [[0.16, 0.12], [0.09, 0.2], [0.04, 0.28]]) {      // light running down the lengths
             xr.strokeStyle = `rgba(255,255,255,${al * (d < 0 ? 1 : 0.7)})`; xr.lineWidth = hw * lw;
@@ -1148,7 +1204,15 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       const [shp, sx] = D();
       sx.fillStyle = '#000';
       // from a little below the hairline down, so none of her painted hair comes with it
-      sx.save(); sx.clip(head); sx.clip(below); sx.fillRect(0, Y(hairline + 0.055), w, h); sx.restore();
+      sx.save(); sx.clip(head); sx.clip(below);
+      if (wig) {
+        // under painted hair the face starts lower, and lower still toward her temples, where the
+        // portrait has her own hair pulled back under the band
+        sx.beginPath(); sx.moveTo(X(-1.3), Y(1.6));
+        for (let i = -26; i <= 26; i++) { const u = i / 20; sx.lineTo(X(u), Y(hairline + 0.13 + 0.5 * Math.max(0, Math.abs(u) - 0.4) ** 1.3)); }
+        sx.lineTo(X(1.3), Y(1.6)); sx.closePath(); sx.fill();
+      } else sx.fillRect(0, Y(hairline + 0.055), w, h);
+      sx.restore();
       sx.save(); sx.clip(neck); sx.fillRect(0, Y(chinV - 0.2), w, Y(1.5) - Y(chinV - 0.2)); sx.restore();
       const [mask, mx] = D();
       mx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1166,12 +1230,43 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       for (const [ox, oy] of stamps) aq.drawImage(half, ox + fr * 0.8, oy + fr * 0.8, half.width - fr * 1.6, half.height - fr * 1.6);
       mx.imageSmoothingEnabled = true; mx.imageSmoothingQuality = 'high';
       mx.drawImage(acc, 0, 0, shp.width, shp.height);
+      if (wig) {
+        // the headband in her portrait hid the top of her forehead; with painted hair it shows, so the
+        // skin just under the band is carried upward to meet the new hairline
+        const v0 = hairline + 0.2, sy = (Y(v0) - y0) / k;
+        // (through a few-pixel-wide copy, so it is a smooth wash of her skin and not streaks of every freckle)
+        const tiny = document.createElement('canvas'); tiny.width = 7; tiny.height = 1;
+        const sx0 = (X(-0.8) - x0) / k, sx1 = (X(0.8) - x0) / k;
+        tiny.getContext('2d').drawImage(im, sx0, sy, sx1 - sx0, Math.max(2, ih * 0.012), 0, 0, 7, 1);
+        xr.save(); xr.setTransform(dpr, 0, 0, dpr, 0, 0); xr.clip(head);
+        xr.imageSmoothingEnabled = true; xr.imageSmoothingQuality = 'high';
+        xr.drawImage(tiny, 0.5, 0, 6, 1, X(-1.1), Y(-1.05), X(1.1) - X(-1.1), Y(hairline + 0.5) - Y(-1.05));
+        xr.restore();
+      }
       const [lay, lx] = D();
       lx.imageSmoothingQuality = 'high';
       lx.drawImage(im, x0, y0, iw * k, ih * k);
       lx.setTransform(1, 0, 0, 1, 0, 0);
       lx.globalCompositeOperation = 'destination-in'; lx.drawImage(mask, 0, 0);
       xr.setTransform(1, 0, 0, 1, 0, 0); xr.drawImage(lay, 0, 0); xr.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // her painted hairstyle, tinted, over the drawn one and the edges of her face
+      if (wig) {
+        xr.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const wk = (2 * ex * hw) / ((WIG.eR - WIG.eL) * WIG_W) * WIG.fit;
+        const wx = cx - (WIG.eL + WIG.eR) / 2 * WIG_W * wk, wy = Y(ey) - WIG.eyeY * WIG_H * wk;
+        xr.imageSmoothingQuality = 'high';
+        xr.save(); xr.shadowColor = 'rgba(40,15,20,0.3)'; xr.shadowBlur = 7 * dpr; xr.shadowOffsetY = 2 * dpr;      // it lifts off her skin a little
+        xr.drawImage(wig.canvas, wx, wy, WIG_W * wk, WIG_H * wk);
+        xr.restore();
+        const drawn = geo.onHair;
+        geo.onHair = (px, py) => {
+          if (onSkin(px, py)) return false;
+          const ix = Math.round((px - wx) / wk), iy = Math.round((py - wy) / wk);
+          if (ix < 0 || iy < 0 || ix >= WIG_W || iy >= WIG_H) return drawn(px, py) && iy < 0;
+          return wig.alpha[iy * WIG_W + ix] > 110;
+        };
+        geo.wig = true;
+      }
     } else {
     if (y0 > 0) { xr.fillStyle = `rgb(${photo.bg || '244,190,205'})`; xr.fillRect(0, 0, w, y0 + 1); }      // the plain backdrop carries on above
     const seamTop = y0 > 0 ? y0 : null;
