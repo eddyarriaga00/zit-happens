@@ -24,6 +24,8 @@ export const PHOTOS = [
 ];
 if (typeof Image !== 'undefined') for (const ph of PHOTOS) {
   ph.img = new Image(); ph.img.src = ph.src;
+  // the same painting with her eyes closed, for blinking and for when her face is being washed
+  ph.shut = new Image(); ph.shut.src = ph.src.replace('.jpg', 'c.jpg');
   // unpacked ahead of time, so the first level that shows her does not stall while the picture decodes
   ph.img.addEventListener('load', () => { try { const d = ph.img.decode && ph.img.decode(); if (d && d.catch) d.catch(() => {}); } catch { /* fine */ } });
 }
@@ -1202,6 +1204,28 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     // eyelids are drawn live when she blinks, so they take their colour from the painting itself
     geo.lid = photo.lid || tone.base;
     geo.lidShade = photo.lidShade || tone.shade;
+    // her closed eyes come from a second painting of her: just the two eyes are cut out of it, feathered,
+    // and faded in over the open ones when she blinks or shuts her eyes
+    if (photo.shut && photo.shut.complete && photo.shut.naturalWidth) {
+      const pad = erx * 2.1, px0 = eyes[0].x - pad, py0 = eyes[0].y - ery * 3.2, pw = eyes[1].x - eyes[0].x + pad * 2, phh = ery * 6.4;
+      const pc = document.createElement('canvas'); pc.width = Math.ceil(pw * dpr); pc.height = Math.ceil(phh * dpr);
+      const pq = pc.getContext('2d');
+      pq.setTransform(dpr, 0, 0, dpr, -px0 * dpr, -py0 * dpr);
+      pq.imageSmoothingQuality = 'high';
+      pq.drawImage(photo.shut, x0, y0, iw * k, ih * k);
+      const mc = document.createElement('canvas'); mc.width = pc.width; mc.height = pc.height;
+      const mq = mc.getContext('2d');
+      mq.setTransform(dpr, 0, 0, dpr, -px0 * dpr, -py0 * dpr);
+      for (const e of eyes) {
+        mq.save(); mq.translate(e.x, e.y + ery * 0.25); mq.scale(1, (ery * 2.7) / (erx * 1.8));
+        const g = mq.createRadialGradient(0, 0, 0, 0, 0, erx * 1.8);
+        g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.62, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        mq.fillStyle = g; mq.beginPath(); mq.arc(0, 0, erx * 1.8, 0, Math.PI * 2); mq.fill();
+        mq.restore();
+      }
+      pq.setTransform(1, 0, 0, 1, 0, 0); pq.globalCompositeOperation = 'destination-in'; pq.drawImage(mc, 0, 0);
+      geo.shut = { canvas: pc, x: px0, y: py0, w: pw, h: phh };
+    }
     geo.eyeCol = null;            // her painted eyes stay as painted
     geo.photo = true;
     geo.photoHair = look.photoFace ? null : photo.hair;
@@ -1212,6 +1236,14 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
 /** Eyelids drawn live over the painted eyes: closed = 0 (open) .. 1 (shut). */
 export function drawLids(ctx, geo, closed) {
   if (closed <= 0.02) return;
+  if (geo.shut) {
+    // painted closed eyes, faded in. Quick at first, so a blink reads as a blink
+    const a = Math.min(1, closed * 1.7);
+    ctx.save(); ctx.globalAlpha = a * a * (3 - 2 * a); ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(geo.shut.canvas, geo.shut.x, geo.shut.y, geo.shut.w, geo.shut.h);
+    ctx.restore();
+    return;
+  }
   if (geo.photo) {
     // over a painting: a soft patch of her own lid colour melts over the painted eye, then the closed
     // lash line and its lashes are drawn where the lids meet

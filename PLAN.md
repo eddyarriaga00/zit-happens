@@ -19,8 +19,8 @@ everything else live up to them. Items are in the order I intend to do them; eac
 - [ ] **Menu and thumbnails**: crop portraits properly for the round thumbnails and the VIP card.
 
 ## 2. Make the painted faces feel alive
-- [ ] **Expressions from art, not lines**: for each girl, painted variants with eyes closed, a wince
-      and a smile, cross-faded in (closed eyes while washing, wince on a hard squeeze, smile at the end).
+- [~] **Expressions from art, not lines**: eyes-closed painting for all 13 girls is in (v113), used for
+      blinks, washing and eyeshadow. Still to paint: a wince (hard squeeze) and a smile (end of visit).
 - [ ] **Each face its own shape**: measure every portrait's real face outline, so foam, masks, gel and
       mess follow her jaw and cheeks exactly instead of one shared outline.
 - [ ] **Sharper close-ups**: larger portraits (or 2x upscales) so leaning in on a spot stays crisp.
