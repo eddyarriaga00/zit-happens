@@ -95,7 +95,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const shine = (a) => `rgba(${hch.map((v) => Math.round(v + (255 - v) * 0.55)).join(',')},${(a * Math.min(1, 0.25 + hlum * 1.6)).toFixed(3)})`;
   const style = look.style || 'short';
   const hasHair = style !== 'bald';
-  const hairline = style === 'bald' ? -2 : style === 'balding' ? -2 : style === 'buzz' ? -0.7 : -0.72;      // a proper forehead
+  const hairline = style === 'bald' ? -2 : style === 'balding' ? -2 : style === 'buzz' ? -0.66 : -0.68;      // a proper forehead
   // the line the hair grows from. Drawn back for a ponytail or a bun it is an even arch, highest in the middle;
   // worn down it sits lower on the side the hair sweeps toward.
   const tiedBack = style === 'pony' || style === 'bun';
@@ -373,7 +373,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const K_EYE = -0.05, HWHH = hw / hh;
   const PROF = [[0, 1], [0.25, 0.98], [0.5, 0.94], [0.75, 0.86], [0.97, 0.745], [1.1, 0.65], [1.25, 0.51], [1.35, 0.39], [1.42, 0.285], [1.48, 0.165], [1.515, 0.07], [1.525, 0]];
   const MOD = { oval: [0, 0, 1], round: [0.05, 0.02, 0.97], square: [0.06, 0.04, 1], heart: [-0.05, -0.03, 1.01], diamond: [-0.03, -0.01, 1.01], oblong: [0, 0, 1.06] }[shape] || [0, 0, 1];
-  const kLen = MOD[2] + vr(9) * 0.03;
+  const kLen = MOD[2] * 0.95 + vr(9) * 0.03;      // eyes to chin ~1.45 face half-widths (average of two reference faces)
   const prof = (k) => {
     k /= kLen;
     let i = 0; while (i < PROF.length - 2 && PROF[i + 1][0] < k) i++;
@@ -429,8 +429,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const sh = (a) => `rgba(168,98,94,${(a * 0.95).toFixed(3)})`;
   const mul = (fn) => { x.save(); x.globalCompositeOperation = 'multiply'; fn(); x.restore(); };
   const ey = -0.05, ex = 0.5;                      // eye line / spacing (head units)
-  const erx = hw * (0.25 + vr(2) * 0.02), ery = hh * (0.084 + vr(3) * 0.008);   // big, bright eyes
-  const mouthY = 0.66, noseY = 0.325;
+  const erx = hw * (0.255 + vr(2) * 0.02), ery = hh * (0.071 + vr(3) * 0.007);   // big, bright eyes
+  const mouthY = 0.6, noseY = 0.32;
   const old = (look.age || 25) >= 55 ? 1 : (look.age || 25) >= 40 ? 0.55 : (look.age || 25) >= 32 ? 0.25 : 0.08;
 
   x.save();
@@ -460,7 +460,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       soft(X(d * (chinW + 0.16)), Y(chinV - 0.15), hw * 0.11, hh * 0.07, sh(0.1));       // the chin stands out from the jaw beside it
       soft(X(d * ex), Y(ey - 0.03), hw * 0.31, hh * 0.15, sh(0.3));                   // eye sockets
       soft(X(d * (ex - 0.21)), Y(ey - 0.02), hw * 0.11, hh * 0.12, sh(0.36));         // deepest beside the bridge
-      soft(X(d * ex), Y(ey - 0.15), hw * 0.27, hh * 0.05, sh(0.2));                 // under the brow
+      soft(X(d * ex), Y(ey - 0.135), hw * 0.27, hh * 0.05, sh(0.2));                 // under the brow
       soft(X(d * (ex + 0.2)), Y(ey + 0.0), hw * 0.09, hh * 0.08, sh(0.2));            // outer corner
       soft(X(d * (ex - 0.04)), Y(ey + 0.135), hw * 0.2, hh * 0.04, `rgba(150,112,140,${0.2 + old * 0.2})`);   // under-eye, a little blue
       soft(X(d * (ex - 0.17)), Y(ey + 0.1), hw * 0.07, hh * 0.05, `rgba(150,112,140,${0.16 + old * 0.14})`);  // tear trough
@@ -486,7 +486,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   soft(X(-0.035), Y(noseY - 0.065), hw * 0.025, hh * 0.016, hi(0.5));
   for (const d of [-1, 1]) {
     soft(X(d * 0.52 - 0.06), Y(0.13), hw * 0.21, hh * 0.085, hi(d < 0 ? 0.2 : 0.11));  // cheekbones
-    soft(X(d * (ex + 0.02)), Y(ey - 0.155), hw * 0.15, hh * 0.022, hi(0.16));           // brow bone
+    soft(X(d * (ex + 0.02)), Y(ey - 0.14), hw * 0.15, hh * 0.022, hi(0.16));           // brow bone
   }
   soft(X(-0.02), Y(chinV - 0.185), hw * Math.min(0.17, 0.07 + chinW * 0.27), hh * 0.07, hi(0.17));    // chin
   if (shape === 'round') for (const d of [-1, 1]) soft(X(d * 0.6 - 0.05), Y(0.36), hw * 0.2, hh * 0.13, hi(d < 0 ? 0.1 : 0.05));   // full cheeks catch the light lower down
@@ -717,7 +717,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const browHair = grey ? '#8a8a8a' : tint(hair, hlum > 0.5 ? 0.62 : 0.85);
   for (const d of [-1, 1]) {
     const bu = (k) => d * (ex - 0.27 + k * 0.57);
-    const bv = (k) => ey - 0.235 - Math.sin(Math.min(1, k / 0.66) * Math.PI / 2) * (0.05 + vr(7) * 0.03) + Math.max(0, k - 0.66) * 0.16;
+    const bv = (k) => ey - 0.215 - Math.sin(Math.min(1, k / 0.66) * Math.PI / 2) * (0.05 + vr(7) * 0.03) + Math.max(0, k - 0.66) * 0.16;
     const bt = (k) => hh * (look.fem ? 0.05 : 0.036) * (1 + vr(6) * 0.5) * (k < 0.14 ? 0.7 + k * 2.1 : 1 - (k - 0.14) * 0.92);
     x.save();
     x.shadowColor = browHair; x.shadowBlur = hh * 0.02;
@@ -810,7 +810,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   soft(cx, Y(noseY + 0.05), hw * 0.09, hh * 0.015, 'rgba(70,26,22,0.16)');             // the tip turning under, between the nostrils
 
   // ---- lips
-  const my = Y(mouthY), mw = hw * (0.37 + vr(4) * 0.03), lh = hh * (1.3 + vr(5) * 0.2);     // how wide her mouth is, how full her lips
+  const my = Y(mouthY), mw = hw * (0.35 + vr(4) * 0.03), lh = hh * (1.3 + vr(5) * 0.2);     // how wide her mouth is, how full her lips
   const mixHex = (a, b, t) => {
     if (!/^#[0-9a-f]{6}$/i.test(a) || !/^#[0-9a-f]{6}$/i.test(b)) return b;
     const p = (c, i) => parseInt(c.slice(1 + i * 2, 3 + i * 2), 16);
@@ -1023,7 +1023,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   below.lineTo(X(1.4), Y(1.4)); below.closePath();
   const clipSkin = (ctx) => { ctx.clip(head); ctx.clip(below); };
   const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint,
-    lipsPath, inLips, lipsBox, cheeks, lids, onHair, clipSkin, headPath: head, shape, eyeCol: look.eye, eyePaths, hairlineY: Y(hairline), browY: Y(ey - 0.235), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
+    lipsPath, inLips, lipsBox, cheeks, lids, onHair, clipSkin, headPath: head, shape, eyeCol: look.eye, eyePaths, hairlineY: Y(hairline), browY: Y(ey - 0.215), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
   return { canvas: c, geo };
 }
 
