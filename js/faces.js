@@ -66,7 +66,8 @@ export function lookFor(def) {
     fem: /\bf\b/.test(ex),
     beard: ex.includes('beard'), stubble: ex.includes('stubble'), stache: ex.includes('stache'),
     glasses: ex.includes('glasses'),
-    eye: EYES[(h >>> 9) % EYES.length],
+    // deeper skin tones almost always come with brown eyes
+    eye: ((def && def.skin != null ? def.skin : h % 5) >= 3 ? ['#5b3a21', '#3f2a18', '#2e2019'] : EYES)[(h >>> 9) % ((def && def.skin != null ? def.skin : h % 5) >= 3 ? 3 : EYES.length)],
     shirt: SHIRTS[(h >>> 12) % SHIRTS.length],
     tone: SKIN_TONES[(def && def.skin != null ? def.skin : h % 5)] || SKIN_TONES[1],
     seed: h,
