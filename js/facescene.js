@@ -1061,17 +1061,39 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
     x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.shadowColor = 'transparent'; x.filter = 'none';
     x.imageSmoothingQuality = 'high';
+    if (look.photoFace) {
+      // in the salon her hair is drawn live (washed, cut, dyed, restyled), so only her painted face and
+      // neck are laid in, feathered at the edges so they melt into the hair and skin drawn around them
+      const D = (W) => { const cv = document.createElement('canvas'); cv.width = c.width; cv.height = c.height; const cx2 = cv.getContext('2d'); cx2.setTransform(dpr, 0, 0, dpr, 0, 0); return [cv, cx2]; };
+      const [shp, sx] = D();
+      sx.fillStyle = '#000';
+      sx.save(); sx.clip(head); sx.clip(below); sx.fillRect(0, 0, w, h); sx.restore();
+      sx.save(); sx.clip(neck); sx.fillRect(0, Y(chinV - 0.2), w, Y(1.5) - Y(chinV - 0.2)); sx.restore();
+      const [mask, mx] = D();
+      mx.setTransform(1, 0, 0, 1, 0, 0);
+      const fe = Math.max(1.5, hw * 0.045) * dpr;
+      mx.filter = `blur(${fe}px)`;
+      // shrink a little first so the feathering eats into her face rather than spilling past it
+      mx.drawImage(shp, fe * 0.6, fe * 0.6, shp.width - fe * 1.2, shp.height - fe * 1.2);
+      const [lay, lx] = D();
+      lx.imageSmoothingQuality = 'high';
+      lx.drawImage(im, x0, y0, iw * k, ih * k);
+      lx.setTransform(1, 0, 0, 1, 0, 0);
+      lx.globalCompositeOperation = 'destination-in'; lx.drawImage(mask, 0, 0);
+      x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(lay, 0, 0); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    } else {
     if (y0 > 0) x.drawImage(im, 4, 4, 3, 3, 0, 0, w, y0 + 1);                                    // the plain backdrop carries on above
     if (y0 + ih * k < h) x.drawImage(im, 0, ih - 3, iw, 3, 0, y0 + ih * k - 1, w, h - (y0 + ih * k) + 1);   // and her top below
     if (x0 > 0) { x.drawImage(im, 0, 0, 3, ih, 0, y0, x0 + 1, ih * k); x.drawImage(im, iw - 3, 0, 3, ih, x0 + iw * k - 1, y0, w - (x0 + iw * k) + 1, ih * k); }
     x.drawImage(im, x0, y0, iw * k, ih * k);
+    }
     // eyelids are drawn live when she blinks, so they take their colour from the painting itself
     const pix = (px, py) => { try { const q = x.getImageData(Math.round(px * dpr), Math.round(py * dpr), 1, 1).data; return '#' + [q[0], q[1], q[2]].map((v) => v.toString(16).padStart(2, '0')).join(''); } catch { return tone.base; } };
     geo.lid = pix(eyes[0].x, eyes[0].y - ery * 2.3);
     geo.lidShade = pix(eyes[0].x, eyes[0].y - ery * 1.75);
     geo.eyeCol = null;            // her painted eyes stay as painted
     geo.photo = true;
-    geo.photoHair = photo.hair;
+    geo.photoHair = look.photoFace ? null : photo.hair;
   }
   return { canvas: c, geo };
 }

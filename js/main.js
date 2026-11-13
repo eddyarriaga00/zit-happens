@@ -581,12 +581,12 @@ function startSalon(kind, vip = null) {
   G.paused = false;
   const client = { ...(vip ? vip.def : LEVELS[Math.floor(Math.random() * LEVELS.length)]), zone: 'forehead' };
   newScene(vip ? vip.seed : Math.floor(Math.random() * 1e9), client);
-  if (kind === 'haircut') { G.look = { ...G.look, style: 'long', noPhoto: true }; paintSkin(); }   // needs a fringe to trim
+  if (kind === 'haircut') { G.look = { ...G.look, style: 'long', photoFace: true }; paintSkin(); }   // needs a fringe to trim
   if (kind === 'hair') {
     // your salon: its walls follow the Decor level, its stations decide the services
     G.salonLv = save.salon;
     const styles = ['long', 'pony', 'bun', 'curly', 'short'];
-    G.look = { ...G.look, noPhoto: true, wall: WALLS[save.salon.decor] || WALLS[0], backdrop: (cx2, w2, h2) => salonBackdrop(cx2, w2, h2, save.salon), style: styles.includes(G.look.style) ? G.look.style : 'long' };
+    G.look = { ...G.look, photoFace: true, wall: WALLS[save.salon.decor] || WALLS[0], backdrop: (cx2, w2, h2) => salonBackdrop(cx2, w2, h2, save.salon), style: styles.includes(G.look.style) ? G.look.style : 'long' };
     paintSkin();
   }
   G.salon = kind === 'makeup' ? new Makeup(G, Math.min(LIP_SHADES.length, 3 + save.makeupDone))
