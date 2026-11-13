@@ -191,6 +191,14 @@ function resize() {
     p.y = Math.min(Math.max(p.y, playTop() + p.r * 2), playBottom() - p.r * 2);
   }
 }
+// Where a touch is, in the game's own coordinates: measured from the drawing area itself and scaled to
+// it, so a touch always lands exactly where it is seen, whatever the phone reports about the page
+// (home-screen apps on iPhone can be offset or stretched by the status bar).
+function touchXY(e) {
+  const b = canvas.getBoundingClientRect();
+  if (!b.width || !b.height) return [e.clientX, e.clientY];
+  return [(e.clientX - b.left) * (G.W / b.width), (e.clientY - b.top) * (G.H / b.height)];
+}
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
@@ -963,7 +971,7 @@ canvas.addEventListener('pointerdown', (e) => {
   audio.unlock();
   if (G.mode === 'demo' || G.paused || G.ended) return;
   try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
-  const sx = e.clientX, sy = e.clientY;
+  const [sx, sy] = touchXY(e);
   (G.taps ||= []).push({ x: sx, y: sy, t: 0 });      // every touch answers back with a soft ring
   const [x, y] = G.salon ? [sx, sy] : toWorld(sx, sy);      // the supplies live on the screen; the face lives under the camera
   if (G.salon) {
@@ -1204,7 +1212,7 @@ function updatePinch(pin) {
 canvas.addEventListener('pointermove', (e) => {
   const ptr = pointers.get(e.pointerId);
   if (!ptr) return;
-  const [x, y] = ptr.kind === 'salon' ? [e.clientX, e.clientY] : toWorld(e.clientX, e.clientY);
+  const [x, y] = ptr.kind === 'salon' ? touchXY(e) : toWorld(...touchXY(e));
   if (ptr.kind === 'pinch') { ptr.x = x; ptr.y = y; updatePinch(ptr.pin); return; }
   if (ptr.kind === 'tweeze') { ptr.p.fx = x; ptr.p.fy = y; }
   if (ptr.kind === 'salon') G.salon?.move(e.pointerId, x, y, ptr.x, ptr.y);
@@ -1245,7 +1253,7 @@ function endPointer(e) {
   }
 }
 // the supplies' close-ups track the finger directly
-canvas.addEventListener('pointermove', (e) => G.sup?.move(e.pointerId, e.clientX, e.clientY));
+canvas.addEventListener('pointermove', (e) => G.sup?.move(e.pointerId, ...touchXY(e)));
 for (const t of ['pointerup', 'pointercancel']) canvas.addEventListener(t, (e) => G.sup?.up(e.pointerId));
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);

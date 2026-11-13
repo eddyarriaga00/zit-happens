@@ -173,7 +173,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // worn down it sits lower on the side the hair sweeps toward.
   const tiedBack = style === 'pony' || style === 'bun';
   // on a painted portrait her hair is held back by the band, so the hairline is an even arch: highest at the parting
-  const hl = (u) => hairline + (photo && !look.photoFace ? -0.02 + 0.13 * u * u : tiedBack ? 0.02 + 0.15 * u * u : 0.05 * Math.abs(u) + (style === 'buzz' ? 0 : 0.1 * Math.max(0, u * 0.9)));
+  // and drops at the temples, where her hair comes forward under the band
+  const hl = (u) => hairline + (photo && !look.photoFace ? -0.02 + 0.13 * u * u + 0.5 * Math.max(0, Math.abs(u) - 0.62) : tiedBack ? 0.02 + 0.15 * u * u : 0.05 * Math.abs(u) + (style === 'buzz' ? 0 : 0.1 * Math.max(0, u * 0.9)));
   x.lineCap = 'round';
   x.lineJoin = 'round';
 
@@ -1049,10 +1050,11 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     return false;
   };
   const ZONE = {
-    forehead: () => [X((R() * 2 - 1) * 0.6), Y(-0.42 + (R() * 2 - 1) * 0.15)],
+    // on a painting the brows are fuller and sit higher, so the forehead zone stays clear of them
+    forehead: () => (photo ? [X((R() * 2 - 1) * 0.52), Y(-0.47 + (R() * 2 - 1) * 0.1)] : [X((R() * 2 - 1) * 0.6), Y(-0.42 + (R() * 2 - 1) * 0.15)]),
     nose: () => [X((R() * 2 - 1) * 0.14), Y(0.12 + (R() * 2 - 1) * 0.2)],
     cheek: () => { const d = R() < 0.5 ? -1 : 1; return [X(d * (0.55 + (R() * 2 - 1) * 0.24)), Y(0.3 + (R() * 2 - 1) * 0.2)]; },
-    chin: () => [X((R() * 2 - 1) * Math.min(0.4, chinW + 0.08)), Y(chinV - 0.19 + (R() * 2 - 1) * 0.1)],
+    chin: () => [X((R() * 2 - 1) * Math.min(0.4, chinW + 0.08)), Y(chinV - (photo ? 0.17 : 0.19) + (R() * 2 - 1) * (photo ? 0.075 : 0.1))],
   };
   const anyPoint = () => {
     for (let i = 0; i < 60; i++) {
