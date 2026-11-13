@@ -5,6 +5,7 @@ import { renderFaceScene, drawLids, drawMood, drawEyes } from './facescene.js';
 import { Makeup, Haircut, LIP_SHADES } from './salon.js';
 import { HairService, STATIONS, WALLS, salonLevel, salonTitle, salonPicture, salonBackdrop } from './hairsalon.js';
 import { Strip, Brows } from './extras.js';
+import { Scalp } from './scalp.js';
 import { FX } from './fx.js';
 import { Ear } from './ear.js';
 import { Treatment } from './steps.js';
@@ -587,7 +588,7 @@ function startSalon(kind, vip = null) {
     paintSkin();
   }
   G.salon = kind === 'makeup' ? new Makeup(G, Math.min(LIP_SHADES.length, 3 + save.makeupDone))
-    : kind === 'hair' ? new HairService(G, save.salon, paintSkin) : kind === 'strip' ? new Strip(G, toast) : kind === 'brows' ? new Brows(G, toast) : new Haircut(G);
+    : kind === 'hair' ? new HairService(G, save.salon, paintSkin) : kind === 'strip' ? new Strip(G, toast) : kind === 'brows' ? new Brows(G, toast) : kind === 'scalp' ? new Scalp(G, toast) : new Haircut(G);
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
@@ -697,7 +698,7 @@ function endSalon() {
     if (2 + save.makeupDone < LIP_SHADES.length) unlock = '<div class="reward"><b>🎁 New lipstick shade unlocked</b><span>Try it on your next client</span></div>';
     const hit = G.salon.want ? ['lips', 'blush', 'shadow'].filter((p) => G.salon.color[p] === G.salon.want[p]).length : 0;
     if (hit) { save.coins += hit * 25; coins += hit * 25; unlock += `<div class="reward"><b>${hit === 3 ? '💖 Exactly the look she wanted!' : `⭐ ${hit} of 3 shades she asked for`}</b><span>Tip: +${hit * 25} coins</span></div>`; }
-  } else if (kind === 'strip') save.stripsDone++; else if (kind === 'brows') save.browsDone++; else save.haircutDone++;
+  } else if (kind === 'strip') save.stripsDone++; else if (kind === 'brows') save.browsDone++; else if (kind === 'scalp') save.scalpsDone++; else save.haircutDone++;
   if (G.salon.summary) unlock = `<div class="reward"><b>${G.salon.summary()}</b></div>`;
   store.save(save);
   $('btn-next').firstChild.textContent = 'Another client';
@@ -1677,6 +1678,7 @@ function renderStats() {
     stat(save.haircutDone.toLocaleString(), 'haircuts'),
     stat(save.stripsDone.toLocaleString(), 'pore strips'),
     stat(save.browsDone.toLocaleString(), 'brows shaped'),
+    stat((save.scalpsDone || 0).toLocaleString(), 'scalps cleaned'),
     stat(save.visits.toLocaleString(), 'VIP visits'),
     stat(save.fiveStars.toLocaleString(), '5-star reviews'),
   ].join('');
@@ -1753,6 +1755,7 @@ document.querySelectorAll('#ear-tools .tool').forEach((b) => b.addEventListener(
 on('btn-makeup', () => startSalon('makeup'));
 on('btn-strip', () => startSalon('strip'));
 on('btn-brows', () => startSalon('brows'));
+on('btn-scalp', () => startSalon('scalp'));
 on('btn-vip', () => startVisit(save.dailyDone !== todayKey()));
 on('btn-haircut', () => showSalon());
 on('btn-salon-go', () => startSalon('hair'));

@@ -32,6 +32,7 @@ const DEFAULTS = {
   haircutDone: 0,
   stripsDone: 0,
   browsDone: 0,
+  scalpsDone: 0,
   visits: 0,        // VIP clients seen all the way through
   fiveStars: 0,
   reviews: [],      // newest first: { n, s, t }
