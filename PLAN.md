@@ -11,8 +11,8 @@ everything else live up to them. Items are in the order I intend to do them; eac
 ## 1. Finish the move to painted art (biggest visible gap)
 - [x] **Back and shoulder levels** (v112): painted, three skin tones each; spots, foam and mess stay on
       bare skin via a colour-based skin map. Could add two more tones later.
-- [ ] **Ear Wax**: the ear is still code-drawn. Paint the outer ear per skin tone; keep the canal and
-      wax drawn so the gameplay stays.
+- [x] **Ear Wax** (v116): painted outer ear in three skin tones (body/ear1-3.jpg); the canal, wax and
+      tools stay drawn and sit in the painted hollow. Hair colour no longer varies per patient.
 - [ ] **Scalp**: paint the parted scalp; keep flakes, lice and nits drawn.
 - [ ] **Hair Salon hair**: painted hair pieces per style in a neutral shade, tinted to any dye colour,
       instead of code-drawn strands.

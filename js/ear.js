@@ -5,7 +5,12 @@
 import * as audio from './audio.js';
 import { drawTweezers, drawExtractor, drawSyringe } from './tools.js';
 import { buzz } from './haptics.js';
-import { rgba } from './skin.js';
+import { rgba, SKIN_TONES } from './skin.js';
+
+// Painted outer ears (fair, medium, deep). cx, cy: the canal in the picture; r: the hollow the
+// drawn canal sits in, as a share of the picture's width; lobe: where an earring hangs.
+const EAR_ART = { files: ['body/ear1.jpg', 'body/ear2.jpg', 'body/ear3.jpg'], cx: 0.44, cy: 0.478, r: 0.16, lobe: [0.325, 0.715] };
+if (typeof Image !== 'undefined') EAR_ART.imgs = EAR_ART.files.map((src) => { const im = new Image(); im.src = src; return im; });
 
 const WAX = [
   ['#f6d277', '#cf9226'],
@@ -35,6 +40,8 @@ export class Ear {
     this.tone = tone;
     this.level = level;
     this.case = EAR_CASES[(level - 1) % EAR_CASES.length];
+    const ti = SKIN_TONES.indexOf(tone);
+    this.art = EAR_ART.imgs ? EAR_ART.imgs[ti <= 1 ? 0 : ti <= 3 ? 1 : 2] : null;
     // who this ear belongs to: hair, which side, jewellery
     this.hair = HAIRS[(level * 3 + 1) % HAIRS.length];
     this.flip = level % 2 === 0;                           // left ear on even levels
@@ -437,16 +444,24 @@ export class Ear {
     // even-numbered patients show their other ear
     ctx.save();
     if (this.flip) { ctx.translate(this.G.W, 0); ctx.scale(-1, 1); }
-    this.drawOuterEar(ctx);
+    const painted = this.drawPainted(ctx);
+    if (!painted) this.drawOuterEar(ctx);
     ctx.restore();
 
     // canal
     const g = ctx.createRadialGradient(cx, cy, Rd * 0.5, cx, cy, R * 1.08);
     g.addColorStop(0, '#2b0e0e');
     g.addColorStop(0.45, '#5e2620');
-    g.addColorStop(0.8, '#a85a4e');
-    g.addColorStop(0.93, rgba(this.tone.blush, 0.9));
-    g.addColorStop(1, rgba(this.tone.bump, 0));
+    let wall = '#a85a4e';
+    if (painted && this.rim) { const [r, gg, b] = this.rim.split(',').map(Number); wall = `rgb(${Math.round(r * 0.6 + 168 * 0.4)},${Math.round(gg * 0.6 + 90 * 0.4)},${Math.round(b * 0.6 + 78 * 0.4)})`; }
+    g.addColorStop(0.8, wall);
+    if (painted && this.rim) {
+      g.addColorStop(0.9, `rgba(${this.rim},0.85)`);
+      g.addColorStop(1, `rgba(${this.rim},0)`);
+    } else {
+      g.addColorStop(0.93, rgba(this.tone.blush, 0.9));
+      g.addColorStop(1, rgba(this.tone.bump, 0));
+    }
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(cx, cy, R * 1.08, 0, Math.PI * 2);
@@ -530,7 +545,7 @@ export class Ear {
     }
     ctx.save();
     if (this.flip) { ctx.translate(this.G.W, 0); ctx.scale(-1, 1); }
-    this.drawFlaps(ctx);
+    if (!painted) this.drawFlaps(ctx);
     ctx.restore();
     // freshly rinsed: the canal glistens
     if (this.wetT > 0) {
@@ -539,6 +554,54 @@ export class Ear {
       ctx.strokeStyle = `rgba(255,255,255,${0.35 * Math.min(1, this.wetT)})`; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, -2.4, -1.5); ctx.stroke();
     }
+  }
+
+  /** The painted ear, placed so its hollow sits exactly under the drawn canal. False until it has loaded. */
+  drawPainted(ctx) {
+    const im = this.art, G = this.G;
+    if (!im || !im.complete || !im.naturalWidth) return false;
+    if (!this.paint || this.paint.w !== G.W || this.paint.h !== G.H) {
+      const A = EAR_ART, dpr = Math.min(3, G.dpr || 2);
+      const c = document.createElement('canvas');
+      c.width = Math.round(G.W * dpr); c.height = Math.round(G.H * dpr);
+      const x = c.getContext('2d');
+      x.scale(dpr, dpr);
+      const ucx = this.flip ? G.W - this.cx : this.cx;         // drawn inside the mirrored frame
+      let k = this.R / (A.r * im.naturalWidth);
+      // never leave a gap at an edge of the screen
+      k = Math.max(k, ucx / (A.cx * im.naturalWidth), (G.W - ucx) / ((1 - A.cx) * im.naturalWidth),
+        this.cy / (A.cy * im.naturalHeight), (G.H - this.cy) / ((1 - A.cy) * im.naturalHeight));
+      const x0 = ucx - A.cx * im.naturalWidth * k, y0 = this.cy - A.cy * im.naturalHeight * k;
+      x.imageSmoothingQuality = 'high';
+      x.drawImage(im, x0, y0, im.naturalWidth * k, im.naturalHeight * k);
+      // the colour of the hollow around the canal, so the drawn canal melts into the painting
+      const t = document.createElement('canvas'); t.width = 32; t.height = 48;
+      const tx = t.getContext('2d'); tx.drawImage(im, 0, 0, 32, 48);
+      const px = tx.getImageData(Math.round(32 * (A.cx + 0.1)), Math.round(48 * (A.cy - 0.05)), 2, 2).data;
+      this.rim = `${Math.round(px[0] * 0.8)},${Math.round(px[1] * 0.7)},${Math.round(px[2] * 0.68)}`;
+      this.paint = { c, w: G.W, h: G.H, lobe: [x0 + A.lobe[0] * im.naturalWidth * k, y0 + A.lobe[1] * im.naturalHeight * k], k: k * im.naturalWidth };
+    }
+    ctx.drawImage(this.paint.c, 0, 0, G.W, G.H);
+    // jewellery on the painted lobe
+    const [lx, ly] = this.paint.lobe, ew = this.paint.k * 0.6;
+    if (this.earring === 1 || this.earring === 3) {
+      const pr = ew * 0.022;
+      ctx.fillStyle = 'rgba(60,20,10,0.3)';
+      ctx.beginPath(); ctx.arc(lx + 1.5, ly + 2, pr, 0, Math.PI * 2); ctx.fill();
+      const sg = ctx.createRadialGradient(lx - pr * 0.3, ly - pr * 0.3, 0.5, lx, ly, pr);
+      sg.addColorStop(0, '#fff6c2'); sg.addColorStop(0.5, '#f4c430'); sg.addColorStop(1, '#b8860b');
+      ctx.fillStyle = sg;
+      ctx.beginPath(); ctx.arc(lx, ly, pr, 0, Math.PI * 2); ctx.fill();
+    }
+    if (this.earring === 2) {
+      ctx.strokeStyle = 'rgba(60,20,10,0.3)'; ctx.lineWidth = ew * 0.014;
+      ctx.beginPath(); ctx.arc(lx + 2, ly + ew * 0.05 + 3, ew * 0.055, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#e9bd3a';
+      ctx.beginPath(); ctx.arc(lx, ly + ew * 0.05, ew * 0.055, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(lx, ly + ew * 0.05, ew * 0.055, 3.6, 4.6); ctx.stroke();
+    }
+    return true;
   }
 
   drawOuterEar(ctx) {
