@@ -31,7 +31,7 @@ function paintEye(ctx, px, py, d, erx, ery, col, gx, gy) {
   const sc = ctx.createRadialGradient(px, py + ery * 0.2, erx * 0.1, px, py, erx * 1.15);
   sc.addColorStop(0, '#ebe3de'); sc.addColorStop(0.55, '#dacdc7'); sc.addColorStop(1, '#a8908b');
   ctx.fillStyle = sc; ctx.fillRect(px - erx * 1.2, py - ery * 1.6, erx * 2.4, ery * 3.2);
-  const ir = ery * 1.0, ix = px + gx * erx * 0.28, iy = py - ery * 0.2 + gy * ery * 0.25;
+  const ir = ery * 0.96, ix = px + gx * erx * 0.28, iy = py - ery * 0.12 + gy * ery * 0.25;   // the lid only just covers the top of the iris: bright, awake eyes
   const ig = ctx.createRadialGradient(ix, iy, ir * 0.3, ix, iy, ir);
   ig.addColorStop(0, tint(col, 1.28)); ig.addColorStop(0.5, tint(col, 1.06)); ig.addColorStop(0.84, tint(col, 0.66)); ig.addColorStop(0.96, tint(col, 0.26)); ig.addColorStop(1, 'rgba(30,18,16,0)');
   ctx.fillStyle = ig; ctx.beginPath(); ctx.arc(ix, iy, ir * 1.03, 0, Math.PI * 2); ctx.fill();
@@ -371,7 +371,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // chin (never a point). k = distance below the eyes in face half-widths; P = width as a share of the
   // cheekbones. Each face shape bends the lower half of the profile a little.
   const K_EYE = -0.05, HWHH = hw / hh;
-  const PROF = [[0, 1], [0.25, 0.99], [0.5, 0.955], [0.75, 0.885], [0.97, 0.78], [1.1, 0.69], [1.25, 0.545], [1.35, 0.415], [1.42, 0.3], [1.48, 0.17], [1.515, 0.07], [1.525, 0]];
+  const PROF = [[0, 1], [0.25, 0.98], [0.5, 0.94], [0.75, 0.86], [0.97, 0.745], [1.1, 0.65], [1.25, 0.51], [1.35, 0.39], [1.42, 0.285], [1.48, 0.165], [1.515, 0.07], [1.525, 0]];
   const MOD = { oval: [0, 0, 1], round: [0.05, 0.02, 0.97], square: [0.06, 0.04, 1], heart: [-0.05, -0.03, 1.01], diamond: [-0.03, -0.01, 1.01], oblong: [0, 0, 1.06] }[shape] || [0, 0, 1];
   const kLen = MOD[2] + vr(9) * 0.03;
   const prof = (k) => {
@@ -402,7 +402,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   for (let i = 0; i <= 60; i++) {
     const k = (K_EYE - 0.06 > 0 ? 0 : (-0.06 - K_EYE) / HWHH) + (kEnd - (-0.06 - K_EYE) / HWHH) * i / 60;
     const v = K_EYE + k * HWHH;
-    outline.push([SH.C * prof(Math.max(0, k)) + 0.012 * gs((v - 0.06) / 0.12) - SH.hol * 0.035 * gs((v - 0.42) / 0.15), v]);
+    outline.push([SH.C * prof(Math.max(0, k)) - SH.hol * 0.03 * gs((v - 0.42) / 0.15), v]);
   }
   outline.push([0, chinV]);
   const head = new Path2D();
@@ -429,7 +429,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const sh = (a) => `rgba(168,98,94,${(a * 0.95).toFixed(3)})`;
   const mul = (fn) => { x.save(); x.globalCompositeOperation = 'multiply'; fn(); x.restore(); };
   const ey = -0.05, ex = 0.5;                      // eye line / spacing (head units)
-  const erx = hw * (0.24 + vr(2) * 0.02), ery = hh * (0.074 + vr(3) * 0.01);   // big, bright eyes
+  const erx = hw * (0.25 + vr(2) * 0.02), ery = hh * (0.084 + vr(3) * 0.008);   // big, bright eyes
   const mouthY = 0.66, noseY = 0.325;
   const old = (look.age || 25) >= 55 ? 1 : (look.age || 25) >= 40 ? 0.55 : (look.age || 25) >= 32 ? 0.25 : 0.08;
 
@@ -710,7 +710,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     const onLid = (t) => { const u = 1 - t; return [0, 1].map((i) => u * u * u * B[0][i] + 3 * u * u * t * B[1][i] + 3 * u * t * t * B[2][i] + t * t * t * B[3][i]); };
     for (let i = 1; i < 28; i++) {
       const k = i / 28, a = onLid(k), b = onLid((i + 1) / 28);
-      x.strokeStyle = `rgba(26,13,10,${0.5 + 0.45 * k})`; x.lineWidth = s * (look.fem ? 0.0072 : 0.0028) * (0.45 + 1.1 * Math.sin(Math.min(1, k * 1.15) * Math.PI * 0.6));
+      x.strokeStyle = `rgba(26,13,10,${0.5 + 0.45 * k})`; x.lineWidth = s * (look.fem ? 0.0062 : 0.0028) * (0.45 + 1.1 * Math.sin(Math.min(1, k * 1.15) * Math.PI * 0.6));
       x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
     }
     // lashes: short, fine, in little clumps, sweeping outward
@@ -897,8 +897,9 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // a couple of moles, never on the lips or the eyes
   for (let i = 0; i < 3; i++) {
     const u = (R() - 0.5) * 1.3, v = -0.3 + R() * 1.1;
-    if ((Math.abs(v - mouthY) < 0.16 && Math.abs(u) < 0.45) || (Math.abs(v - ey) < 0.16 && Math.abs(Math.abs(u) - ex) < 0.3)) continue;
-    x.fillStyle = 'rgba(85,48,34,0.6)';
+    // a beauty mark sits out on the cheek or near the lip, never on the nose or between the eyes
+    if (i > 0 || Math.abs(u) < 0.42 || (Math.abs(v - mouthY) < 0.16 && Math.abs(u) < 0.45) || (Math.abs(v - ey) < 0.16 && Math.abs(Math.abs(u) - ex) < 0.3)) continue;
+    x.fillStyle = 'rgba(85,48,34,0.5)';
     x.beginPath(); x.arc(X(u), Y(v), (0.8 + R() * 1.3) * Math.max(0.3, Math.min(1, s / 380)), 0, Math.PI * 2); x.fill();
   }
 
