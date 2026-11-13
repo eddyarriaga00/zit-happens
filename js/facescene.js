@@ -2,7 +2,26 @@
 // with real skin texture, shading, eyes, nose, lips and hair. Returns the canvas plus
 // "geo": where the features are, so pimples land on skin and the eyes can blink.
 
-import { renderSkin, rgba } from './skin.js';
+import { renderSkin, rgba, SKIN_TONES } from './skin.js';
+
+// Painted portraits. When one is loaded for her skin tone, the face on screen is the painting and the
+// geometry below (eyes, nose, lips, chin) is fitted to it, so every tool still lands in the right place.
+// Landmarks are fractions of the image: eyeY, eL/eR (iris centres), nose (its base), mouth (the seam), chin.
+export const PHOTOS = [
+  { src: 'faces/girl1.jpg', tone: [1], hair: '#4a2e1f', eyeY: 0.370, eL: 0.365, eR: 0.640, nose: 0.495, mouth: 0.560, chin: 0.667 },
+  { src: 'faces/girl2.jpg', tone: [0], hair: '#b5673a', eyeY: 0.368, eL: 0.369, eR: 0.641, nose: 0.495, mouth: 0.554, chin: 0.658 },
+  { src: 'faces/girl3.jpg', tone: [2], hair: '#1c1412', eyeY: 0.365, eL: 0.365, eR: 0.631, nose: 0.495, mouth: 0.551, chin: 0.662 },
+  { src: 'faces/girl4.jpg', tone: [3], hair: '#2a1a14', eyeY: 0.363, eL: 0.369, eR: 0.635, nose: 0.493, mouth: 0.551, chin: 0.654 },
+  { src: 'faces/girl5.jpg', tone: [4], hair: '#17110f', eyeY: 0.363, eL: 0.369, eR: 0.638, nose: 0.491, mouth: 0.549, chin: 0.641 },
+  { src: 'faces/girl6.jpg', tone: [0, 1], hair: '#2a1c16', eyeY: 0.359, eL: 0.369, eR: 0.638, nose: 0.487, mouth: 0.553, chin: 0.652 },
+];
+if (typeof Image !== 'undefined') for (const ph of PHOTOS) { ph.img = new Image(); ph.img.src = ph.src; }
+export const photosReady = typeof Image === 'undefined' ? Promise.resolve() : Promise.all(PHOTOS.map((ph) => ph.img.decode().catch(() => {})));
+const pickPhoto = (tone, seed) => {
+  const ti = SKIN_TONES.indexOf(tone);
+  const list = PHOTOS.filter((ph) => ph.tone.includes(ti) && ph.img && ph.img.complete && ph.img.naturalWidth);
+  return list.length ? list[(seed >>> 4) % list.length] : null;
+};
 
 function tint(col, k) {   // k < 1 darker, k > 1 lighter. Takes #rrggbb or rgb(r,g,b).
   let r, g, b;
@@ -85,7 +104,10 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const hw = s * 0.415, hh = s * 0.6;      // proportions measured from makeover-game art (face ~1.15x as tall as wide)
   const cx = w / 2, cy = top + (bottom - top) * 0.47;
   const X = (u) => cx + u * hw, Y = (v) => cy + v * hh;
-  const vr = (i) => (((seed >>> (i * 3 + 2)) & 15) / 15 - 0.5) * (look.fixed ? 0 : 1);     // -0.5..0.5, hers alone
+  const photo = look.noPhoto ? null : pickPhoto(tone, seed);
+  // how far below her eyes a landmark of the painting sits, in face half-widths (eyes are one half-width apart)
+  const pdown = (f) => (f - photo.eyeY) * photo.img.naturalHeight / ((photo.eR - photo.eL) * photo.img.naturalWidth);
+  const vr = (i) => (((seed >>> (i * 3 + 2)) & 15) / 15 - 0.5) * (look.fixed || photo ? 0 : 1);     // -0.5..0.5, hers alone
   const hair = /^#[0-9a-f]{6}$/i.test(look.hair || '') ? look.hair : '#3a2618';
   const grey = ['#cfcfcf', '#b9b9b9', '#8f8f8f'].includes(hair);
   const hairLo = tint(hair, 0.72), hairHi = tint(hair, 1.16);
@@ -331,7 +353,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     diamond: { T: 0.93,  C: 0.98,  full: -0.03, jaw: 0.54, jv: 0.70, a: 0.23, b: 0.17, bv: 0.21, cw: 0.20, chinV: 1.04,  hol: 0.3 },
     oblong:  { T: 0.985, C: 0.95,  full: 0.01,  jaw: 0.62, jv: 0.72, a: 0.15, b: 0.17, bv: 0.22, cw: 0.24, chinV: 1.085, hol: 0.22 },
   };
-  const shape = SHAPES[look.shape] ? look.shape : look.fixed ? 'oval'
+  const shape = photo ? 'oval' : SHAPES[look.shape] ? look.shape : look.fixed ? 'oval'
     : ['oval', 'oval', 'oval', 'round', 'round', 'heart', 'heart', 'square', 'diamond', 'oblong'][((seed >>> 13) ^ (seed >>> 22)) % 10];
   const SH = SHAPES[shape];
   const earX = SH.C + 0.025;
@@ -373,7 +395,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const K_EYE = -0.05, HWHH = hw / hh;
   const PROF = [[0, 1], [0.25, 0.98], [0.5, 0.94], [0.75, 0.86], [0.97, 0.745], [1.1, 0.65], [1.25, 0.51], [1.35, 0.39], [1.42, 0.285], [1.48, 0.165], [1.515, 0.07], [1.525, 0]];
   const MOD = { oval: [0, 0, 1], round: [0.05, 0.02, 0.97], square: [0.06, 0.04, 1], heart: [-0.05, -0.03, 1.01], diamond: [-0.03, -0.01, 1.01], oblong: [0, 0, 1.06] }[shape] || [0, 0, 1];
-  const kLen = MOD[2] * 0.95 + vr(9) * 0.03;      // eyes to chin ~1.45 face half-widths (average of two reference faces)
+  const kLen = photo ? pdown(photo.chin) / 1.525 : MOD[2] * 0.95 + vr(9) * 0.03;      // eyes to chin ~1.45 face half-widths (average of two reference faces)
   const prof = (k) => {
     k /= kLen;
     let i = 0; while (i < PROF.length - 2 && PROF[i + 1][0] < k) i++;
@@ -429,8 +451,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const sh = (a) => `rgba(168,98,94,${(a * 0.95).toFixed(3)})`;
   const mul = (fn) => { x.save(); x.globalCompositeOperation = 'multiply'; fn(); x.restore(); };
   const ey = -0.05, ex = 0.5;                      // eye line / spacing (head units)
-  const erx = hw * (0.255 + vr(2) * 0.02), ery = hh * (0.071 + vr(3) * 0.007);   // big, bright eyes
-  const mouthY = 0.6, noseY = 0.32;
+  const erx = hw * (photo ? 0.21 : 0.255 + vr(2) * 0.02), ery = hh * (photo ? 0.058 : 0.071 + vr(3) * 0.007);   // big, bright eyes
+  const mouthY = photo ? ey + pdown(photo.mouth) * hw / hh : 0.6, noseY = photo ? ey + pdown(photo.nose) * hw / hh - 0.05 : 0.32;
   const old = (look.age || 25) >= 55 ? 1 : (look.age || 25) >= 40 ? 0.55 : (look.age || 25) >= 32 ? 0.25 : 0.08;
 
   x.save();
@@ -810,7 +832,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   soft(cx, Y(noseY + 0.05), hw * 0.09, hh * 0.015, 'rgba(70,26,22,0.16)');             // the tip turning under, between the nostrils
 
   // ---- lips
-  const my = Y(mouthY), mw = hw * (0.35 + vr(4) * 0.03), lh = hh * (1.3 + vr(5) * 0.2);     // how wide her mouth is, how full her lips
+  const my = Y(mouthY), mw = hw * (photo ? 0.37 : 0.35 + vr(4) * 0.03), lh = hh * (photo ? 1.0 : 1.3 + vr(5) * 0.2);     // how wide her mouth is, how full her lips
   const mixHex = (a, b, t) => {
     if (!/^#[0-9a-f]{6}$/i.test(a) || !/^#[0-9a-f]{6}$/i.test(b)) return b;
     const p = (c, i) => parseInt(c.slice(1 + i * 2, 3 + i * 2), 16);
@@ -1024,6 +1046,26 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const clipSkin = (ctx) => { ctx.clip(head); ctx.clip(below); };
   const geo = { cx, cy, hw, hh, eyes, inHead, onSkin, blocked, anyPoint, zonePoint, strayPoint,
     lipsPath, inLips, lipsBox, cheeks, lids, onHair, clipSkin, headPath: head, shape, eyeCol: look.eye, eyePaths, hairlineY: Y(hairline), browY: Y(ey - 0.215), lid: tone.base, lidShade: tone.shade, lash: '#2a1712' };
+  if (photo) {
+    // the painting, scaled and placed so its eyes sit exactly on the geometry's eyes
+    const im = photo.img, iw = im.naturalWidth, ih = im.naturalHeight;
+    const k = (2 * ex * hw) / ((photo.eR - photo.eL) * iw);
+    const x0 = cx - (photo.eL + photo.eR) / 2 * iw * k, y0 = Y(ey) - photo.eyeY * ih * k;
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.shadowColor = 'transparent'; x.filter = 'none';
+    x.imageSmoothingQuality = 'high';
+    if (y0 > 0) x.drawImage(im, 4, 4, 3, 3, 0, 0, w, y0 + 1);                                    // the plain backdrop carries on above
+    if (y0 + ih * k < h) x.drawImage(im, 0, ih - 3, iw, 3, 0, y0 + ih * k - 1, w, h - (y0 + ih * k) + 1);   // and her top below
+    if (x0 > 0) { x.drawImage(im, 0, 0, 3, ih, 0, y0, x0 + 1, ih * k); x.drawImage(im, iw - 3, 0, 3, ih, x0 + iw * k - 1, y0, w - (x0 + iw * k) + 1, ih * k); }
+    x.drawImage(im, x0, y0, iw * k, ih * k);
+    // eyelids are drawn live when she blinks, so they take their colour from the painting itself
+    const pix = (px, py) => { try { const q = x.getImageData(Math.round(px * dpr), Math.round(py * dpr), 1, 1).data; return '#' + [q[0], q[1], q[2]].map((v) => v.toString(16).padStart(2, '0')).join(''); } catch { return tone.base; } };
+    geo.lid = pix(eyes[0].x, eyes[0].y - ery * 2.3);
+    geo.lidShade = pix(eyes[0].x, eyes[0].y - ery * 1.75);
+    geo.eyeCol = null;            // her painted eyes stay as painted
+    geo.photo = true;
+    geo.photoHair = photo.hair;
+  }
   return { canvas: c, geo };
 }
 

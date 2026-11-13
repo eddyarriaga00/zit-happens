@@ -1,7 +1,7 @@
 import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
 import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL, AWARDS, rankFor } from './levels.js';
 import { lookFor, portraitURL } from './faces.js';
-import { renderFaceScene, drawLids, drawMood, drawEyes } from './facescene.js';
+import { renderFaceScene, drawLids, drawMood, drawEyes, photosReady } from './facescene.js';
 import { Makeup, Haircut, LIP_SHADES } from './salon.js';
 import { HairService, STATIONS, WALLS, salonLevel, salonTitle, salonPicture, salonBackdrop } from './hairsalon.js';
 import { Strip, Brows } from './extras.js';
@@ -39,6 +39,7 @@ function paintSkin() {
     const scene = renderFaceScene(G.W, G.H, Math.min(3, G.dpr * 1.5), tone(), G.seed, G.look, playTop(), playBottom(), faceFit());
     G.skin = scene.canvas;
     G.geo = scene.geo;
+    if (scene.geo.photoHair && G.look) G.look = { ...G.look, hair: scene.geo.photoHair };      // her brows and scalp match the painting
   } else {
     G.geo = null;
     G.skin = renderSkin(G.W, G.H, G.dpr, tone(), G.seed, G.zone, G.look);
@@ -580,12 +581,12 @@ function startSalon(kind, vip = null) {
   G.paused = false;
   const client = { ...(vip ? vip.def : LEVELS[Math.floor(Math.random() * LEVELS.length)]), zone: 'forehead' };
   newScene(vip ? vip.seed : Math.floor(Math.random() * 1e9), client);
-  if (kind === 'haircut') { G.look = { ...G.look, style: 'long' }; paintSkin(); }   // needs a fringe to trim
+  if (kind === 'haircut') { G.look = { ...G.look, style: 'long', noPhoto: true }; paintSkin(); }   // needs a fringe to trim
   if (kind === 'hair') {
     // your salon: its walls follow the Decor level, its stations decide the services
     G.salonLv = save.salon;
     const styles = ['long', 'pony', 'bun', 'curly', 'short'];
-    G.look = { ...G.look, wall: WALLS[save.salon.decor] || WALLS[0], backdrop: (cx2, w2, h2) => salonBackdrop(cx2, w2, h2, save.salon), style: styles.includes(G.look.style) ? G.look.style : 'long' };
+    G.look = { ...G.look, noPhoto: true, wall: WALLS[save.salon.decor] || WALLS[0], backdrop: (cx2, w2, h2) => salonBackdrop(cx2, w2, h2, save.salon), style: styles.includes(G.look.style) ? G.look.style : 'long' };
     paintSkin();
   }
   G.salon = kind === 'makeup' ? new Makeup(G, Math.min(LIP_SHADES.length, 3 + save.makeupDone))
@@ -1545,6 +1546,7 @@ function refreshTools() {
 // ---- level map, patient card, shop
 const SHOP_ICONS = { steady: '🤲', loop: '⭕', pad: '🧽', spa: '🧖‍♀️', lucky: '🍀', magnet: '🧲', wash: '🚿', chair: '💺', colour: '🎨', style: '💁‍♀️', decor: '🪞' };
 const faceCache = new Map();     // level -> small portrait, kept for the session
+photosReady.then(() => { faceCache.clear(); const vf = $('vip-face'); if (vf) vf.dataset.who = ''; });     // repaint thumbnails once the painted portraits have loaded
 function showLevels() {
   const total = Object.values(save.stars).reduce((a, b) => a + b, 0);
   let html = `<div class="lv-top"><span>★ ${total} / ${LEVELS.length * 3}</span><span>🪙 ${save.coins.toLocaleString()}</span></div>`;
