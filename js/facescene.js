@@ -172,7 +172,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // the line the hair grows from. Drawn back for a ponytail or a bun it is an even arch, highest in the middle;
   // worn down it sits lower on the side the hair sweeps toward.
   const tiedBack = style === 'pony' || style === 'bun';
-  const hl = (u) => hairline + (tiedBack ? 0.02 + 0.15 * u * u : 0.05 * Math.abs(u) + (style === 'buzz' ? 0 : 0.1 * Math.max(0, u * 0.9)));
+  // on a painted portrait her hair is held back by the band, so the hairline is an even arch: highest at the parting
+  const hl = (u) => hairline + (photo && !look.photoFace ? -0.02 + 0.13 * u * u : tiedBack ? 0.02 + 0.15 * u * u : 0.05 * Math.abs(u) + (style === 'buzz' ? 0 : 0.1 * Math.max(0, u * 0.9)));
   x.lineCap = 'round';
   x.lineJoin = 'round';
 

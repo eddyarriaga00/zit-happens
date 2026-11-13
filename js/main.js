@@ -170,7 +170,10 @@ probe.style.cssText = 'position:fixed;top:0;left:0;padding-top:env(safe-area-ins
 document.body.appendChild(probe);
 
 function resize() {
-  const W = window.innerWidth, H = window.innerHeight;
+  // sized from the canvas's own box rather than the window: on iPhone home-screen apps the window can
+  // report a height one status bar short, which left an empty strip along the bottom
+  const box = canvas.getBoundingClientRect();
+  const W = Math.round(box.width) || window.innerWidth, H = Math.round(box.height) || window.innerHeight;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);   // 2x is plenty and keeps iPhones at 60fps
   const cs = getComputedStyle(probe);
   G.safeTop = parseFloat(cs.paddingTop) || 0;

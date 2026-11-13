@@ -16,6 +16,10 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* iPhone home-screen apps with a see-through status bar report a page that is one status bar too
+   short, leaving an empty strip at the bottom; this stretches the page back to the full screen */
+html { min-height: calc(100% + env(safe-area-inset-top)); }
+
 html, body {
   margin: 0;
   height: 100%;

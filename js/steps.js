@@ -398,7 +398,8 @@ export class Treatment {
     // lather: a creamy white layer with soft shading and a scatter of glossy bubbles
     if (this.phase === 'lather' || this.phase === 'rinse') {
       ctx.save();
-      if (G.geo && G.geo.clipSkin) G.geo.clipSkin(ctx);      // lather stays on her face: not in her hair, on her ears or on the wall
+      // lather is only ever put on cells over her skin, so it needs no hard cut-out: its own bubbles
+      // make the edge, the way real foam sits on a face
       const wob = this.time * 2;
       const pass = (dx, dy, k, style) => {
         ctx.fillStyle = style;
@@ -419,9 +420,10 @@ export class Treatment {
         }
         ctx.fill();
       };
-      pass(2, 3.5, 1.04, 'rgba(70,90,120,0.16)');          // soft shadow on the skin
-      pass(0, 0, 1, 'rgba(226,235,246,0.92)');             // cool underside
-      pass(-1.5, -2, 0.86, 'rgba(255,255,255,0.96)');      // lit top
+      pass(2.5, 4, 1.06, 'rgba(90,60,70,0.14)');           // soft shadow on the skin
+      pass(0, 0, 1, 'rgba(214,226,242,0.94)');             // cool underside
+      pass(-1, -1.6, 0.9, 'rgba(240,246,252,0.97)');       // body of the foam
+      pass(-2.4, -3.6, 0.62, 'rgba(255,255,255,0.98)');    // lit top, so each puff reads as round
       // a few distinct bubbles: thin rim, bright glint
       ctx.lineWidth = 1;
       for (let row = 0; row < rows; row++) {
@@ -430,7 +432,7 @@ export class Treatment {
           if (foam[i] <= 0.4 || jit[i * 4 + 3] > 0.55) continue;
           const x = (col + jit[i * 4 + 2]) * CELL, y = (row + jit[i * 4 + 3]) * CELL + Math.sin(wob + i) * 1.2;
           const r = CELL * (0.12 + 0.2 * jit[i * 4]);
-          ctx.strokeStyle = 'rgba(150,180,215,0.5)';
+          ctx.strokeStyle = 'rgba(150,180,215,0.32)';
           ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
           ctx.fillStyle = 'rgba(255,255,255,0.95)';
           ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.4, Math.max(0.8, r * 0.22), 0, Math.PI * 2); ctx.fill();
