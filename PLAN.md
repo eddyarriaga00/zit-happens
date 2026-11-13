@@ -40,7 +40,7 @@ everything else live up to them. Items are in the order I intend to do them; eac
 - [ ] One-thumb play checked on every mode (reach, button sizes, nothing under the toolbar).
 
 ## 5. Phone basics
-- [ ] Smaller download: portraits as WebP at two sizes (about a third of today's 3.5 MB).
+- [x] Smaller download, first cut (v115): all art re-encoded, 12 MB down to 5.8 MB. Still open: WebP at two sizes.
 - [ ] Loading screen on first open instead of a blank moment.
 - [ ] Works offline after first open (check the saved file list covers all art).
 - [ ] The blank bottom strip, fixed in a way that is confirmed on the phone.
