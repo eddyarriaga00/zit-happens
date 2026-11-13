@@ -1079,6 +1079,40 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
 /** Eyelids drawn live over the painted eyes: closed = 0 (open) .. 1 (shut). */
 export function drawLids(ctx, geo, closed) {
   if (closed <= 0.02) return;
+  if (geo.photo) {
+    // over a painting: a soft patch of her own lid colour melts over the painted eye, then the closed
+    // lash line and its lashes are drawn where the lids meet
+    const k = Math.min(1, closed * 1.6), hex = (c, al) => { const n = parseInt(c.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${al})`; };
+    for (const e of geo.eyes) {
+      const d = Math.sign(e.x - geo.cx) || 1, rx = e.rx, ry = e.ry;
+      ctx.save();
+      ctx.translate(e.x, e.y + ry * 0.15); ctx.scale(1, (ry * 2.5) / (rx * 1.5));
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx * 1.5);
+      g.addColorStop(0, hex(geo.lid, k)); g.addColorStop(0.62, hex(geo.lid, k)); g.addColorStop(0.82, hex(geo.lid, k * 0.55)); g.addColorStop(1, hex(geo.lid, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx * 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = k; ctx.lineCap = 'round';
+      const ax = e.x - d * rx * 1.02, ay = e.y + ry * 0.35, bx = e.x + d * rx * 1.08, by = e.y + ry * 0.05, mx = e.x + d * rx * 0.05, my = e.y + ry * 1.5;
+      // the dome of the lid catches a little light, and the crease above it stays
+      const hl = ctx.createRadialGradient(e.x, e.y - ry * 0.2, 0, e.x, e.y - ry * 0.2, rx * 0.7);
+      hl.addColorStop(0, 'rgba(255,240,225,0.16)'); hl.addColorStop(1, 'rgba(255,240,225,0)');
+      ctx.fillStyle = hl; ctx.beginPath(); ctx.ellipse(e.x, e.y - ry * 0.2, rx * 0.7, ry * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hex(geo.lidShade, 0.55); ctx.lineWidth = Math.max(0.8, rx * 0.045);
+      ctx.beginPath(); ctx.moveTo(e.x - d * rx * 0.85, e.y - ry * 0.75); ctx.quadraticCurveTo(e.x, e.y - ry * 1.75, e.x + d * rx * 0.95, e.y - ry * 0.7); ctx.stroke();
+      ctx.strokeStyle = 'rgba(38,20,14,0.9)'; ctx.lineWidth = Math.max(1, rx * 0.075);
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(mx, my, bx, by); ctx.stroke();
+      ctx.lineWidth = Math.max(0.5, rx * 0.03);
+      for (let i = 1; i < 16; i++) {
+        const t = i / 16, u = 1 - t;
+        const lx = u * u * ax + 2 * u * t * mx + t * t * bx, ly = u * u * ay + 2 * u * t * my + t * t * by;
+        const len = ry * 0.55 * (0.45 + t * 0.7);
+        ctx.beginPath(); ctx.moveTo(lx, ly); ctx.quadraticCurveTo(lx + d * len * 0.25, ly + len * 0.7, lx + d * len * (0.3 + t * 0.6), ly + len * 0.85); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    return;
+  }
   for (const e of geo.eyes) {
     // a real lid: skin sliding down from the upper lash line, its edge curving with the eyeball
     const d = Math.sign(e.x - geo.cx) || 1, rx = e.rx * 1.03, ry = e.ry;
