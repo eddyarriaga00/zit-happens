@@ -24,11 +24,15 @@ export const PHOTOS = [
 ];
 if (typeof Image !== 'undefined') for (const ph of PHOTOS) { ph.img = new Image(); ph.img.src = ph.src; }
 export const photosReady = typeof Image === 'undefined' ? Promise.resolve() : Promise.all(PHOTOS.map((ph) => new Promise((res) => { if (ph.img.complete) res(); else { ph.img.onload = res; ph.img.onerror = res; } })));
+const loaded = (ph) => ph.img && ph.img.complete && ph.img.naturalWidth;
 const pickPhoto = (tone, seed) => {
   const ti = SKIN_TONES.indexOf(tone);
-  const list = PHOTOS.filter((ph) => ph.tone.includes(ti) && ph.img && ph.img.complete && ph.img.naturalWidth);
+  let list = PHOTOS.filter((ph) => ph.tone.includes(ti) && loaded(ph));
+  if (!list.length) list = PHOTOS.filter(loaded);          // never fall back to a drawn face while any painting is there
   return list.length ? list[(seed >>> 4) % list.length] : null;
 };
+export const photosLoaded = () => PHOTOS.some(loaded);
+const scratch = (dpr) => { const t = document.createElement('canvas'); t.width = t.height = 1; const tx = t.getContext('2d'); tx.scale(dpr, dpr); return tx; };
 
 function tint(col, k) {   // k < 1 darker, k > 1 lighter. Takes #rrggbb or rgb(r,g,b).
   let r, g, b;
@@ -102,8 +106,15 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const c = document.createElement('canvas');
   c.width = Math.round(w * dpr);
   c.height = Math.round(h * dpr);
-  const x = c.getContext('2d');
-  x.scale(dpr, dpr);
+  const xr = c.getContext('2d');
+  xr.scale(dpr, dpr);
+  const photo = pickPhoto(tone, seed);
+  // Every face is a painting. The scene below is still worked out in full, because it is the map of
+  // where her eyes, lips, cheeks and hairline are, but when the whole painting covers it, it is drawn
+  // onto a 1x1 scratch canvas so no time is spent filling pixels nobody sees. In the salon only her face
+  // is painted in and the hair around it is drawn live, so there the scene draws for real.
+  const full = !!photo && !look.photoFace;
+  const x = full ? scratch(dpr) : xr;
   let sd = (seed >>> 0) || 1;
   const R = () => { sd = (sd * 1664525 + 1013904223) >>> 0; return sd / 4294967296; };
 
@@ -111,7 +122,6 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const hw = s * 0.415, hh = s * 0.6;      // proportions measured from makeover-game art (face ~1.15x as tall as wide)
   const cx = w / 2, cy = top + (bottom - top) * 0.47;
   const X = (u) => cx + u * hw, Y = (v) => cy + v * hh;
-  const photo = look.noPhoto ? null : pickPhoto(tone, seed);
   // how far below her eyes a landmark of the painting sits, in face half-widths (eyes are one half-width apart)
   const pdown = (f) => (f - photo.eyeY) * photo.img.naturalHeight / ((photo.eR - photo.eL) * photo.img.naturalWidth);
   const vr = (i) => (((seed >>> (i * 3 + 2)) & 15) / 15 - 0.5) * (look.fixed || photo ? 0 : 1);     // -0.5..0.5, hers alone
@@ -961,8 +971,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     x.fillStyle = pg; x.beginPath(); x.arc(cx, py2, pr, 0, Math.PI * 2); x.fill();
   }
 
-  // ---- glasses
-  if (look.glasses) {
+  // ---- glasses (the painted portraits have none, and arms poking out past a painted face look wrong)
+  if (look.glasses && !photo) {
     x.strokeStyle = '#27212b'; x.lineWidth = s * 0.014;
     for (const d of [-1, 1]) {
       x.beginPath(); x.roundRect(X(d * ex) - erx * 1.5, Y(ey) - ery * 2.6, erx * 3, ery * 5.2, ery * 1.7); x.stroke();
@@ -991,7 +1001,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
 
   // ---- where things are, for the game
   const ell = (px, py, ox, oy, rx, ry) => ((px - ox) / rx) ** 2 + ((py - oy) / ry) ** 2 < 1;
-  const inHead = (px, py) => x.isPointInPath(head, px * dpr, py * dpr);
+  const inHead = (px, py) => xr.isPointInPath(head, px * dpr, py * dpr);
   const edgeV = (u) => (hasHair && style !== 'balding' ? hl(u) + 0.03 : -0.92);
   const blocked = (px, py, r = 0) => {
     const u = (px - cx) / hw, v = (py - cy) / hh;
@@ -1039,7 +1049,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   };
   const lipsPath = new Path2D();
   lipsPath.addPath(upper); lipsPath.addPath(lower);
-  const inLips = (px, py) => x.isPointInPath(lipsPath, px * dpr, py * dpr);
+  const inLips = (px, py) => xr.isPointInPath(lipsPath, px * dpr, py * dpr);
   const lipsBox = [cx - mw, my - lh * 0.066, cx + mw, my + lh * 0.112];
   const cheeks = [-1, 1].map((d) => ({ x: X(d * 0.56), y: Y(0.3), rx: hw * 0.27, ry: hh * 0.16 }));
   const lids = eyes.map((e) => ({ x: e.x, y: e.y - ery * 1.0, rx: erx * 1.12, ry: ery * 1.6 }));     // the whole lid, lash line to crease: she shuts her eyes for it
@@ -1058,9 +1068,9 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     const im = photo.img, iw = im.naturalWidth, ih = im.naturalHeight;
     const k = (2 * ex * hw) / ((photo.eR - photo.eL) * iw);
     const x0 = cx - (photo.eL + photo.eR) / 2 * iw * k, y0 = Y(ey) - photo.eyeY * ih * k;
-    x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.shadowColor = 'transparent'; x.filter = 'none';
-    x.imageSmoothingQuality = 'high';
+    xr.setTransform(dpr, 0, 0, dpr, 0, 0);
+    xr.globalAlpha = 1; xr.globalCompositeOperation = 'source-over'; xr.shadowColor = 'transparent'; xr.filter = 'none';
+    xr.imageSmoothingQuality = 'high';
     if (look.photoFace) {
       // in the salon her hair is drawn live (washed, cut, dyed, restyled), so only her painted face and
       // neck are laid in, feathered at the edges so they melt into the hair and skin drawn around them
@@ -1080,15 +1090,15 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       lx.drawImage(im, x0, y0, iw * k, ih * k);
       lx.setTransform(1, 0, 0, 1, 0, 0);
       lx.globalCompositeOperation = 'destination-in'; lx.drawImage(mask, 0, 0);
-      x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(lay, 0, 0); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      xr.setTransform(1, 0, 0, 1, 0, 0); xr.drawImage(lay, 0, 0); xr.setTransform(dpr, 0, 0, dpr, 0, 0);
     } else {
-    if (y0 > 0) x.drawImage(im, 4, 4, 3, 3, 0, 0, w, y0 + 1);                                    // the plain backdrop carries on above
-    if (y0 + ih * k < h) x.drawImage(im, 0, ih - 3, iw, 3, 0, y0 + ih * k - 1, w, h - (y0 + ih * k) + 1);   // and her top below
-    if (x0 > 0) { x.drawImage(im, 0, 0, 3, ih, 0, y0, x0 + 1, ih * k); x.drawImage(im, iw - 3, 0, 3, ih, x0 + iw * k - 1, y0, w - (x0 + iw * k) + 1, ih * k); }
-    x.drawImage(im, x0, y0, iw * k, ih * k);
+    if (y0 > 0) xr.drawImage(im, 4, 4, 3, 3, 0, 0, w, y0 + 1);                                    // the plain backdrop carries on above
+    if (y0 + ih * k < h) xr.drawImage(im, 0, ih - 3, iw, 3, 0, y0 + ih * k - 1, w, h - (y0 + ih * k) + 1);   // and her top below
+    if (x0 > 0) { xr.drawImage(im, 0, 0, 3, ih, 0, y0, x0 + 1, ih * k); xr.drawImage(im, iw - 3, 0, 3, ih, x0 + iw * k - 1, y0, w - (x0 + iw * k) + 1, ih * k); }
+    xr.drawImage(im, x0, y0, iw * k, ih * k);
     }
     // eyelids are drawn live when she blinks, so they take their colour from the painting itself
-    const pix = (px, py) => { try { const q = x.getImageData(Math.round(px * dpr), Math.round(py * dpr), 1, 1).data; return '#' + [q[0], q[1], q[2]].map((v) => v.toString(16).padStart(2, '0')).join(''); } catch { return tone.base; } };
+    const pix = (px, py) => { try { const q = xr.getImageData(Math.round(px * dpr), Math.round(py * dpr), 1, 1).data; return '#' + [q[0], q[1], q[2]].map((v) => v.toString(16).padStart(2, '0')).join(''); } catch { return tone.base; } };
     geo.lid = pix(eyes[0].x, eyes[0].y - ery * 2.3);
     geo.lidShade = pix(eyes[0].x, eyes[0].y - ery * 1.75);
     geo.eyeCol = null;            // her painted eyes stay as painted

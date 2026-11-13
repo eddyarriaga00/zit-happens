@@ -151,14 +151,21 @@ export class HairService {
     else if (s === 'dry') { this.paint(this.dry, x, y, 46, 0.35); audio.loop('dryer', true); }
     if (++this.tick % 6 === 0) buzz('light');
   }
-  down(id, x, y) { if (this.pause > 0 || this.ready) return; if (this.stage === 'cut') this.cut.down(id, x, y); else this.apply(x, y); }
+  // A finger belongs to the stage it touched down in. Still rubbing when the rinse finishes must not
+  // turn into snipping her fringe at random heights: lift and touch again for the next stage.
+  down(id, x, y) {
+    (this.owner ||= new Map()).set(id, this.i);
+    if (this.pause > 0 || this.ready) return;
+    if (this.stage === 'cut') this.cut.down(id, x, y); else this.apply(x, y);
+  }
   move(id, x, y, px, py) {
     if (this.pause > 0 || this.ready) return;
+    if (!this.owner || this.owner.get(id) !== this.i) return;
     if (this.stage === 'cut') return this.cut.move(id, x, y, px, py);
     const d = Math.hypot(x - px, y - py), n = Math.max(1, Math.ceil(d / 14));
     for (let k = 1; k <= n; k++) this.apply(px + (x - px) * k / n, py + (y - py) * k / n);
   }
-  up(id) { this.hand = null; audio.loop('water', false); audio.loop('dryer', false); if (this.cut) this.cut.up(id); }
+  up(id) { if (this.owner) this.owner.delete(id); this.hand = null; audio.loop('water', false); audio.loop('dryer', false); if (this.cut) this.cut.up(id); }
 
   update(dt) {
     this.pause = Math.max(0, this.pause - dt);

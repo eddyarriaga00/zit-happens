@@ -1,7 +1,7 @@
 import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
 import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL, AWARDS, rankFor } from './levels.js';
 import { lookFor, portraitURL } from './faces.js';
-import { renderFaceScene, drawLids, drawMood, drawEyes, photosReady } from './facescene.js';
+import { renderFaceScene, drawLids, drawMood, drawEyes, photosReady, photosLoaded } from './facescene.js';
 import { Makeup, Haircut, LIP_SHADES } from './salon.js';
 import { HairService, STATIONS, WALLS, salonLevel, salonTitle, salonPicture, salonBackdrop } from './hairsalon.js';
 import { Strip, Brows } from './extras.js';
@@ -1373,7 +1373,9 @@ function update(dt) {
   toolfx.update(dt);
   if (G.taps) { for (const tp of G.taps) tp.t += dt; G.taps = G.taps.filter((tp) => tp.t < 0.35); }
   if (G.treat) { G.treat.update(dt); G.treat.updatePuffs(dt); }
-  G.fx.keep = G.geo && !G.ear ? G.geo.onSkin : null;       // mess only ever lands on the face itself
+  // mess only ever lands on the face itself; on a back or shoulders it stays where a finger can wipe it
+  // (a long squirt used to land off the edge of the screen and could never be cleaned)
+  G.fx.keep = G.geo && !G.ear ? G.geo.onSkin : G.ear ? null : (x, y) => x > 8 && x < G.W - 8 && y > G.safeTop + 70 && y < G.H - 8;
   G.fx.update(dt);
   G.shake *= Math.pow(0.001, dt);
   if (G.shake < 0.2) G.shake = 0;
@@ -1546,7 +1548,14 @@ function refreshTools() {
 // ---- level map, patient card, shop
 const SHOP_ICONS = { steady: '🤲', loop: '⭕', pad: '🧽', spa: '🧖‍♀️', lucky: '🍀', magnet: '🧲', wash: '🚿', chair: '💺', colour: '🎨', style: '💁‍♀️', decor: '🪞' };
 const faceCache = new Map();     // level -> small portrait, kept for the session
-photosReady.then(() => { faceCache.clear(); const vf = $('vip-face'); if (vf) vf.dataset.who = ''; });     // repaint thumbnails once the painted portraits have loaded
+photosReady.then(() => {
+  // the paintings have arrived: anything drawn before they did is drawn again with them
+  faceCache.clear();
+  const vf = $('vip-face'); if (vf) vf.dataset.who = '';
+  if (G.mode === 'demo') startDemo();
+  else if (G.geo && !G.geo.photo) paintSkin();
+  if (currentScreen === 'levels') showLevels();
+});
 function showLevels() {
   const total = Object.values(save.stars).reduce((a, b) => a + b, 0);
   let html = `<div class="lv-top"><span>★ ${total} / ${LEVELS.length * 3}</span><span>🪙 ${save.coins.toLocaleString()}</span></div>`;
@@ -1826,7 +1835,8 @@ let dailyNote = '';
   }
 }
 resize();
-startDemo();
+// the menu sits over a patient, so it waits (briefly) for the paintings rather than showing her without one
+if (photosLoaded()) startDemo(); else Promise.race([photosReady, new Promise((r) => setTimeout(r, 4000))]).then(() => { if (!G.mode || G.mode === 'demo') startDemo(); });
 showScreen('menu');
 const firstRun = !localStorage.getItem('zit-seen-howto');
 if (firstRun) {
@@ -1850,4 +1860,5 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 
 // handy for debugging from the console
 window.__zit = G;
+G.dbg = { toScreen, toWorld, cam: () => cam, pointers };     // for automated play-tests
 G.step = (dt) => { update(dt); render(); }; // advance one frame by hand (testing)
