@@ -14,9 +14,16 @@ export const PHOTOS = [
   { src: 'faces/girl4.jpg', tone: [3], hair: '#2a1a14', eyeY: 0.363, eL: 0.369, eR: 0.635, nose: 0.493, mouth: 0.551, chin: 0.654 },
   { src: 'faces/girl5.jpg', tone: [4], hair: '#17110f', eyeY: 0.363, eL: 0.369, eR: 0.638, nose: 0.491, mouth: 0.549, chin: 0.641 },
   { src: 'faces/girl6.jpg', tone: [0, 1], hair: '#2a1c16', eyeY: 0.359, eL: 0.369, eR: 0.638, nose: 0.487, mouth: 0.553, chin: 0.652 },
+  { src: 'faces/girl7.jpg', tone: [0], hair: '#d9b87a', eyeY: 0.357, eL: 0.368, eR: 0.636, nose: 0.483, mouth: 0.548, chin: 0.650 },
+  { src: 'faces/girl8.jpg', tone: [1], hair: '#5a1f26', eyeY: 0.357, eL: 0.368, eR: 0.636, nose: 0.483, mouth: 0.548, chin: 0.650 },
+  { src: 'faces/girl9.jpg', tone: [1], hair: '#6b4a32', eyeY: 0.357, eL: 0.368, eR: 0.636, nose: 0.483, mouth: 0.548, chin: 0.650 },
+  { src: 'faces/girl10.jpg', tone: [2], hair: '#7a5234', eyeY: 0.357, eL: 0.368, eR: 0.636, nose: 0.483, mouth: 0.548, chin: 0.650 },
+  { src: 'faces/girl11.jpg', tone: [3], hair: '#17110f', eyeY: 0.357, eL: 0.368, eR: 0.636, nose: 0.483, mouth: 0.545, chin: 0.650 },
+  { src: 'faces/girl12.jpg', tone: [4], hair: '#120d0c', eyeY: 0.357, eL: 0.368, eR: 0.636, nose: 0.483, mouth: 0.543, chin: 0.650 },
+  { src: 'faces/girl13.jpg', tone: [2], hair: '#7a5234', eyeY: 0.357, eL: 0.368, eR: 0.636, nose: 0.483, mouth: 0.548, chin: 0.650 },
 ];
 if (typeof Image !== 'undefined') for (const ph of PHOTOS) { ph.img = new Image(); ph.img.src = ph.src; }
-export const photosReady = typeof Image === 'undefined' ? Promise.resolve() : Promise.all(PHOTOS.map((ph) => ph.img.decode().catch(() => {})));
+export const photosReady = typeof Image === 'undefined' ? Promise.resolve() : Promise.all(PHOTOS.map((ph) => new Promise((res) => { if (ph.img.complete) res(); else { ph.img.onload = res; ph.img.onerror = res; } })));
 const pickPhoto = (tone, seed) => {
   const ti = SKIN_TONES.indexOf(tone);
   const list = PHOTOS.filter((ph) => ph.tone.includes(ti) && ph.img && ph.img.complete && ph.img.naturalWidth);
@@ -1118,13 +1125,14 @@ export function drawLids(ctx, geo, closed) {
 /** A passing expression drawn live over the painted face: k = 1 pleased .. -1 pained. */
 export function drawMood(ctx, geo, k) {
   if (Math.abs(k) < 0.03 || !geo.lipsBox) return;
-  const [x0, y0, x1, y1] = geo.lipsBox, sy = y0 + (y1 - y0) * 0.36, len = geo.hw * 0.075, a = Math.abs(k);
+  // on a painted portrait the expression is only hinted at; line weights follow the size she is drawn at
+  const [x0, y0, x1, y1] = geo.lipsBox, sy = y0 + (y1 - y0) * 0.36, len = geo.hw * 0.075, a = Math.abs(k) * (geo.photo ? 0.45 : 1), lwK = Math.min(1, geo.hw / 150);
   ctx.save();
   ctx.lineCap = 'round';
   for (const [cxm, d] of [[x0, -1], [x1, 1]]) {
     // the corner of the mouth turns up or down, with the little crease that comes with it
     const ex = cxm + d * len, ey = sy - len * 0.85 * k;
-    ctx.strokeStyle = `rgba(70,22,26,${0.6 * a})`; ctx.lineWidth = 1.8;
+    ctx.strokeStyle = `rgba(70,22,26,${0.6 * a})`; ctx.lineWidth = 1.8 * lwK;
     ctx.beginPath(); ctx.moveTo(cxm - d * 2, sy); ctx.quadraticCurveTo(cxm + d * len * 0.6, sy - len * 0.1 * k, ex, ey); ctx.stroke();
     const g = ctx.createRadialGradient(ex + d * 3, ey, 0, ex + d * 3, ey, len * 1.1);
     g.addColorStop(0, `rgba(70,30,26,${0.22 * a})`); g.addColorStop(1, 'rgba(70,30,26,0)');
@@ -1136,13 +1144,13 @@ export function drawMood(ctx, geo, k) {
       const g = ctx.createRadialGradient(c.x, c.y - c.ry * 0.3, 0, c.x, c.y - c.ry * 0.3, c.rx * 0.9);
       g.addColorStop(0, `rgba(255,120,120,${0.13 * a})`); g.addColorStop(1, 'rgba(255,120,120,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y - c.ry * 0.3, c.rx * 0.9, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = `rgba(90,45,40,${0.1 * a})`; ctx.lineWidth = 1.2;      // the eyes crinkle from below
+      ctx.strokeStyle = `rgba(90,45,40,${0.1 * a})`; ctx.lineWidth = 1.2 * lwK;      // the eyes crinkle from below
       const e = geo.eyes[c.x < geo.cx ? 0 : geo.eyes.length - 1];
       if (e) { ctx.beginPath(); ctx.moveTo(e.x - e.rx * 0.55, e.y + e.ry * 1.05); ctx.quadraticCurveTo(e.x, e.y + e.ry * (1.05 - 0.35 * a), e.x + e.rx * 0.55, e.y + e.ry * 1.05); ctx.stroke(); }
     }
   } else {
     // pained: the brows pinch together
-    ctx.strokeStyle = `rgba(80,40,30,${0.5 * a})`; ctx.lineWidth = 1.6;
+    ctx.strokeStyle = `rgba(80,40,30,${0.5 * a})`; ctx.lineWidth = 1.6 * lwK;
     for (const d of [-1, 1]) {
       ctx.beginPath(); ctx.moveTo(geo.cx + d * geo.hw * 0.05, geo.browY - geo.hh * 0.03); ctx.quadraticCurveTo(geo.cx + d * geo.hw * 0.075, geo.browY + geo.hh * 0.01, geo.cx + d * geo.hw * 0.055, geo.browY + geo.hh * 0.05); ctx.stroke();
     }
