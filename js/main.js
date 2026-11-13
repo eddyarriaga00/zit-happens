@@ -11,7 +11,7 @@ import { Ear } from './ear.js';
 import { Treatment } from './steps.js';
 import { Supplies } from './supplies.js';
 import { ToolFX } from './tools.js';
-import { SKIN_TONES, renderSkin, zoneBlocked, ZONE_NAMES } from './skin.js';
+import { SKIN_TONES, renderSkin, zoneBlocked, ZONE_NAMES, bodySkinAt, bodyPainted, bodyReady } from './skin.js';
 import * as audio from './audio.js';
 import { buzz, setHapticsEnabled } from './haptics.js';
 import * as store from './storage.js';
@@ -40,10 +40,12 @@ function paintSkin() {
     const scene = renderFaceScene(G.W, G.H, G.look && G.look.photoFace ? G.dpr : Math.min(3, G.dpr * 1.5), tone(), G.seed, G.look, playTop(), playBottom(), faceFit());
     G.skin = scene.canvas;
     G.geo = scene.geo;
+    G.skinAt = null;
     if (scene.geo.photoHair && G.look) G.look = { ...G.look, hair: scene.geo.photoHair };      // her brows and scalp match the painting
   } else {
     G.geo = null;
     G.skin = renderSkin(G.W, G.H, G.dpr, tone(), G.seed, G.zone, G.look);
+    G.skinAt = (G.zone === 'back' || G.zone === 'shoulder') && bodyPainted() ? bodySkinAt : null;      // painted backs and shoulders know where their skin is
   }
   G.scale = G.baseScale * (G.geo ? FACE_SCALE * faceFit() : 1);
 }
@@ -1387,7 +1389,7 @@ function update(dt) {
   if (G.treat) { G.treat.update(dt); G.treat.updatePuffs(dt); }
   // mess only ever lands on the face itself; on a back or shoulders it stays where a finger can wipe it
   // (a long squirt used to land off the edge of the screen and could never be cleaned)
-  G.fx.keep = G.geo && !G.ear ? G.geo.onSkin : G.ear ? null : (x, y) => x > 8 && x < G.W - 8 && y > G.safeTop + 70 && y < G.H - 8;
+  G.fx.keep = G.geo && !G.ear ? G.geo.onSkin : G.ear ? null : (x, y) => x > 8 && x < G.W - 8 && y > G.safeTop + 70 && y < G.H - 8 && (!G.skinAt || G.skinAt(x, y));
   G.fx.update(dt);
   G.shake *= Math.pow(0.001, dt);
   if (G.shake < 0.2) G.shake = 0;
@@ -1560,6 +1562,7 @@ function refreshTools() {
 // ---- level map, patient card, shop
 const SHOP_ICONS = { steady: '🤲', loop: '⭕', pad: '🧽', spa: '🧖‍♀️', lucky: '🍀', magnet: '🧲', wash: '🚿', chair: '💺', colour: '🎨', style: '💁‍♀️', decor: '🪞' };
 const faceCache = new Map();     // level -> small portrait, kept for the session
+bodyReady.then(() => { if (!G.geo && (G.zone === 'back' || G.zone === 'shoulder') && !G.skinAt && G.mode !== 'ear') paintSkin(); });
 photosReady.then(() => {
   // the paintings have arrived: anything drawn before they did is drawn again with them
   faceCache.clear();

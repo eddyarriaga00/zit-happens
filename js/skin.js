@@ -45,12 +45,61 @@ function getNoiseTile() {
   return c;
 }
 
+// ---------------------------------------------------------------- painted backs and shoulders
+// Like the faces, these are paintings. Each has three reference points (fractions of the picture): bare
+// skin, her top, and the backdrop. A coarse map of "is this skin?" is worked out from them, so spots,
+// foam and mess stay on her skin and off her straps, whatever the picture.
+const BODY = {
+  back: { skin: [0.5, 0.45], top: [0.5, 0.965], bg: [0.03, 0.03], files: ['body/back1.jpg', 'body/back2.jpg', 'body/back3.jpg'] },
+  shoulder: { skin: [0.6, 0.5], top: [0.04, 0.86], bg: [0.95, 0.04], files: ['body/shoulder1.jpg', 'body/shoulder2.jpg', 'body/shoulder3.jpg'] },
+};
+if (typeof Image !== 'undefined') for (const b of Object.values(BODY)) b.imgs = b.files.map((src) => { const im = new Image(); im.src = src; return im; });
+export const bodyReady = typeof Image === 'undefined' ? Promise.resolve() : Promise.all(Object.values(BODY).flatMap((b) => b.imgs).map((im) => new Promise((res) => { if (im.complete) res(); else { im.onload = res; im.onerror = res; } })));
+let body = null;        // the painting on screen now: { zone, w, h, mw, mh, map }
+/** True where the painted back or shoulder on screen is bare skin (with a little margin). */
+export function bodySkinAt(px, py, margin = 0) {
+  if (!body) return true;
+  const at = (x, y) => { const cx2 = Math.floor(x / body.w * body.mw), cy2 = Math.floor(y / body.h * body.mh); return cx2 >= 0 && cy2 >= 0 && cx2 < body.mw && cy2 < body.mh && body.map[cy2 * body.mw + cx2] === 1; };
+  if (!at(px, py)) return false;
+  return !margin || (at(px - margin, py) && at(px + margin, py) && at(px, py - margin) && at(px, py + margin));
+}
+export const bodyPainted = () => !!body;
+function paintBody(c, x, w, h, zone, tone) {
+  const def = BODY[zone], ti = SKIN_TONES.indexOf(tone), im = def && def.imgs && def.imgs[ti <= 1 ? 0 : ti <= 3 ? 1 : 2];
+  if (!im || !im.complete || !im.naturalWidth) return false;
+  const iw = im.naturalWidth, ih = im.naturalHeight, k = Math.max(w / iw, h / ih), x0 = (w - iw * k) / 2, y0 = (h - ih * k) / 2;
+  x.imageSmoothingQuality = 'high';
+  x.drawImage(im, x0, y0, iw * k, ih * k);
+  // the skin map, at a sixth of the size: each point goes to whichever reference it is closest in colour to
+  const mw = Math.ceil(w / 6), mh = Math.ceil(h / 6), t = document.createElement('canvas'); t.width = mw; t.height = mh;
+  const tx = t.getContext('2d', { willReadFrequently: true });
+  tx.drawImage(im, x0 / 6, y0 / 6, iw * k / 6, ih * k / 6);
+  const d = tx.getImageData(0, 0, mw, mh).data;
+  const ref = ([fx, fy]) => { const s = document.createElement('canvas'); s.width = s.height = 1; const q = s.getContext('2d', { willReadFrequently: true }); q.drawImage(im, fx * iw - 14, fy * ih - 14, 28, 28, 0, 0, 1, 1); return q.getImageData(0, 0, 1, 1).data; };
+  // colour is compared mostly by its mix of red, green and blue rather than how bright it is, so the
+  // shaded side of a shoulder still counts as skin
+  const feat = (r, g, b) => { const sum = r + g + b + 1; return [r / sum, g / sum, (sum / 765) * 0.12]; };
+  const refs = [ref(def.skin), ref(def.top), ref(def.bg)].map((p) => feat(p[0], p[1], p[2]));
+  const map = new Uint8Array(mw * mh);
+  for (let i = 0; i < mw * mh; i++) {
+    const f = feat(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]);
+    const dist = (rf) => Math.sqrt((f[0] - rf[0]) ** 2 + (f[1] - rf[1]) ** 2 + (f[2] - rf[2]) ** 2);
+    // it only stops being skin when it is clearly her top or the backdrop: lit and shaded skin drift
+    // a little toward both, and must still count
+    const ds = dist(refs[0]), dn = Math.min(dist(refs[1]), dist(refs[2]));
+    map[i] = dn < ds * 0.4 ? 0 : 1;
+  }
+  body = { zone, w, h, mw, mh, map };
+  return true;
+}
+
 export function renderSkin(w, h, dpr, tone, seed, zone = null, look = null) {
   const c = document.createElement('canvas');
   c.width = Math.round(w * dpr);
   c.height = Math.round(h * dpr);
   const x = c.getContext('2d');
   x.scale(dpr, dpr);
+  if (zone === 'back' || zone === 'shoulder') { if (paintBody(c, x, w, h, zone, tone)) return c; body = null; } else if (zone) body = null;
   const R = rng(seed);
 
   // Base + soft lighting
@@ -162,6 +211,7 @@ export function zoneBlocked(zone, px, py, w, h) {
   if (zone === 'nose') return v > 0.7 || u < 0.14 || u > 0.86;
   if (zone === 'chin') return v < 0.31;
   if (zone === 'cheek') return v < 0.26 || u > 0.86 || u < 0.1;
+  if (body && body.zone === zone) return !bodySkinAt(px, py, 16);     // painted: bare skin only, clear of straps and edges
   if (zone === 'back') return Math.abs(u - 0.2) < 0.105 || Math.abs(u - 0.8) < 0.105;     // not under the straps
   if (zone === 'shoulder') {
     const strap = (u > 0.05 + 0.1 * v && u < 0.26 + 0.1 * v) || (u < 0.14 && v < 0.3);     // the strap, and the lock of hair

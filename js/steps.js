@@ -26,7 +26,7 @@ export class Treatment {
     this.cells = 0;        // how many grid cells are over skin
     for (let row = 0; row < this.rows; row++) {
       for (let col = 0; col < this.cols; col++) {
-        const on = G.geo ? G.geo.onSkin((col + 0.5) * CELL, (row + 0.5) * CELL) : true;
+        const on = G.geo ? G.geo.onSkin((col + 0.5) * CELL, (row + 0.5) * CELL) : G.skinAt ? G.skinAt((col + 0.5) * CELL, (row + 0.5) * CELL) : true;
         this.mask[row * this.cols + col] = on ? 1 : 0;
         if (on) this.cells++;
       }
