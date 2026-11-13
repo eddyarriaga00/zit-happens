@@ -642,6 +642,24 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   }
   x.restore();
 
+  // face-framing locks: worn down, the hair falls from the parting over the temples and on down past
+  // the cheeks, so her face sits inside her hair the way it does in makeover-game art
+  if (hasHair && (style === 'long' || style === 'short')) {
+    const len = style === 'long' ? 1.3 : 0.8;
+    for (const d of [-1, 1]) {
+      mul(() => soft(X(d * 0.84), Y(0.05), hw * 0.14, hh * 0.5, sh(0.2)));          // the shade it casts on her cheek
+      for (let i = 0; i < 6; i++) {
+        const t = i / 5;
+        const u0 = d * (0.6 + t * 0.32), v0 = -0.7 + t * 0.14;                          // along the hairline toward the temple
+        const u1 = d * (0.95 + t * 0.12 + R() * 0.04), v1 = -0.1 + len * (0.6 + 0.4 * t) + R() * 0.08;
+        lock(X(u0), Y(v0), X(u1), Y(v1), d * hw * (0.1 + t * 0.06), hw * (0.065 + R() * 0.025));
+      }
+      strands(170, () => {
+        const t = R(), u0 = d * (0.6 + t * 0.32), v0 = -0.7 + t * 0.14, u1 = d * (0.94 + t * 0.15), v1 = -0.1 + len * (0.6 + 0.4 * t) + R() * 0.1;
+        return [X(u0), Y(v0), X(u1), Y(v1), d * hw * (0.11 + t * 0.06), R() < 0.3 ? shine(0.3) : hairCol()];
+      }, 0.7);
+    }
+  }
 
   // curls: coils sitting all over the crown, getting bigger toward the outside, with ringlets
   // falling in front of the ears
@@ -851,7 +869,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // ---- jewellery: most women wear a little something
   const jewel = (seed >>> 3) % 5, chain = (seed >>> 5) % 3 === 0;
   const metal = (seed >>> 7) % 2 ? ['#fff3c4', '#e9c46a', '#a9822a'] : ['#ffffff', '#cfd6df', '#7f8794'];
-  if (jewel) {
+  if (jewel && style !== 'long' && style !== 'short') {          // worn down, her hair covers her ears
     for (const d of [-1, 1]) {
       const lx = X(d * (earX + 0.045)), ly = Y(0.19), r = hw * 0.028;
       if (jewel === 3) {                                   // a small hoop
