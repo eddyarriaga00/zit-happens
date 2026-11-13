@@ -56,7 +56,7 @@ const photoSkin = (ph) => {
     const row = document.createElement('canvas'); row.width = 64; row.height = 1;
     const rq = row.getContext('2d', { willReadFrequently: true }); rq.drawImage(ph.img, 0, 0, iw, 6, 0, 0, 64, 1);
     const px = rq.getImageData(0, 0, 64, 1).data; let lo = -1, hi2 = -1;
-    for (let c2 = 0; c2 < 64; c2++) { const dd = Math.abs(px[c2 * 4] - b[0]) + Math.abs(px[c2 * 4 + 1] - b[1]) + Math.abs(px[c2 * 4 + 2] - b[2]); if (dd > 90) { if (lo < 0) lo = c2; hi2 = c2; } }
+    for (let c2 = 0; c2 < 64; c2++) { const dd = Math.abs(px[c2 * 4] - b[0]) + Math.abs(px[c2 * 4 + 1] - b[1]) + Math.abs(px[c2 * 4 + 2] - b[2]); if (c2 > 14 && c2 < 50 && dd > 60) { if (lo < 0) lo = c2; hi2 = c2; } }     // only the middle: the corners are backdrop or loose curls
     ph.cap = lo >= 0 && hi2 - lo > 6 ? [lo / 64, (hi2 + 1) / 64] : null;
   } catch { ph.skin = {}; }
   return ph.skin;
@@ -1182,10 +1182,12 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       const cap = photo.cap;
       for (const [a, b] of cap ? [[0, cap[0] - 0.03], [cap[1] + 0.03, 1]] : [[0, 1]]) if (b > a) { xr.fillStyle = sg; xr.fillRect(x0 + a * iw * k, seamTop - 0.5, (b - a) * iw * k, 41); }
       if (cap) {
-        const mx = x0 + (cap[0] + cap[1]) / 2 * iw * k, rx = (cap[1] - cap[0]) / 2 * iw * k, ry = Math.min(seamTop - 4, rx * 0.2);
+        // the top of her hair is part of a circle about 0.43 picture-widths across its radius: carry that same curve on
+        const mx = x0 + (cap[0] + cap[1]) / 2 * iw * k, rx = (cap[1] - cap[0]) / 2 * iw * k, Rr = Math.max(rx * 1.02, 0.43 * iw * k), ry = Math.min(seamTop - 4, Rr - Math.sqrt(Rr * Rr - rx * rx));
         if (ry > 2) {
           xr.save();
-          xr.beginPath(); xr.ellipse(mx, seamTop + 1, rx, ry, 0, Math.PI, Math.PI * 2); xr.closePath(); xr.clip();
+          // a low arc that tapers to nothing at each end (a half-ellipse stands up straight at its ends and read as a block)
+          xr.beginPath(); xr.moveTo(mx - rx, seamTop + 1); xr.quadraticCurveTo(mx, seamTop - ry * 2, mx + rx, seamTop + 1); xr.closePath(); xr.clip();
           xr.drawImage(im, 0, 0, iw, 3, x0, seamTop - ry - 1, iw * k, ry + 3);
           const dg = xr.createLinearGradient(0, seamTop - ry, 0, seamTop);        // it turns away from the light at the top
           dg.addColorStop(0, 'rgba(0,0,0,0.22)'); dg.addColorStop(0.5, 'rgba(0,0,0,0.07)'); dg.addColorStop(1, 'rgba(0,0,0,0)');

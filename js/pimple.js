@@ -366,14 +366,17 @@ export class Pimple {
   finishHair(game) {
     const a = this.hairAngle, L = this.hairLen;
     const pts = [];
+    // once it is out, a hair springs back into a small loose curl beside the spot. It used to lie at
+    // full length across her face, which read as a crack over an eye or her mouth
+    const span = Math.min(L * 0.3, 26 * this.scale), curl = span * 0.42;
     for (let i = 0; i < 26; i++) {
-      const k = i / 25, bend = Math.sin(k * 3 + this.seed) * 10;
+      const k = i / 25, bend = Math.sin(k * 5.2 + this.seed) * curl * (0.4 + 0.6 * k);
       pts.push({
-        x: this.x + Math.cos(a) * (14 + k * L) - Math.sin(a) * bend,
-        y: this.y + Math.sin(a) * (14 + k * L) + Math.cos(a) * bend,
+        x: this.x + Math.cos(a) * (10 + k * span) - Math.sin(a) * bend,
+        y: this.y + Math.sin(a) * (10 + k * span) + Math.cos(a) * bend,
       });
     }
-    game.fx.wormSplat(pts, 2.2 * this.scale, '#2a1a12', null, 0, true);
+    game.fx.wormSplat(pts, 1.3 * this.scale, '#2a1a12', null, 0, true);
     if (!this.T.stray) game.fx.squirt(this.x, this.y, a, 5, { color: this.T.pusColor, speed: 120, spread: 0.8, size: 2, lift: 90 });
     audio.pluck();
     buzz('heavy');
