@@ -99,7 +99,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // the line the hair grows from. Drawn back for a ponytail or a bun it is an even arch, highest in the middle;
   // worn down it sits lower on the side the hair sweeps toward.
   const tiedBack = style === 'pony' || style === 'bun';
-  const hl = (u) => hairline + (tiedBack ? -0.03 + 0.17 * u * u : 0.05 * Math.abs(u) + (style === 'buzz' ? 0 : 0.1 * Math.max(0, u * 0.9)));
+  const hl = (u) => hairline + (tiedBack ? 0.02 + 0.15 * u * u : 0.05 * Math.abs(u) + (style === 'buzz' ? 0 : 0.1 * Math.max(0, u * 0.9)));
   x.lineCap = 'round';
   x.lineJoin = 'round';
 
@@ -672,6 +672,24 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
         const [a, b, c, e] = path(d, R(), R()), dx = (R() - 0.5) * 0.06;
         x.strokeStyle = R() < 0.3 ? shine(0.3) : hairCol();
         x.beginPath(); x.moveTo(X(a[0] + dx), Y(a[1])); x.bezierCurveTo(X(b[0] + dx), Y(b[1]), X(c[0] + dx * 0.8), Y(c[1]), X(e[0]), Y(e[1])); x.stroke();
+      }
+    }
+  }
+
+  // pulled back, a few soft wisps always slip loose at the temples and curl down beside the face
+  if (hasHair && tiedBack) {
+    x.lineCap = 'round';
+    for (const d of [-1, 1]) for (let i = 0; i < 3; i++) {
+      const u0 = d * (0.66 + i * 0.09 + R() * 0.04), v0 = hl(u0) + 0.01, L = 0.85 + R() * 0.3 - i * 0.12;
+      const ph = R() * 6.3, n = 26, amp = 0.025 + R() * 0.02;
+      const pt = (t) => [X(u0 + d * (0.2 * t + 0.1 * Math.sin(t * Math.PI)) + Math.sin(t * 8 + ph) * amp * t), Y(v0 + L * t)];
+      for (const [col, k] of [['rgba(0,0,0,0.18)', 1.5], [hair, 1], [shine(0.35), 0.35]]) {
+        x.strokeStyle = col;
+        for (let j = 0; j < n; j++) {
+          const t0 = j / n, t1 = (j + 1) / n, [ax, ay] = pt(t0), [bx, by] = pt(t1);
+          x.lineWidth = Math.max(0.5, hw * 0.034 * k * (1 - t0 * 0.8));
+          x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke();
+        }
       }
     }
   }
