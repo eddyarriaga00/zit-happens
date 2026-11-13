@@ -646,18 +646,33 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // the cheeks, so her face sits inside her hair the way it does in makeover-game art
   if (hasHair && (style === 'long' || style === 'short')) {
     const len = style === 'long' ? 1.3 : 0.8;
+    // a lock that follows the head: out from the parting over the top, round the temple, then down
+    const lockC = (p0, p1, p2, p3, wd) => {
+      const g = x.createLinearGradient(X(p0[0]), Y(p0[1]), X(p3[0]), Y(p3[1]));
+      g.addColorStop(0, hair); g.addColorStop(0.25, hairHi); g.addColorStop(0.5, hair); g.addColorStop(0.85, hair); g.addColorStop(1, hairLo);
+      x.fillStyle = g;
+      const o = (p, k) => [X(p[0]) - wd * k, Y(p[1])], q = (p, k) => [X(p[0]) + wd * k, Y(p[1])];
+      x.beginPath(); x.moveTo(...o(p0, 1));
+      x.bezierCurveTo(...o(p1, 1), ...o(p2, 0.8), X(p3[0]), Y(p3[1]));
+      x.bezierCurveTo(...q(p2, 0.8), ...q(p1, 1), ...q(p0, 1));
+      x.closePath(); x.fill();
+      x.strokeStyle = 'rgba(0,0,0,0.16)'; x.lineWidth = 1;
+      x.beginPath(); x.moveTo(...q(p0, 1)); x.bezierCurveTo(...q(p1, 1), ...q(p2, 0.8), X(p3[0]), Y(p3[1])); x.stroke();
+    };
+    const path = (d, t, j) => {
+      const u0 = -0.3 + d * (0.06 + t * 0.5), v0 = -1.02 + t * 0.22 + j * 0.03;
+      const u3 = d * (0.96 + t * 0.12 + j * 0.04), v3 = -0.1 + len * (0.6 + 0.4 * t) + j * 0.1;
+      return [[u0, v0], [d * (0.75 + t * 0.2), v0 - 0.05], [d * (1.04 + t * 0.06), -0.5 + t * 0.1], [u3, v3]];
+    };
     for (const d of [-1, 1]) {
-      mul(() => soft(X(d * 0.84), Y(0.05), hw * 0.14, hh * 0.5, sh(0.2)));          // the shade it casts on her cheek
-      for (let i = 0; i < 6; i++) {
-        const t = i / 5;
-        const u0 = d * (0.6 + t * 0.32), v0 = -0.7 + t * 0.14;                          // along the hairline toward the temple
-        const u1 = d * (0.95 + t * 0.12 + R() * 0.04), v1 = -0.1 + len * (0.6 + 0.4 * t) + R() * 0.08;
-        lock(X(u0), Y(v0), X(u1), Y(v1), d * hw * (0.1 + t * 0.06), hw * (0.065 + R() * 0.025));
+      mul(() => soft(X(d * 0.86), Y(0.05), hw * 0.13, hh * 0.5, sh(0.2)));          // the shade it casts on her cheek
+      for (let i = 0; i < 7; i++) { const [a, b, c, e] = path(d, i / 6, R()); lockC(a, b, c, e, hw * (0.07 + R() * 0.025)); }
+      x.lineWidth = 0.7;
+      for (let i = 0; i < 200; i++) {
+        const [a, b, c, e] = path(d, R(), R()), dx = (R() - 0.5) * 0.06;
+        x.strokeStyle = R() < 0.3 ? shine(0.3) : hairCol();
+        x.beginPath(); x.moveTo(X(a[0] + dx), Y(a[1])); x.bezierCurveTo(X(b[0] + dx), Y(b[1]), X(c[0] + dx * 0.8), Y(c[1]), X(e[0]), Y(e[1])); x.stroke();
       }
-      strands(170, () => {
-        const t = R(), u0 = d * (0.6 + t * 0.32), v0 = -0.7 + t * 0.14, u1 = d * (0.94 + t * 0.15), v1 = -0.1 + len * (0.6 + 0.4 * t) + R() * 0.1;
-        return [X(u0), Y(v0), X(u1), Y(v1), d * hw * (0.11 + t * 0.06), R() < 0.3 ? shine(0.3) : hairCol()];
-      }, 0.7);
     }
   }
 
