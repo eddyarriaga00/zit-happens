@@ -31,14 +31,14 @@ const NAMES = { shampoo: 'Shampoo', rinse: 'Rinse', cut: 'Cut', dye: 'Colour', d
 
 export class HairService {
   /** lv = save.salon (station levels). repaint() redraws the client after a colour/style change. */
-  constructor(G, lv, repaint) {
+  constructor(G, lv, repaint, have = null) {
     this.G = G;
     this.lv = lv;
     this.repaint = repaint;
     this.stages = ['shampoo', 'rinse', 'cut', ...(lv.colour ? ['dye'] : []), 'dry'];
     this.i = 0;
     this.dyes = DYES.slice(0, 4 * (lv.colour || 0));
-    this.styles = STYLES.slice(0, STYLE_COUNT[lv.style || 0]);
+    this.styles = STYLES.slice(0, STYLE_COUNT[lv.style || 0]).filter((st) => !have || have.includes(st[0]));   // only styles painted for her
     // what she asks for
     const other = (list, cur) => { const o = list.filter((v) => v !== cur); return o[Math.floor(Math.random() * o.length)]; };
     this.wantDye = this.dyes.length ? other(this.dyes, G.look.hair) : null;

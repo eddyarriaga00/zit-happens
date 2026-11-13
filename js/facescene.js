@@ -137,95 +137,154 @@ function paintEye(ctx, px, py, d, erx, ery, col, gx, gy) {
   ctx.restore();
 }
 
-// Painted salon hair: one picture per style in plain silver, on the same girl as faces/girl1.jpg so the
-// eyes line up. Only the hair is taken from it (it is the one thing in the picture with no colour),
-// tinted to whatever shade she has or asks for, and laid over the hair drawn in code.
-const WIG = { eyeY: 0.370, eL: 0.365, eR: 0.640, fit: 1, styles: {} };
-if (typeof Image !== 'undefined') for (const st of ['long', 'pony', 'bun', 'curly', 'short']) { const im = new Image(); im.src = `hair/${st}.jpg`; WIG.styles[st] = { img: im, tints: new Map() }; }
-const WIG_W = 512, WIG_H = 768;
-function wigFor(style, hairHex) {
-  const wdef = WIG.styles[style];
-  if (!wdef || !wdef.img.complete || !wdef.img.naturalWidth || typeof hairHex !== 'string' || !/^#[0-9a-f]{6}$/i.test(hairHex)) return null;
-  if (wdef.tints.has(hairHex)) return wdef.tints.get(hairHex);
-  if (!wdef.base) {
-    // once per style: how much each pixel is hair (0..255) and how light it is
-    const cv = document.createElement('canvas'); cv.width = WIG_W; cv.height = WIG_H;
-    const q = cv.getContext('2d', { willReadFrequently: true }); q.drawImage(wdef.img, 0, 0, WIG_W, WIG_H);
-    const d = q.getImageData(0, 0, WIG_W, WIG_H).data, n = WIG_W * WIG_H;
-    const al = new Uint8ClampedArray(n), li = new Float32Array(n);
+// ---- Her own portrait in each salon hairstyle (hair/gN_style.jpg): the same girl painted with long
+// hair, a ponytail, a bun, curls and a bob, always in plain silver. In the salon the whole picture is
+// used: the pink backdrop is cut away so the salon shows behind her, and only her hair (the one thing
+// with no colour in it) is tinted to the shade she has or asks for. STYLE_FIT says where her eyes are
+// in each picture (worked out once by lining the picture up with her portrait).
+const STYLE_FIT = {
+  g1_long: [0.37, 0.3624, 0.6374], g1_pony: [0.3695, 0.3651, 0.6346], g1_bun: [0.3691, 0.3679, 0.6319], g1_curly: [0.3263, 0.3696, 0.6198], g1_short: [0.3695, 0.3651, 0.6346],
+  g2_long: [0.3647, 0.3676, 0.6424], g2_pony: [0.368, 0.369, 0.641], g2_bun: [0.398, 0.372, 0.6276], g2_curly: [0.368, 0.369, 0.641], g2_short: [0.3717, 0.3676, 0.6424],
+  g3_long: [0.3646, 0.3703, 0.6309], g3_pony: [0.361, 0.3664, 0.6244], g3_bun: [0.4016, 0.3743, 0.6164], g3_curly: [0.3648, 0.3637, 0.6271], g3_short: [0.3615, 0.3624, 0.6284],
+  g4_long: [0.363, 0.3664, 0.6324], g4_pony: [0.363, 0.3664, 0.6324], g4_bun: [0.3655, 0.3744, 0.6245], g4_curly: [0.3232, 0.3798, 0.6192], g4_short: [0.363, 0.3664, 0.6324],
+  g5_long: [0.363, 0.3664, 0.6354], g5_pony: [0.3515, 0.3705, 0.6207], g5_bun: [0.3764, 0.3704, 0.6313], g5_curly: [0.363, 0.3664, 0.6354], g5_short: [0.3628, 0.3677, 0.634],
+  g6_long: [0.359, 0.3664, 0.6354], g6_pony: [0.359, 0.3664, 0.6354], g6_bun: [0.3792, 0.3731, 0.6286], g6_curly: [0.3443, 0.3757, 0.6259], g6_short: [0.3413, 0.3704, 0.6313],
+  g7_long: [0.3255, 0.3694, 0.6294], g7_pony: [0.3569, 0.3667, 0.6321], g7_bun: [0.3569, 0.3667, 0.6321], g7_curly: [0.3569, 0.3667, 0.6321], g7_short: [0.357, 0.3654, 0.6334],
+  g8_long: [0.3535, 0.3654, 0.6334], g8_pony: [0.3568, 0.3681, 0.6307], g8_bun: [0.3741, 0.3694, 0.6294], g8_curly: [0.357, 0.3654, 0.6334], g8_short: [0.357, 0.3654, 0.6334],
+  g9_long: [0.357, 0.3654, 0.6334], g9_pony: [0.357, 0.3654, 0.6334], g9_bun: [0.3775, 0.3694, 0.6294], g9_curly: [0.357, 0.3654, 0.6334],
+  g10_long: [0.357, 0.3654, 0.6334], g10_pony: [0.3567, 0.3694, 0.6294], g10_bun: [0.357, 0.3654, 0.6334], g10_curly: [0.3568, 0.3681, 0.6307],
+  g11_long: [0.3287, 0.3721, 0.6267], g11_pony: [0.357, 0.3654, 0.6334], g11_bun: [0.3704, 0.3721, 0.6267], g11_curly: [0.357, 0.3654, 0.6334],
+  g12_long: [0.357, 0.3654, 0.6334], g12_pony: [0.3426, 0.3721, 0.6267], g12_bun: [0.3569, 0.3667, 0.6321], g12_curly: [0.357, 0.3654, 0.6334],
+  g13_long: [0.357, 0.3654, 0.6334], g13_pony: [0.357, 0.3654, 0.6334], g13_bun: [0.3569, 0.3667, 0.6321], g13_curly: [0.3286, 0.3735, 0.6254],
+};
+const STYLED = new Map();
+let styledCb = null;
+/** The salon hairstyles that have been painted for the girl this client will be (null: she has no portrait). */
+export function styledList(tone, seed) {
+  const ph = pickPhoto(tone, seed);
+  if (!ph) return null;
+  const n = PHOTOS.indexOf(ph) + 1;
+  const have = ['long', 'pony', 'bun', 'curly', 'short'].filter((st) => STYLE_FIT[`g${n}_${st}`]);
+  if (typeof Image !== 'undefined') for (const st of have) styledEntry(`g${n}_${st}`, STYLE_FIT[`g${n}_${st}`]);   // start fetching them now
+  return have;
+}
+/** Called when a hairstyle picture finishes loading, so whoever is showing her can repaint. */
+export function onStyledArt(fn) { styledCb = fn; }
+function styledEntry(key, fit) {
+  let e = STYLED.get(key);
+  if (!e) {
+    if (STYLED.size > 9) STYLED.clear();                    // one girl's set at a time is plenty
+    const im = new Image();
+    e = { img: im, tints: new Map(), fit };
+    STYLED.set(key, e);
+    im.onload = () => { if (styledCb) styledCb(); };
+    im.src = `hair/${key}.jpg`;
+  }
+  return e;
+}
+function styledFor(photo, style, hairHex) {
+  const key = `g${PHOTOS.indexOf(photo) + 1}_${style}`, fit = STYLE_FIT[key];
+  if (!fit || typeof hairHex !== 'string' || !/^#[0-9a-f]{6}$/i.test(hairHex) || typeof Image === 'undefined') return null;
+  const e = styledEntry(key, fit), im = e.img;
+  if (!im.complete || !im.naturalWidth) return null;
+  if (e.tints.has(hairHex)) return e.tints.get(hairHex);
+  const FW = im.naturalWidth, FH = im.naturalHeight;
+  if (!e.base) {
+    // masks are worked out at half size (quicker, and they are soft anyway), then stretched back up
+    const HW = Math.round(FW / 2), HH = Math.round(FH / 2), n = HW * HH;
+    const hc = document.createElement('canvas'); hc.width = HW; hc.height = HH;
+    const hq = hc.getContext('2d', { willReadFrequently: true }); hq.imageSmoothingQuality = 'high'; hq.drawImage(im, 0, 0, HW, HH);
+    const id = hq.getImageData(0, 0, HW, HH), d = id.data;
+    const al = new Float32Array(n), pink = new Uint8Array(n);
+    const fcx = (fit[1] + fit[2]) / 2, ed = fit[2] - fit[1], frx = ed * 0.73, fcy = fit[0] + 0.055, fry = 0.145;
+    // how strongly coloured her skin is (her cheeks, under the eyes): hair counts as anything well short
+    // of that, so silver hair that picks up a warm glow from brown skin is still hair
+    const cheek = [];
+    for (let y = Math.round((fit[0] + 0.05) * HH); y < (fit[0] + 0.1) * HH; y += 2) for (let x = Math.round(fit[1] * HW); x < fit[2] * HW; x += 2) {
+      const i = y * HW + x, mx = Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]), mn = Math.min(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]);
+      cheek.push(mx ? (mx - mn) / mx : 0);
+    }
+    cheek.sort((p2, q2) => p2 - q2);
+    const skinSat = cheek[Math.floor(cheek.length / 2)] || 0.3, base = Math.max(0.125, skinSat * 0.52);
+    const weak = new Uint8Array(n);
     for (let i = 0; i < n; i++) {
       const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
       const sat = mx ? (mx - mn) / mx : 0, L = (r + g + b) / 765;
-      const lim = 0.125 + 0.4 * Math.max(0, 0.72 - L);        // hair in shadow picks up a little colour
-      // nothing inside her face counts (the whites of her eyes are grey too)
-      const fx = (i % WIG_W) / WIG_W - 0.5025, fy = Math.floor(i / WIG_W) / WIG_H - 0.45;
-      const face = (fx / 0.2) ** 2 + (fy / 0.21) ** 2 < 1;
-      al[i] = face ? 0 : Math.max(0, Math.min(1, (lim - sat) / 0.055)) * 255;
-      li[i] = Math.max(0, Math.min(1, (L - 0.3) / 0.65));
+      pink[i] = b > g + 5 && r > 205 && sat > 0.1 ? 1 : 0;
+      const lim = base + 0.4 * Math.max(0, 0.72 - L);
+      const fx = (i % HW) / HW - fcx, fy = Math.floor(i / HW) / HH - fcy;
+      // nothing on her face is hair: the oval of it, and the band her eyebrows sit in (dark and not
+      // very colourful, they would be dyed along with her hair otherwise)
+      if ((fx / frx) ** 2 + (fy / fry) ** 2 < 1) continue;
+      if (Math.abs(fx) < ed * 0.78 && fy + fcy > fit[0] - 0.085 && fy + fcy < fit[0] + 0.03) continue;
+      al[i] = Math.max(0, Math.min(1, (lim - sat) / 0.055)) * 255;
+      weak[i] = sat < Math.min(lim * 1.45, skinSat * 0.8) ? 1 : 0;
     }
-    // the picture is a JPEG, whose colour comes in little blocks: smooth the hair mask (two box blurs),
-    // then firm its edge up again. A lone grey pixel in skin or cloth disappears on the way.
-    let src = Float32Array.from(al), tmp = new Float32Array(n);
-    for (let pass = 0; pass < 2; pass++) {
-      for (let y = 0; y < WIG_H; y++) for (let x = 0; x < WIG_W; x++) { let sum = 0, c = 0; for (let k = -2; k <= 2; k++) { const xx = x + k; if (xx >= 0 && xx < WIG_W) { sum += src[y * WIG_W + xx]; c++; } } tmp[y * WIG_W + x] = sum / c; }
-      for (let y = 0; y < WIG_H; y++) for (let x = 0; x < WIG_W; x++) { let sum = 0, c = 0; for (let k = -2; k <= 2; k++) { const yy = y + k; if (yy >= 0 && yy < WIG_H) { sum += tmp[yy * WIG_W + x]; c++; } } src[y * WIG_W + x] = sum / c; }
+    // the backdrop is whatever pink is joined to the edge of the picture (so nothing pink on her counts)
+    const bg = new Uint8Array(n), stack = [];
+    const push = (i) => { if (pink[i] && !bg[i]) { bg[i] = 1; stack.push(i); } };
+    for (let x = 0; x < HW; x++) { push(x); push((HH - 1) * HW + x); }
+    for (let y = 0; y < HH; y++) { push(y * HW); push(y * HW + HW - 1); }
+    while (stack.length) {
+      const i = stack.pop(), x = i % HW;
+      if (x > 0) push(i - 1); if (x < HW - 1) push(i + 1); if (i >= HW) push(i - HW); if (i < n - HW) push(i + HW);
     }
-    const a2 = new Uint8ClampedArray(n);
-    for (let i = 0; i < n; i++) a2[i] = Math.max(0, Math.min(1, (src[i] / 255 - 0.3) / 0.4)) * 255;
-    // her forehead as this hairstyle frames it: on each row above her brows, the run of skin between the
-    // hair on either side. Its light and shade are kept (as a grey picture), so the same forehead can be
-    // given to any girl in her own skin colour.
-    const yB = Math.round(WIG_H * 0.352), mid = Math.round(WIG_W * 0.5025), reach = Math.round(WIG_W * 0.3);
-    const fc = document.createElement('canvas'); fc.width = WIG_W; fc.height = WIG_H;
-    const fq = fc.getContext('2d'), fo = fq.createImageData(WIG_W, WIG_H), fd = fo.data;
-    const lum = (i) => (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 765;
-    const spans = [];
-    const lums = [];
-    for (let y = 0; y < yB; y++) {
-      if (a2[y * WIG_W + mid] > 128) { spans.push(null); continue; }
-      let xl = mid, xr2 = mid;
-      while (xl > mid - reach && a2[y * WIG_W + xl - 1] <= 128) xl--;
-      while (xr2 < mid + reach && a2[y * WIG_W + xr2 + 1] <= 128) xr2++;
-      // a row that runs out to the backdrop on either side is above her head, not her forehead
-      const open = (xx) => { const i = y * WIG_W + xx, r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2]; return b > g + 6 && r > 225; };
-      if ((xl === mid - reach && open(xl)) || (xr2 === mid + reach && open(xr2))) { spans.push(null); continue; }
-      spans.push([xl, xr2]);
-      for (let xx = xl; xx <= xr2; xx += 3) lums.push(lum(y * WIG_W + xx));
-    }
-    lums.sort((p, q2) => p - q2);
-    const ref = lums[Math.floor(lums.length * 0.55)] || 1;      // ordinary forehead skin counts as full brightness; only the shaded rim darkens
-    spans.forEach((sp, y) => {
-      if (!sp) return;
-      for (let xx = Math.max(0, sp[0] - 6); xx <= Math.min(WIG_W - 1, sp[1] + 6); xx++) {
-        // a few pixels under the hair on each side too, so no gap can open along the hairline
-        const i = y * WIG_W + xx, inside = xx >= sp[0] && xx <= sp[1];
-        const v = inside ? Math.max(0.78, Math.min(1, lum(i) / ref)) : 0.84;
-        // shade the way skin shades (a little warmer as it darkens, never grey); fade out at the bottom
-        // edge, and at a side where the row ran out to its limit instead of ending at hair
-        fd[i * 4] = v * 255; fd[i * 4 + 1] = v ** 1.18 * 255; fd[i * 4 + 2] = v ** 1.3 * 255;
-        let a = Math.min(1, (yB - y) / 12);
-        if (sp[0] === mid - reach) a *= Math.max(0, Math.min(1, (xx - sp[0]) / 22));
-        if (sp[1] === mid + reach) a *= Math.max(0, Math.min(1, (sp[1] - xx) / 22));
-        fd[i * 4 + 3] = 255 * a;
+    const blur = (src, rad, passes) => {
+      const tmp = new Float32Array(n);
+      for (let p2 = 0; p2 < passes; p2++) {
+        for (let y = 0; y < HH; y++) for (let x = 0; x < HW; x++) { let sum = 0, c = 0; for (let k = -rad; k <= rad; k++) { const xx = x + k; if (xx >= 0 && xx < HW) { sum += src[y * HW + xx]; c++; } } tmp[y * HW + x] = sum / c; }
+        for (let y = 0; y < HH; y++) for (let x = 0; x < HW; x++) { let sum = 0, c = 0; for (let k = -rad; k <= rad; k++) { const yy = y + k; if (yy >= 0 && yy < HH) { sum += tmp[yy * HW + x]; c++; } } src[y * HW + x] = sum / c; }
       }
-    });
-    fq.putImageData(fo, 0, 0);
-    wdef.base = { al: a2, li, forehead: fc };
+      return src;
+    };
+    // doubtful pixels (a bit of colour in them) are hair when they sit among hair, or right at the cut-out
+    // edge, where the backdrop has bled a little pink into the strands
+    const near = blur(Float32Array.from(al), 4, 2), edge = blur(Float32Array.from(bg, (v) => (v ? 255 : 0)), 3, 1);
+    for (let i = 0; i < n; i++) if (weak[i] && (near[i] > 105 || edge[i] > 12)) al[i] = Math.max(al[i], 255);
+    blur(al, 2, 2);
+    // the cut-out is pulled in a pixel or two, so no rim of backdrop comes with her
+    const solid = blur(Float32Array.from(bg, (v) => (v ? 0 : 255)), 2, 1);
+    const hairA = new Uint8ClampedArray(n);
+    for (let i = 0; i < n; i++) {
+      hairA[i] = Math.max(0, Math.min(1, (al[i] / 255 - 0.3) / 0.4)) * 255;
+      d[i * 4] = hairA[i]; d[i * 4 + 1] = Math.max(0, Math.min(1, (solid[i] / 255 - 0.62) / 0.3)) * 255; d[i * 4 + 2] = 0; d[i * 4 + 3] = 255;
+    }
+    hq.putImageData(id, 0, 0);
+    const fc = document.createElement('canvas'); fc.width = FW; fc.height = FH;
+    const fq = fc.getContext('2d', { willReadFrequently: true }); fq.imageSmoothingQuality = 'high'; fq.drawImage(hc, 0, 0, FW, FH);
+    const md = fq.getImageData(0, 0, FW, FH).data, N = FW * FH;
+    const mh = new Uint8Array(N), ms = new Uint8Array(N);
+    for (let i = 0; i < N; i++) { mh[i] = md[i * 4]; ms[i] = md[i * 4 + 1]; }
+    fq.drawImage(im, 0, 0);
+    e.base = { src: fq.getImageData(0, 0, FW, FH), mh, ms, hairA, HW, HH };
   }
-  const { al, li } = wdef.base, n = WIG_W * WIG_H;
+  const { src, mh, ms, hairA, HW, HH } = e.base, N = FW * FH, sd = src.data;
   const hv = parseInt(hairHex.slice(1), 16), hr = hv >> 16, hg = (hv >> 8) & 255, hb = hv & 255;
-  const cv = document.createElement('canvas'); cv.width = WIG_W; cv.height = WIG_H;
-  const q = cv.getContext('2d'), out = q.createImageData(WIG_W, WIG_H), o = out.data;
-  const dark = 1 - (hr + hg + hb) / 765;                 // dark hair gets a stronger sheen
-  for (let i = 0; i < n; i++) {
-    const t = li[i], body = 0.4 + 0.72 * t, spec = (40 + 60 * dark) * t * t * t * t;
-    o[i * 4] = hr * body + spec; o[i * 4 + 1] = hg * body + spec; o[i * 4 + 2] = hb * body + spec; o[i * 4 + 3] = al[i];
+  const dark = 1 - (hr + hg + hb) / 765;
+  const cv = document.createElement('canvas'); cv.width = FW; cv.height = FH;
+  const q = cv.getContext('2d'), out = q.createImageData(FW, FH), o = out.data;
+  for (let i = 0; i < N; i++) {
+    const j = i * 4, r = sd[j], g = sd[j + 1], b = sd[j + 2], a = mh[i];
+    if (a) {
+      const t = Math.max(0, Math.min(1, ((r + g + b) / 765 - 0.3) / 0.65)), body = 0.4 + 0.72 * t, spec = (40 + 60 * dark) * t * t * t * t, k = a / 255;
+      o[j] = r + (hr * body + spec - r) * k; o[j + 1] = g + (hg * body + spec - g) * k; o[j + 2] = b + (hb * body + spec - b) * k;
+    } else { o[j] = r; o[j + 1] = g; o[j + 2] = b; }
+    o[j + 3] = ms[i];
   }
   q.putImageData(out, 0, 0);
-  const wig = { canvas: cv, alpha: al, forehead: wdef.base.forehead };
-  if (wdef.tints.size > 12) wdef.tints.clear();
-  wdef.tints.set(hairHex, wig);
-  return wig;
+  const res = { canvas: cv, hairA, HW, HH, fit };
+  if (e.tints.size > 1) e.tints.clear();                   // each is a big picture: keep two shades at most
+  e.tints.set(hairHex, res);
+  return res;
+}
+
+// (The first try at painted salon hair, one shared silver wig per style fitted over every girl, is gone:
+// it never sat right on anyone but the girl it was painted on. Its hooks below stay switched off.)
+const wigFor = () => null, WIG = { eL: 0, eR: 1, eyeY: 0, fit: 1 }, WIG_W = 1, WIG_H = 1;
+/** True while her own hairstyle painting exists but has not arrived yet (asking for it starts the download). */
+function styledWaiting(photo, style, hairHex) {
+  const key = `g${PHOTOS.indexOf(photo) + 1}_${style}`;
+  return !!STYLE_FIT[key] && !styledFor(photo, style, hairHex);
 }
 
 export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 1) {
@@ -239,7 +298,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // where her eyes, lips, cheeks and hairline are, but when the whole painting covers it, it is drawn
   // onto a stand-in surface that does nothing, so no time is spent on pixels nobody sees. In the salon only her face
   // is painted in and the hair around it is drawn live, so there the scene draws for real.
-  const full = !!photo && !look.photoFace;
+  // in the salon she is shown in her plain portrait for the moment it takes her hairstyle painting to arrive
+  const full = !!photo && (!look.photoFace || styledWaiting(photo, look.style || 'short', /^#[0-9a-f]{6}$/i.test(look.hair || '') ? look.hair : '#3a2618'));
   // in the salon her ears and neck are drawn, so they take their colours from her own painted skin
   if (photo) photoSkin(photo);
   if (photo && look.photoFace) tone = { ...tone, ...photo.skin };
@@ -348,6 +408,9 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   x.fillStyle = wall; x.fillRect(0, 0, w, h);
   soft(w * 0.2, h * 0.2, w * 0.5, h * 0.3, 'rgba(255,255,255,0.5)');
   if (look.backdrop) look.backdrop(x, w, h);     // e.g. the hair salon's mirror
+  // the empty room, kept for when her own painted portrait stands in it instead of the drawn person
+  let room = null;
+  if (photo && look.photoFace) { room = document.createElement('canvas'); room.width = c.width; room.height = c.height; room.getContext('2d').drawImage(c, 0, 0); }
   else {
   // an out-of-focus room: window light, a shelf, a few soft glints
   x.fillStyle = 'rgba(255,255,255,0.35)';
@@ -1205,7 +1268,20 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     xr.setTransform(dpr, 0, 0, dpr, 0, 0);
     xr.globalAlpha = 1; xr.globalCompositeOperation = 'source-over'; xr.shadowColor = 'transparent'; xr.filter = 'none';
     xr.imageSmoothingQuality = 'high';
-    if (look.photoFace) {
+    const own = look.photoFace && hasHair && !full ? styledFor(photo, style, hair) : null;
+    if (own) {
+      // the salon, with her own portrait in this hairstyle: the room, then the whole painting of her
+      const sw2 = own.canvas.width, sh2 = own.canvas.height, f = own.fit;
+      const sk = (2 * ex * hw) / ((f[2] - f[1]) * sw2), ox = cx - (f[1] + f[2]) / 2 * sw2 * sk, oy = Y(ey) - f[0] * sh2 * sk;
+      if (room) { xr.save(); xr.setTransform(1, 0, 0, 1, 0, 0); xr.drawImage(room, 0, 0); xr.restore(); }
+      xr.drawImage(own.canvas, ox, oy, sw2 * sk, sh2 * sk);
+      if (oy + sh2 * sk < h) xr.drawImage(own.canvas, 0, sh2 - 3, sw2, 3, ox, oy + sh2 * sk - 1, sw2 * sk, h - (oy + sh2 * sk) + 1);   // her top carries on below
+      geo.onHair = (px, py) => {
+        const ix = Math.round((px - ox) / sk / 2), iy = Math.round((py - oy) / sk / 2);
+        return ix >= 0 && iy >= 0 && ix < own.HW && iy < own.HH && own.hairA[iy * own.HW + ix] > 110;
+      };
+      geo.wig = true; geo.own = true;
+    } else if (look.photoFace && !full) {
       // in the salon her hair is drawn live (washed, cut, dyed, restyled), so only her painted face and
       // neck are laid in, feathered at the edges so they melt into the hair and skin drawn around them
       const D = (W) => { const cv = document.createElement('canvas'); cv.width = c.width; cv.height = c.height; const cx2 = cv.getContext('2d'); cx2.setTransform(dpr, 0, 0, dpr, 0, 0); return [cv, cx2]; };

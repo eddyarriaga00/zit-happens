@@ -14,8 +14,11 @@ everything else live up to them. Items are in the order I intend to do them; eac
 - [x] **Ear Wax** (v116): painted outer ear in three skin tones (body/ear1-3.jpg); the canal, wax and
       tools stay drawn and sit in the painted hollow. Hair colour no longer varies per patient.
 - [x] **Scalp** (v117): painted parting in three tones (body/scalp1-3.jpg); flakes, lice, nits and clips stay drawn.
-- [x] **Hair Salon hair** (v117): five painted styles in silver (hair/*.jpg), keyed out by colour and tinted
-      to any dye. Still open: a painted fringe for the cut stage, hair that changes length when cut.
+- [x] **Hair Salon hair** (v119): every girl painted herself in each style (hair/gN_style.jpg, silver hair,
+      tinted in the game). 60 of 65 done; ChatGPT's daily image limit stopped it.
+      - [ ] Still to paint: the bob (short) for girls 9, 10, 11, 12, 13. Same prompt, upload faces/girlN.jpg,
+            then run _fit.js to get the eye positions and add them to STYLE_FIT in js/facescene.js.
+      - [ ] A painted fringe for the cut stage (still the drawn locks), hair that changes length when cut.
 - [ ] **Menu and thumbnails**: crop portraits properly for the round thumbnails and the VIP card.
 
 ## 2. Make the painted faces feel alive

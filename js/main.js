@@ -1,7 +1,7 @@
 import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
 import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL, AWARDS, rankFor } from './levels.js';
 import { lookFor, portraitURL } from './faces.js';
-import { renderFaceScene, drawLids, drawMood, drawEyes, photosReady, photosLoaded } from './facescene.js';
+import { renderFaceScene, drawLids, drawMood, drawEyes, photosReady, photosLoaded, onStyledArt, styledList } from './facescene.js';
 import { Makeup, Haircut, LIP_SHADES } from './salon.js';
 import { HairService, STATIONS, WALLS, salonLevel, salonTitle, salonPicture, salonBackdrop } from './hairsalon.js';
 import { Strip, Brows } from './extras.js';
@@ -600,12 +600,15 @@ function startSalon(kind, vip = null) {
   if (kind === 'hair') {
     // your salon: its walls follow the Decor level, its stations decide the services
     G.salonLv = save.salon;
-    const styles = ['long', 'pony', 'bun', 'curly', 'short'];
+    // only the hairstyles that have been painted for this girl
+    const have = styledList(tone(), G.seed);
+    const styles = (have && have.length ? have : ['long', 'pony', 'bun', 'curly', 'short']);
+    G.styledHave = have && have.length ? have : null;
     G.look = { ...G.look, photoFace: true, wall: WALLS[save.salon.decor] || WALLS[0], backdrop: (cx2, w2, h2) => salonBackdrop(cx2, w2, h2, save.salon), style: styles.includes(G.look.style) ? G.look.style : 'long' };
     paintSkin();
   }
   G.salon = kind === 'makeup' ? new Makeup(G, Math.min(LIP_SHADES.length, 3 + save.makeupDone))
-    : kind === 'hair' ? new HairService(G, save.salon, paintSkin) : kind === 'strip' ? new Strip(G, toast) : kind === 'brows' ? new Brows(G, toast) : kind === 'scalp' ? new Scalp(G, toast) : new Haircut(G);
+    : kind === 'hair' ? new HairService(G, save.salon, paintSkin, G.styledHave) : kind === 'strip' ? new Strip(G, toast) : kind === 'brows' ? new Brows(G, toast) : kind === 'scalp' ? new Scalp(G, toast) : new Haircut(G);
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
@@ -1572,6 +1575,12 @@ function refreshTools() {
 const SHOP_ICONS = { steady: '🤲', loop: '⭕', pad: '🧽', spa: '🧖‍♀️', lucky: '🍀', magnet: '🧲', wash: '🚿', chair: '💺', colour: '🎨', style: '💁‍♀️', decor: '🪞' };
 const faceCache = new Map();     // level -> small portrait, kept for the session
 bodyReady.then(() => { if (!G.geo && (G.zone === 'back' || G.zone === 'shoulder') && !G.skinAt && G.mode !== 'ear') paintSkin(); });
+// a hairstyle painting arrived while she is in the chair: show it, and move the wash/dye grid onto it
+onStyledArt(() => {
+  if (!G.salon || !G.look || !G.look.photoFace || G.ended) return;
+  paintSkin();
+  if (G.salon.buildGrid && G.salon.i === 0 && G.salon.mean(G.salon.foam) === 0) G.salon.buildGrid();
+});
 photosReady.then(() => {
   // the paintings have arrived: anything drawn before they did is drawn again with them
   faceCache.clear();
