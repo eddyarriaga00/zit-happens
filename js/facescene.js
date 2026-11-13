@@ -32,6 +32,19 @@ const pickPhoto = (tone, seed) => {
   return list.length ? list[(seed >>> 4) % list.length] : null;
 };
 export const photosLoaded = () => PHOTOS.some(loaded);
+// her skin colours, read off the painting once: lit cheek, the shaded side of her face, a warm in-between
+const photoSkin = (ph) => {
+  if (ph.skin) return ph.skin;
+  try {
+    const t = document.createElement('canvas'); t.width = t.height = 2;
+    const tx = t.getContext('2d', { willReadFrequently: true }), iw = ph.img.naturalWidth, ih = ph.img.naturalHeight;
+    const at = (fx, fy) => { tx.drawImage(ph.img, fx * iw - 12, fy * ih - 12, 24, 24, 0, 0, 2, 2); const d = tx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; };
+    const hex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+    const lit = at(ph.eL + 0.02, ph.eyeY + 0.085), side = at(ph.eL - 0.085, ph.eyeY + 0.07);
+    ph.skin = { base: hex(lit), shade: hex(side), bump: hex(lit.map((v, i) => (v + side[i]) / 2)) };
+  } catch { ph.skin = {}; }
+  return ph.skin;
+};
 const scratch = (dpr) => { const t = document.createElement('canvas'); t.width = t.height = 1; const tx = t.getContext('2d'); tx.scale(dpr, dpr); return tx; };
 
 function tint(col, k) {   // k < 1 darker, k > 1 lighter. Takes #rrggbb or rgb(r,g,b).
@@ -114,6 +127,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // onto a 1x1 scratch canvas so no time is spent filling pixels nobody sees. In the salon only her face
   // is painted in and the hair around it is drawn live, so there the scene draws for real.
   const full = !!photo && !look.photoFace;
+  // in the salon her ears and neck are drawn, so they take their colours from her own painted skin
+  if (photo && look.photoFace) tone = { ...tone, ...photoSkin(photo) };
   const x = full ? scratch(dpr) : xr;
   let sd = (seed >>> 0) || 1;
   const R = () => { sd = (sd * 1664525 + 1013904223) >>> 0; return sd / 4294967296; };
@@ -941,7 +956,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   // ---- jewellery: most women wear a little something
   const jewel = (seed >>> 3) % 5, chain = (seed >>> 5) % 3 === 0;
   const metal = (seed >>> 7) % 2 ? ['#fff3c4', '#e9c46a', '#a9822a'] : ['#ffffff', '#cfd6df', '#7f8794'];
-  if (jewel && style !== 'long' && style !== 'short') {          // worn down, her hair covers her ears
+  if (jewel && !photo && style !== 'long' && style !== 'short') {          // worn down, her hair covers her ears
     for (const d of [-1, 1]) {
       const lx = X(d * (earX + 0.045)), ly = Y(0.19), r = hw * 0.028;
       if (jewel === 3) {                                   // a small hoop
