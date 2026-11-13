@@ -403,14 +403,15 @@ function queueBreakouts() {
   G.plan.later.forEach((t, i) => G.spawnQueue.push({ t: G.time + 3 + i * 2.5 + Math.random(), type: t, breakout: true }));
 }
 
-// grime to wash off in the first step
+// the day's makeup to wash off in the first step: smudged foundation and blush
 function addDirt() {
-  for (let i = 0; i < 18; i++) {
-    const r = (3 + Math.random() * 5) * G.scale;
+  const MAKEUP = ['#b9826c', '#c98a76', '#cf7486', '#b86a78'];
+  for (let i = 0; i < 16; i++) {
+    const r = (3 + Math.random() * 4.5) * G.scale;
     G.fx.addSplat({
       kind: 'drop', ...(G.geo ? G.geo.anyPoint() : { x: 20 + Math.random() * (G.W - 40), y: playTop() + Math.random() * (G.H - playTop() - 40) }),
-      rx: r * (1 + Math.random()), ry: r, rot: Math.random() * 3, bx: r * 2,
-      color: Math.random() < 0.6 ? '#6f5340' : '#3d3a37', alpha: 0.3 + Math.random() * 0.25, mass: 1, dirt: true,
+      rx: r * (1.4 + Math.random()), ry: r * 0.8, rot: Math.random() * 3, bx: r * 2,
+      color: MAKEUP[Math.floor(Math.random() * MAKEUP.length)], alpha: 0.2 + Math.random() * 0.18, mass: 1, dirt: true,
     });
   }
 }

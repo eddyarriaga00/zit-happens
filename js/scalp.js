@@ -33,7 +33,7 @@ export class Scalp {
     const hair = G.look && typeof G.look.hair === 'string' && /^#[0-9a-f]{6}$/i.test(G.look.hair) ? G.look.hair : '#3a2418';
     this.hair = hair;
     this.skin = G.tone && G.tone.base ? G.tone : { base: '#eec1a2', shade: '#d69f80', pore: '#a8705a', blush: '#e88e7f' };
-    this.bw = Math.min(30, W * 0.075);           // half-width of bare scalp along the part
+    this.bw = Math.min(21, W * 0.055);           // half-width of bare scalp along the part
     this.wob = rnd(0, 6);
     this.paintLayer();
 
@@ -106,6 +106,7 @@ export class Scalp {
     x.save();
     x.clip(band);
     x.fillStyle = sk.base; x.fillRect(0, 0, W, H);
+    x.fillStyle = mix(sk.blush || sk.base, 0, 0.18); x.fillRect(0, 0, W, H);   // scalp skin is a little pinker than the face
     for (let y = -20; y < H + 20; y += 4) {
       const g = x.createLinearGradient(this.px(y) - bw * 1.1, 0, this.px(y) + bw * 1.1, 0);
       g.addColorStop(0, mix(sk.shade, -0.25, 0.9)); g.addColorStop(0.22, mix(sk.shade, 0, 0.35));
@@ -152,9 +153,35 @@ export class Scalp {
       x.strokeStyle = mix(hair, rnd(-0.1, 0.25), 0.7); x.lineWidth = 0.7;
       x.beginPath(); x.moveTo(rx, y); x.quadraticCurveTo(this.px(y), y - rnd(4, 12), rx - s * bw * rnd(1.4, 2.6), y + rnd(-6, 14)); x.stroke();
     }
+    // glossy hair: a soft band of shine running down each side, the way healthy hair catches the light
+    x.save(); x.globalCompositeOperation = 'screen';
+    for (let y = -20; y < H + 20; y += 6) for (const s of [-1, 1]) {
+      const e = this.px(y) + s * bw, a = e + s * 40, b = e + s * 120;
+      const g = x.createLinearGradient(a, 0, b, 0);
+      g.addColorStop(0, mix(hair, 0.6, 0)); g.addColorStop(0.45, mix(hair, 0.6, 0.22)); g.addColorStop(1, mix(hair, 0.6, 0));
+      x.fillStyle = g; x.fillRect(Math.min(a, b), y, 80, 6.5);
+    }
+    x.restore();
+    // pastel snap clips holding the sections back: a flat teardrop of metal with an open centre
+    const clips = [['#ffc2d8', '#ff86b3'], ['#d9c8ff', '#a58df3'], ['#b4ecdc', '#62c7aa'], ['#ffe0ad', '#f4b45e']];
+    [[-1, 0.2], [1, 0.36], [-1, 0.62], [1, 0.8]].forEach(([s, f], i) => {
+      const y = this.top + (this.bot - this.top) * f, cxp = this.px(y) + s * (bw + 66), [c1, c2] = clips[i];
+      x.save(); x.translate(cxp, y); x.rotate(s > 0 ? 0.28 : Math.PI - 0.28);
+      const clip = new Path2D();
+      clip.moveTo(-30, 0); clip.bezierCurveTo(-30, -9, -10, -11, 4, -10); clip.bezierCurveTo(22, -9, 30, -5, 30, 0);
+      clip.bezierCurveTo(30, 5, 22, 9, 4, 10); clip.bezierCurveTo(-10, 11, -30, 9, -30, 0); clip.closePath();
+      const hole = new Path2D(); hole.ellipse(-8, 0, 13, 4.2, 0, 0, 7);
+      x.save(); x.translate(2, 3); x.fillStyle = 'rgba(40,10,30,0.28)'; const sr = new Path2D(clip); sr.addPath(hole); x.fill(sr, 'evenodd'); x.restore();
+      const g = x.createLinearGradient(0, -10, 0, 10); g.addColorStop(0, c1); g.addColorStop(1, c2);
+      const ring = new Path2D(clip); ring.addPath(hole);
+      x.fillStyle = g; x.fill(ring, 'evenodd');
+      x.strokeStyle = 'rgba(255,255,255,0.6)'; x.lineWidth = 1.2; x.beginPath(); x.moveTo(-24, -5.5); x.quadraticCurveTo(0, -9, 22, -5); x.stroke();
+      x.fillStyle = 'rgba(255,255,255,0.9)'; x.beginPath(); x.arc(22, 0, 2, 0, 7); x.fill();
+      x.restore();
+    });
     // a soft vignette keeps the eye on the middle
     const v = x.createRadialGradient(W / 2, H * 0.48, Math.min(W, H) * 0.3, W / 2, H * 0.48, Math.max(W, H) * 0.75);
-    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.35)');
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(60,20,40,0.28)');
     x.fillStyle = v; x.fillRect(0, 0, W, H);
     this.layer = c;
   }
