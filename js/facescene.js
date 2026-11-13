@@ -1090,16 +1090,56 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       // in the salon her hair is drawn live (washed, cut, dyed, restyled), so only her painted face and
       // neck are laid in, feathered at the edges so they melt into the hair and skin drawn around them
       const D = (W) => { const cv = document.createElement('canvas'); cv.width = c.width; cv.height = c.height; const cx2 = cv.getContext('2d'); cx2.setTransform(dpr, 0, 0, dpr, 0, 0); return [cv, cx2]; };
+      // her drawn hair is made to sit with the painting: the fine strands are softened into painted
+      // masses, then given the gloss and depth a painter would add
+      {
+        const sm = document.createElement('canvas'); sm.width = Math.ceil(c.width / 3); sm.height = Math.ceil(c.height / 3);
+        const sq = sm.getContext('2d'); sq.imageSmoothingQuality = 'high'; sq.drawImage(c, 0, 0, sm.width, sm.height);
+        xr.save(); xr.setTransform(1, 0, 0, 1, 0, 0); xr.imageSmoothingQuality = 'high'; xr.globalAlpha = 0.62; xr.drawImage(sm, 0, 0, c.width, c.height); xr.restore();
+        xr.save();
+        xr.globalCompositeOperation = 'soft-light'; xr.lineCap = 'round';
+        const arc = (ox, oy, rx, ry, a0, a1, lw, al, col = '255,255,255') => { xr.strokeStyle = `rgba(${col},${al})`; xr.lineWidth = lw; xr.beginPath(); xr.ellipse(ox, oy, rx, ry, 0, a0, a1); xr.stroke(); };
+        if (hasHair && style !== 'buzz' && style !== 'curly') {
+          xr.save();
+          const dome = new Path2D(); dome.ellipse(cx, Y(-0.3), hw * 1.06, hh * 0.85, 0, Math.PI, Math.PI * 2); xr.clip(dome);
+          for (const [lw, al] of [[0.2, 0.14], [0.13, 0.2], [0.07, 0.3], [0.03, 0.4]]) arc(X(-0.06), Y(-0.2), hw * 0.86, hh * 0.6, Math.PI * 1.18, Math.PI * 1.8, hh * lw, al);   // a band of shine over the crown
+          for (const [lw, al] of [[0.3, 0.16], [0.18, 0.2]]) arc(cx, Y(-0.3), hw * 1.06, hh * 0.85, Math.PI * 1.02, Math.PI * 1.98, hh * lw, al, '20,8,12');                        // the head turns away at its edge
+          xr.restore();
+        }
+        if (style === 'long' || style === 'short') {
+          const y1 = style === 'long' ? 1.05 : 0.5;
+          for (const d of [-1, 1]) for (const [lw, al] of [[0.16, 0.12], [0.09, 0.2], [0.04, 0.28]]) {      // light running down the lengths
+            xr.strokeStyle = `rgba(255,255,255,${al * (d < 0 ? 1 : 0.7)})`; xr.lineWidth = hw * lw;
+            xr.beginPath(); xr.moveTo(X(d * 1.02), Y(-0.25)); xr.quadraticCurveTo(X(d * 1.12), Y(y1 * 0.4), X(d * 1.06), Y(y1)); xr.stroke();
+          }
+          for (const d of [-1, 1]) for (const [lw, al] of [[0.2, 0.2], [0.1, 0.25]]) {                         // and shade where it falls behind her jaw
+            xr.strokeStyle = `rgba(20,8,12,${al})`; xr.lineWidth = hw * lw;
+            xr.beginPath(); xr.moveTo(X(d * 0.86), Y(0.45)); xr.quadraticCurveTo(X(d * 0.8), Y(0.8), X(d * 0.72), Y(y1 + 0.1)); xr.stroke();
+          }
+        }
+        xr.restore();
+      }
       const [shp, sx] = D();
       sx.fillStyle = '#000';
-      sx.save(); sx.clip(head); sx.clip(below); sx.fillRect(0, 0, w, h); sx.restore();
+      // from a little below the hairline down, so none of her painted hair comes with it
+      sx.save(); sx.clip(head); sx.clip(below); sx.fillRect(0, Y(hairline + 0.055), w, h); sx.restore();
       sx.save(); sx.clip(neck); sx.fillRect(0, Y(chinV - 0.2), w, Y(1.5) - Y(chinV - 0.2)); sx.restore();
       const [mask, mx] = D();
       mx.setTransform(1, 0, 0, 1, 0, 0);
       const fe = Math.max(1.5, hw * 0.045) * dpr;
-      mx.filter = `blur(${fe}px)`;
-      // shrink a little first so the feathering eats into her face rather than spilling past it
-      mx.drawImage(shp, fe * 0.6, fe * 0.6, shp.width - fe * 1.2, shp.height - fe * 1.2);
+      // feathered without canvas blur filters (iPhone Safari has none): the shape is stamped many times
+      // in a small ring at low strength, at a third of the size, then stretched back smoothly
+      const half = document.createElement('canvas'); half.width = Math.ceil(shp.width / 3); half.height = Math.ceil(shp.height / 3);
+      const hq = half.getContext('2d'); hq.imageSmoothingQuality = 'high'; hq.drawImage(shp, 0, 0, half.width, half.height);
+      const acc = document.createElement('canvas'); acc.width = half.width; acc.height = half.height;
+      const aq = acc.getContext('2d'); aq.globalCompositeOperation = 'lighter';
+      const fr = fe / 3, stamps = [[0, 0]];
+      for (const [rad, n] of [[0.5, 8], [1, 14]]) for (let q = 0; q < n; q++) stamps.push([Math.cos(q / n * 6.283) * fr * rad, Math.sin(q / n * 6.283) * fr * rad]);
+      aq.globalAlpha = 1 / stamps.length;
+      // shrunk a little, so the feather eats into her face rather than spilling past it
+      for (const [ox, oy] of stamps) aq.drawImage(half, ox + fr * 0.8, oy + fr * 0.8, half.width - fr * 1.6, half.height - fr * 1.6);
+      mx.imageSmoothingEnabled = true; mx.imageSmoothingQuality = 'high';
+      mx.drawImage(acc, 0, 0, shp.width, shp.height);
       const [lay, lx] = D();
       lx.imageSmoothingQuality = 'high';
       lx.drawImage(im, x0, y0, iw * k, ih * k);
