@@ -36,7 +36,8 @@ const faceFit = () => (G.mode === 'level' || G.mode === 'zen' ? 0.86 : 1);
 function paintSkin() {
   if (FACE_ZONES.includes(G.zone)) {
     // the whole face, with the breakout mostly in one area of it
-    const scene = renderFaceScene(G.W, G.H, Math.min(3, G.dpr * 1.5), tone(), G.seed, G.look, playTop(), playBottom(), faceFit());
+    // extra sharpness is only for modes that lean in; the salon never does, and repaints on every hair change
+    const scene = renderFaceScene(G.W, G.H, G.look && G.look.photoFace ? G.dpr : Math.min(3, G.dpr * 1.5), tone(), G.seed, G.look, playTop(), playBottom(), faceFit());
     G.skin = scene.canvas;
     G.geo = scene.geo;
     if (scene.geo.photoHair && G.look) G.look = { ...G.look, hair: scene.geo.photoHair };      // her brows and scalp match the painting

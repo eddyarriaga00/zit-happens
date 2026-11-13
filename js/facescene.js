@@ -22,7 +22,11 @@ export const PHOTOS = [
   { src: 'faces/girl12.jpg', tone: [4], hair: '#120d0c', eyeY: 0.357, eL: 0.368, eR: 0.636, nose: 0.483, mouth: 0.543, chin: 0.650 },
   { src: 'faces/girl13.jpg', tone: [2], hair: '#7a5234', eyeY: 0.357, eL: 0.368, eR: 0.636, nose: 0.483, mouth: 0.548, chin: 0.650 },
 ];
-if (typeof Image !== 'undefined') for (const ph of PHOTOS) { ph.img = new Image(); ph.img.src = ph.src; }
+if (typeof Image !== 'undefined') for (const ph of PHOTOS) {
+  ph.img = new Image(); ph.img.src = ph.src;
+  // unpacked ahead of time, so the first level that shows her does not stall while the picture decodes
+  ph.img.addEventListener('load', () => { try { const d = ph.img.decode && ph.img.decode(); if (d && d.catch) d.catch(() => {}); } catch { /* fine */ } });
+}
 export const photosReady = typeof Image === 'undefined' ? Promise.resolve() : Promise.all(PHOTOS.map((ph) => new Promise((res) => { if (ph.img.complete) res(); else { ph.img.onload = res; ph.img.onerror = res; } })));
 const loaded = (ph) => ph.img && ph.img.complete && ph.img.naturalWidth;
 const pickPhoto = (tone, seed) => {
@@ -42,10 +46,24 @@ const photoSkin = (ph) => {
     const hex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
     const lit = at(ph.eL + 0.02, ph.eyeY + 0.085), side = at(ph.eL - 0.085, ph.eyeY + 0.07);
     ph.skin = { base: hex(lit), shade: hex(side), bump: hex(lit.map((v, i) => (v + side[i]) / 2)) };
+    // her eyelid colours (for blinking) and the backdrop above her head, read here once so the big
+    // canvas never has to be read back from (reading it back makes every later frame slower)
+    const up = (m) => ph.eyeY - m * (ph.eR - ph.eL) * iw / ih;
+    ph.lid = hex(at(ph.eL, up(0.193))); ph.lidShade = hex(at(ph.eL, up(0.147)));
+    tx.drawImage(ph.img, 0, 0, iw, 10, 0, 0, 2, 2); const b = tx.getImageData(0, 0, 1, 1).data;
+    ph.bg = `${b[0]},${b[1]},${b[2]}`;
+    // where her hair runs off the top edge of the picture (as fractions of its width), if it does
+    const row = document.createElement('canvas'); row.width = 64; row.height = 1;
+    const rq = row.getContext('2d', { willReadFrequently: true }); rq.drawImage(ph.img, 0, 0, iw, 6, 0, 0, 64, 1);
+    const px = rq.getImageData(0, 0, 64, 1).data; let lo = -1, hi2 = -1;
+    for (let c2 = 0; c2 < 64; c2++) { const dd = Math.abs(px[c2 * 4] - b[0]) + Math.abs(px[c2 * 4 + 1] - b[1]) + Math.abs(px[c2 * 4 + 2] - b[2]); if (dd > 90) { if (lo < 0) lo = c2; hi2 = c2; } }
+    ph.cap = lo >= 0 && hi2 - lo > 6 ? [lo / 64, (hi2 + 1) / 64] : null;
   } catch { ph.skin = {}; }
   return ph.skin;
 };
-const scratch = (dpr) => { const t = document.createElement('canvas'); t.width = t.height = 1; const tx = t.getContext('2d'); tx.scale(dpr, dpr); return tx; };
+// a stand-in drawing surface that does nothing at all: every call and every property is swallowed
+const NOOP = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : NOOP), set: () => true, apply: () => NOOP });
+const scratch = () => NOOP;
 
 function tint(col, k) {   // k < 1 darker, k > 1 lighter. Takes #rrggbb or rgb(r,g,b).
   let r, g, b;
@@ -124,11 +142,12 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
   const photo = pickPhoto(tone, seed);
   // Every face is a painting. The scene below is still worked out in full, because it is the map of
   // where her eyes, lips, cheeks and hairline are, but when the whole painting covers it, it is drawn
-  // onto a 1x1 scratch canvas so no time is spent filling pixels nobody sees. In the salon only her face
+  // onto a stand-in surface that does nothing, so no time is spent on pixels nobody sees. In the salon only her face
   // is painted in and the hair around it is drawn live, so there the scene draws for real.
   const full = !!photo && !look.photoFace;
   // in the salon her ears and neck are drawn, so they take their colours from her own painted skin
-  if (photo && look.photoFace) tone = { ...tone, ...photoSkin(photo) };
+  if (photo) photoSkin(photo);
+  if (photo && look.photoFace) tone = { ...tone, ...photo.skin };
   const x = full ? scratch(dpr) : xr;
   let sd = (seed >>> 0) || 1;
   const R = () => { sd = (sd * 1664525 + 1013904223) >>> 0; return sd / 4294967296; };
@@ -489,7 +508,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
 
   x.save();
   x.clip(head);
-  x.drawImage(renderSkin(w, h, dpr, tone, seed), 0, 0, w, h);    // real pores and texture
+  if (!full) x.drawImage(renderSkin(w, h, dpr, tone, seed), 0, 0, w, h);    // real pores and texture
   // form. One soft light, high and a little to our left: the head is a ball that turns away
   // from it at the sides, the far side more, and falls into shade under the jaw
   mul(() => {
@@ -1147,15 +1166,37 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       lx.globalCompositeOperation = 'destination-in'; lx.drawImage(mask, 0, 0);
       xr.setTransform(1, 0, 0, 1, 0, 0); xr.drawImage(lay, 0, 0); xr.setTransform(dpr, 0, 0, dpr, 0, 0);
     } else {
-    if (y0 > 0) xr.drawImage(im, 4, 4, 3, 3, 0, 0, w, y0 + 1);                                    // the plain backdrop carries on above
+    if (y0 > 0) { xr.fillStyle = `rgb(${photo.bg || '244,190,205'})`; xr.fillRect(0, 0, w, y0 + 1); }      // the plain backdrop carries on above
+    const seamTop = y0 > 0 ? y0 : null;
     if (y0 + ih * k < h) xr.drawImage(im, 0, ih - 3, iw, 3, 0, y0 + ih * k - 1, w, h - (y0 + ih * k) + 1);   // and her top below
     if (x0 > 0) { xr.drawImage(im, 0, 0, 3, ih, 0, y0, x0 + 1, ih * k); xr.drawImage(im, iw - 3, 0, 3, ih, x0 + iw * k - 1, y0, w - (x0 + iw * k) + 1, ih * k); }
     xr.drawImage(im, x0, y0, iw * k, ih * k);
+    if (seamTop != null) {
+      // the pictures are cropped through the top of her hair, so above the picture the hair is rounded
+      // off: a dome over the span where hair meets the edge, filled by carrying its top rows upward
+      const q = photo.bg || '244,190,205';
+      xr.fillStyle = `rgb(${q})`; xr.fillRect(0, 0, w, seamTop + 0.5);
+      const sg = xr.createLinearGradient(0, seamTop, 0, seamTop + 40);        // the backdrop melts into the picture's own
+      sg.addColorStop(0, `rgba(${q},1)`); sg.addColorStop(1, `rgba(${q},0)`);
+      const cap = photo.cap;
+      for (const [a, b] of cap ? [[0, cap[0] - 0.03], [cap[1] + 0.03, 1]] : [[0, 1]]) if (b > a) { xr.fillStyle = sg; xr.fillRect(x0 + a * iw * k, seamTop - 0.5, (b - a) * iw * k, 41); }
+      if (cap) {
+        const mx = x0 + (cap[0] + cap[1]) / 2 * iw * k, rx = (cap[1] - cap[0]) / 2 * iw * k, ry = Math.min(seamTop - 4, rx * 0.2);
+        if (ry > 2) {
+          xr.save();
+          xr.beginPath(); xr.ellipse(mx, seamTop + 1, rx, ry, 0, Math.PI, Math.PI * 2); xr.closePath(); xr.clip();
+          xr.drawImage(im, 0, 0, iw, 3, x0, seamTop - ry - 1, iw * k, ry + 3);
+          const dg = xr.createLinearGradient(0, seamTop - ry, 0, seamTop);        // it turns away from the light at the top
+          dg.addColorStop(0, 'rgba(0,0,0,0.22)'); dg.addColorStop(0.5, 'rgba(0,0,0,0.07)'); dg.addColorStop(1, 'rgba(0,0,0,0)');
+          xr.fillStyle = dg; xr.fillRect(mx - rx, seamTop - ry - 1, rx * 2, ry + 2);
+          xr.restore();
+        }
+      }
+    }
     }
     // eyelids are drawn live when she blinks, so they take their colour from the painting itself
-    const pix = (px, py) => { try { const q = xr.getImageData(Math.round(px * dpr), Math.round(py * dpr), 1, 1).data; return '#' + [q[0], q[1], q[2]].map((v) => v.toString(16).padStart(2, '0')).join(''); } catch { return tone.base; } };
-    geo.lid = pix(eyes[0].x, eyes[0].y - ery * 2.3);
-    geo.lidShade = pix(eyes[0].x, eyes[0].y - ery * 1.75);
+    geo.lid = photo.lid || tone.base;
+    geo.lidShade = photo.lidShade || tone.shade;
     geo.eyeCol = null;            // her painted eyes stay as painted
     geo.photo = true;
     geo.photoHair = look.photoFace ? null : photo.hair;
