@@ -1,7 +1,7 @@
 // Offline support. Serves from cache instantly, then refreshes the cache in the
 // background, so a new deploy shows up on the next launch.
 // Bump VERSION when you add/rename files.
-const VERSION = 'zit-v113';
+const VERSION = 'zit-v114';
 const FILES = [
   './',
   'index.html',
@@ -25,6 +25,19 @@ const FILES = [
   'body/shoulder2.jpg',
   'body/shoulder3.jpg',
   'faces/girl1.jpg',
+  'faces/girl1s.jpg',
+  'faces/girl2s.jpg',
+  'faces/girl3s.jpg',
+  'faces/girl4s.jpg',
+  'faces/girl5s.jpg',
+  'faces/girl6s.jpg',
+  'faces/girl7s.jpg',
+  'faces/girl8s.jpg',
+  'faces/girl9s.jpg',
+  'faces/girl10s.jpg',
+  'faces/girl11s.jpg',
+  'faces/girl12s.jpg',
+  'faces/girl13s.jpg',
   'faces/girl1c.jpg',
   'faces/girl2c.jpg',
   'faces/girl3c.jpg',

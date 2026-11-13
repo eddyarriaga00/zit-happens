@@ -41,6 +41,7 @@ function paintSkin() {
     G.skin = scene.canvas;
     G.geo = scene.geo;
     G.skinAt = null;
+    G.geo.noSmile = G.mode === 'makeup';      // lipstick is painted onto her resting lips, so they stay put there
     if (scene.geo.photoHair && G.look) G.look = { ...G.look, hair: scene.geo.photoHair };      // her brows and scalp match the painting
   } else {
     G.geo = null;
@@ -971,7 +972,7 @@ function pimpleAt(x, y) {
 canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   audio.unlock();
-  if (G.mode === 'demo' || G.paused || G.ended) return;
+  if (!G.sup || G.mode === 'demo' || G.paused || G.ended) return;
   try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   const [sx, sy] = touchXY(e);
   (G.taps ||= []).push({ x: sx, y: sy, t: 0 });      // every touch answers back with a soft ring
@@ -1324,11 +1325,19 @@ document.addEventListener('visibilitychange', () => {
 // ---------------------------------------------------------------- loop
 let last = performance.now();
 function frame(now) {
+  // The next frame is always asked for first, and a frame that fails is skipped rather than fatal: one
+  // error must never stop the game for good. (It once did: a frame ran before the first scene existed,
+  // threw, and nothing moved again until the app was reopened.)
+  requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (!G.paused) update(dt);
-  render();
-  requestAnimationFrame(frame);
+  if (!G.sup || !G.fx) return;          // no scene yet (the paintings are still loading)
+  try {
+    if (!G.paused) update(dt);
+    render();
+  } catch (err) {
+    if (!frame.warned) { frame.warned = true; console.error('frame failed', err); }
+  }
 }
 
 function update(dt) {

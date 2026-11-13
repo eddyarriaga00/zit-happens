@@ -20,7 +20,8 @@ everything else live up to them. Items are in the order I intend to do them; eac
 
 ## 2. Make the painted faces feel alive
 - [~] **Expressions from art, not lines**: eyes-closed painting for all 13 girls is in (v113), used for
-      blinks, washing and eyeshadow. Still to paint: a wince (hard squeeze) and a smile (end of visit).
+      blinks, washing and eyeshadow. A painted smile for all 13 is in too (v114), faded in when she is pleased.
+      Still to paint: a wince (hard squeeze).
 - [ ] **Each face its own shape**: measure every portrait's real face outline, so foam, masks, gel and
       mess follow her jaw and cheeks exactly instead of one shared outline.
 - [ ] **Sharper close-ups**: larger portraits (or 2x upscales) so leaning in on a spot stays crisp.

@@ -26,6 +26,8 @@ if (typeof Image !== 'undefined') for (const ph of PHOTOS) {
   ph.img = new Image(); ph.img.src = ph.src;
   // the same painting with her eyes closed, for blinking and for when her face is being washed
   ph.shut = new Image(); ph.shut.src = ph.src.replace('.jpg', 'c.jpg');
+  // and with a soft smile, for when she is pleased
+  ph.smile = new Image(); ph.smile.src = ph.src.replace('.jpg', 's.jpg');
   // unpacked ahead of time, so the first level that shows her does not stall while the picture decodes
   ph.img.addEventListener('load', () => { try { const d = ph.img.decode && ph.img.decode(); if (d && d.catch) d.catch(() => {}); } catch { /* fine */ } });
 }
@@ -1226,6 +1228,23 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       pq.setTransform(1, 0, 0, 1, 0, 0); pq.globalCompositeOperation = 'destination-in'; pq.drawImage(mc, 0, 0);
       geo.shut = { canvas: pc, x: px0, y: py0, w: pw, h: phh };
     }
+    // her smile comes from a third painting: the lower face (mouth, and the cheeks that lift with it)
+    // is cut out, feathered, and faded in when she is pleased
+    if (photo.smile && photo.smile.complete && photo.smile.naturalWidth) {
+      const srx = hw * 0.8, sry = hh * 0.3, scx = cx, scy = Y(mouthY - 0.03);
+      const px0 = scx - srx, py0 = scy - sry, pw = srx * 2, phh = sry * 2;
+      const pc = document.createElement('canvas'); pc.width = Math.ceil(pw * dpr); pc.height = Math.ceil(phh * dpr);
+      const pq = pc.getContext('2d');
+      pq.setTransform(dpr, 0, 0, dpr, -px0 * dpr, -py0 * dpr);
+      pq.imageSmoothingQuality = 'high';
+      pq.drawImage(photo.smile, x0, y0, iw * k, ih * k);
+      pq.globalCompositeOperation = 'destination-in';
+      pq.translate(scx, scy); pq.scale(1, sry / srx);
+      const g = pq.createRadialGradient(0, 0, 0, 0, 0, srx);
+      g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.55, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      pq.fillStyle = g; pq.fillRect(-srx, -srx, srx * 2, srx * 2);
+      geo.smile = { canvas: pc, x: px0, y: py0, w: pw, h: phh };
+    }
     geo.eyeCol = null;            // her painted eyes stay as painted
     geo.photo = true;
     geo.photoHair = look.photoFace ? null : photo.hair;
@@ -1324,6 +1343,14 @@ export function drawLids(ctx, geo, closed) {
 /** A passing expression drawn live over the painted face: k = 1 pleased .. -1 pained. */
 export function drawMood(ctx, geo, k) {
   if (Math.abs(k) < 0.03 || !geo.lipsBox) return;
+  if (k > 0 && geo.smile && !geo.noSmile) {
+    // a painted smile, eased in
+    const a = Math.min(1, k);
+    ctx.save(); ctx.globalAlpha = a * a * (3 - 2 * a); ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(geo.smile.canvas, geo.smile.x, geo.smile.y, geo.smile.w, geo.smile.h);
+    ctx.restore();
+    return;
+  }
   // on a painted portrait the expression is only hinted at; line weights follow the size she is drawn at
   const [x0, y0, x1, y1] = geo.lipsBox, sy = y0 + (y1 - y0) * 0.36, len = geo.hw * 0.075, a = Math.abs(k) * (geo.photo ? 0.45 : 1), lwK = Math.min(1, geo.hw / 150);
   ctx.save();
