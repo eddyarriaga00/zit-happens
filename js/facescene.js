@@ -168,6 +168,25 @@ export function styledList(tone, seed) {
   if (typeof Image !== 'undefined') for (const st of have) styledEntry(`g${n}_${st}`, STYLE_FIT[`g${n}_${st}`]);   // start fetching them now
   return have;
 }
+/** A strip of her own painted hair in this colour (from her long-hair painting): what the salon's
+ *  fringe is made of. Null until that painting has arrived. */
+export function styledSwatch(tone, seed, hairHex, wet = false) {
+  const ph = pickPhoto(tone, seed);
+  if (!ph || !STYLE_FIT[`g${PHOTOS.indexOf(ph) + 1}_long`]) return null;
+  const own = styledFor(ph, 'long', hairHex, wet);
+  if (!own) return null;
+  const W = own.canvas.width, H = own.canvas.height, wd = 0.07;
+  // a narrow strip of the lengths hanging beside her face: wherever it is most purely hair
+  let best = null;
+  for (let x0 = 0.03; x0 < 0.9; x0 += 0.01) {
+    if (x0 > 0.26 && x0 < 0.67) continue;
+    let hit = 0, all = 0;
+    for (let y = 0.54; y < 0.9; y += 0.02) for (let x = x0; x < x0 + wd; x += 0.01) { all++; if (own.hairA[Math.floor(y * own.HH) * own.HW + Math.floor(x * own.HW)] > 230) hit++; }
+    if (!best || hit / all > best.k) best = { k: hit / all, x0 };
+  }
+  if (!best || best.k < 0.97) return null;
+  return { canvas: own.canvas, sx: best.x0 * W, sy: 0.54 * H, sw: wd * W, sh: 0.36 * H };
+}
 /** Called when a hairstyle picture finishes loading, so whoever is showing her can repaint. */
 export function onStyledArt(fn) { styledCb = fn; }
 function styledEntry(key, fit) {
@@ -182,12 +201,13 @@ function styledEntry(key, fit) {
   }
   return e;
 }
-function styledFor(photo, style, hairHex) {
+function styledFor(photo, style, hairHex, wet = false) {
   const key = `g${PHOTOS.indexOf(photo) + 1}_${style}`, fit = STYLE_FIT[key];
   if (!fit || typeof hairHex !== 'string' || !/^#[0-9a-f]{6}$/i.test(hairHex) || typeof Image === 'undefined') return null;
   const e = styledEntry(key, fit), im = e.img;
   if (!im.complete || !im.naturalWidth) return null;
-  if (e.tints.has(hairHex)) return e.tints.get(hairHex);
+  const tkey = hairHex + (wet ? 'w' : '');
+  if (e.tints.has(tkey)) return e.tints.get(tkey);
   const FW = im.naturalWidth, FH = im.naturalHeight;
   if (!e.base) {
     // masks are worked out at half size (quicker, and they are soft anyway), then stretched back up
@@ -240,7 +260,7 @@ function styledFor(photo, style, hairHex) {
     // doubtful pixels (a bit of colour in them) are hair when they sit among hair, or right at the cut-out
     // edge, where the backdrop has bled a little pink into the strands
     const near = blur(Float32Array.from(al), 4, 2), edge = blur(Float32Array.from(bg, (v) => (v ? 255 : 0)), 3, 1);
-    for (let i = 0; i < n; i++) if (weak[i] && (near[i] > 105 || edge[i] > 12)) al[i] = Math.max(al[i], 255);
+    for (let i = 0; i < n; i++) if (weak[i] && (near[i] > 64 || edge[i] > 12)) al[i] = Math.max(al[i], 255);
     blur(al, 2, 2);
     // the cut-out is pulled in a pixel or two, so no rim of backdrop comes with her
     const solid = blur(Float32Array.from(bg, (v) => (v ? 0 : 255)), 2, 1);
@@ -266,7 +286,9 @@ function styledFor(photo, style, hairHex) {
   for (let i = 0; i < N; i++) {
     const j = i * 4, r = sd[j], g = sd[j + 1], b = sd[j + 2], a = mh[i];
     if (a) {
-      const t = Math.max(0, Math.min(1, ((r + g + b) / 765 - 0.3) / 0.65)), body = 0.4 + 0.72 * t, spec = (40 + 60 * dark) * t * t * t * t, k = a / 255;
+      const t = Math.max(0, Math.min(1, ((r + g + b) / 765 - 0.3) / 0.65)), k = a / 255;
+      // wet hair is darker and clumps into sharper, brighter streaks
+      const body = wet ? 0.27 + 0.6 * t * t : 0.4 + 0.72 * t, spec = wet ? (70 + 70 * dark) * t ** 7 : (40 + 60 * dark) * t * t * t * t;
       o[j] = r + (hr * body + spec - r) * k; o[j + 1] = g + (hg * body + spec - g) * k; o[j + 2] = b + (hb * body + spec - b) * k;
     } else { o[j] = r; o[j + 1] = g; o[j + 2] = b; }
     o[j + 3] = ms[i];
@@ -274,7 +296,7 @@ function styledFor(photo, style, hairHex) {
   q.putImageData(out, 0, 0);
   const res = { canvas: cv, hairA, HW, HH, fit };
   if (e.tints.size > 1) e.tints.clear();                   // each is a big picture: keep two shades at most
-  e.tints.set(hairHex, res);
+  e.tints.set(tkey, res);
   return res;
 }
 
@@ -284,7 +306,9 @@ const wigFor = () => null, WIG = { eL: 0, eR: 1, eyeY: 0, fit: 1 }, WIG_W = 1, W
 /** True while her own hairstyle painting exists but has not arrived yet (asking for it starts the download). */
 function styledWaiting(photo, style, hairHex) {
   const key = `g${PHOTOS.indexOf(photo) + 1}_${style}`;
-  return !!STYLE_FIT[key] && !styledFor(photo, style, hairHex);
+  if (!STYLE_FIT[key] || typeof Image === 'undefined') return false;
+  const im = styledEntry(key, STYLE_FIT[key]).img;
+  return !(im.complete && im.naturalWidth);
 }
 
 export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 1) {
@@ -1268,7 +1292,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     xr.setTransform(dpr, 0, 0, dpr, 0, 0);
     xr.globalAlpha = 1; xr.globalCompositeOperation = 'source-over'; xr.shadowColor = 'transparent'; xr.filter = 'none';
     xr.imageSmoothingQuality = 'high';
-    const own = look.photoFace && hasHair && !full ? styledFor(photo, style, hair) : null;
+    const own = look.photoFace && hasHair && !full ? styledFor(photo, style, hair, !!look.wet) : null;
     if (own) {
       // the salon, with her own portrait in this hairstyle: the room, then the whole painting of her
       const sw2 = own.canvas.width, sh2 = own.canvas.height, f = own.fit;

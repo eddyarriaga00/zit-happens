@@ -18,7 +18,7 @@ everything else live up to them. Items are in the order I intend to do them; eac
       tinted in the game). 60 of 65 done; ChatGPT's daily image limit stopped it.
       - [ ] Still to paint: the bob (short) for girls 9, 10, 11, 12, 13. Same prompt, upload faces/girlN.jpg,
             then run _fit.js to get the eye positions and add them to STYLE_FIT in js/facescene.js.
-      - [ ] A painted fringe for the cut stage (still the drawn locks), hair that changes length when cut.
+      - [x] Fringe in the cut stage is made from her own painted hair (v120). Open: hair that changes length when cut.
 - [ ] **Menu and thumbnails**: crop portraits properly for the round thumbnails and the VIP card.
 
 ## 2. Make the painted faces feel alive

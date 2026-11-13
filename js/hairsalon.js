@@ -117,7 +117,7 @@ export class HairService {
 
   next() {
     const G = this.G, s = this.stage;
-    if (s === 'rinse') this.wet = true;
+    if (s === 'rinse') { this.wet = true; if (G.geo && G.geo.own) { G.look = { ...G.look, wet: true }; this.repaint(); } }
     if (s === 'dye') {
       G.look = { ...G.look, hair: this.pick.dye };
       this.repaint();
@@ -126,6 +126,7 @@ export class HairService {
     }
     if (s === 'dry') {
       this.wet = false;
+      if (G.look.wet) { G.look = { ...G.look, wet: false }; if (!this.pick.style) this.repaint(); }
       if (this.pick.style) { G.look = { ...G.look, style: this.pick.style }; this.repaint(); this.buildGrid(); }
     }
     audio.loop('water', false); audio.loop('dryer', false);
@@ -186,7 +187,7 @@ export class HairService {
   draw(ctx) {
     const t = this.G.time;
     // wet hair sits darker until it is blown dry
-    if (this.wet) {
+    if (this.wet && !(this.G.geo && this.G.geo.own)) {
       ctx.fillStyle = 'rgba(10,10,25,0.2)';
       ctx.beginPath();
       for (let i = 0; i < this.cells.length; i++) { if (this.dry[i] > 0.5) continue; const c = this.cells[i]; ctx.moveTo(c.x + CELL * 0.75, c.y); ctx.arc(c.x, c.y, CELL * 0.75, 0, Math.PI * 2); }

@@ -198,7 +198,7 @@ export class Haircut {
     const g = G.geo;
     this.hair = G.look.hair;
     this.tol = 14 + 7 * (((G.salonLv && G.salonLv.chair) || 1) - 1);   // how close to the line counts
-    this.y0 = g.hairlineY - 8;                 // where the fringe hangs from
+    this.y0 = g.hairlineY - (g.own ? 30 : 8);  // where the fringe hangs from (up inside her painted hair, so its top is lost in it)
     this.target = g.browY - 10;                // the line to cut to: just above the brows
     this.locks = [];
     const n = 13, span = g.hw * 1.62;
@@ -208,6 +208,15 @@ export class Haircut {
     }
     this.bits = [];
     this.snip = { x: g.cx, y: this.target, t: 0, show: false };
+  }
+
+  /** A strip of her own painted hair to make the fringe from, once that painting is in. */
+  swatch() {
+    const key = this.hair + (this.G.look && this.G.look.wet ? 'w' : '');
+    if (this.sw && this.swKey === key) return this.sw;
+    const sw = this.G.hairSwatch ? this.G.hairSwatch(this.hair) : null;
+    if (sw) { this.sw = sw; this.swKey = key; }
+    return sw;
   }
 
   end(l) { return this.y0 + l.len; }
@@ -285,6 +294,14 @@ export class Haircut {
       }
       ctx.closePath();
       ctx.fillStyle = this.hair; ctx.fill();
+      const sw = this.swatch();
+      if (sw) {
+        // painted hair: each lock shows its own slice of the strip, so no two look the same
+        const part = sw.sw * 0.5, off = (l.seed / 9) * (sw.sw - part);
+        ctx.save(); ctx.clip();
+        ctx.drawImage(sw.canvas, sw.sx + off, sw.sy, part, sw.sh, x - hw2 - 1, top, l.w * 1.04 + 2, Math.max(60, end - top + 10));
+        ctx.restore();
+      }
       const lg = ctx.createLinearGradient(0, top, 0, end);
       lg.addColorStop(0, 'rgba(0,0,0,0)'); lg.addColorStop(0.1, 'rgba(0,0,0,0.14)'); lg.addColorStop(0.25, 'rgba(0,0,0,0.04)'); lg.addColorStop(0.42, 'rgba(255,255,255,0.14)'); lg.addColorStop(0.6, 'rgba(0,0,0,0.02)'); lg.addColorStop(1, 'rgba(0,0,0,0.2)');
       ctx.fillStyle = lg; ctx.fill();
@@ -292,7 +309,7 @@ export class Haircut {
       sg.addColorStop(0, 'rgba(0,0,0,0.16)'); sg.addColorStop(0.3, 'rgba(0,0,0,0)'); sg.addColorStop(0.7, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,0.2)');
       ctx.fillStyle = sg; ctx.fill();
       ctx.lineWidth = 1;
-      this.strands(ctx, l.x, l.w, top, this.end(l) - (l.cut ? 3 : 0), l.seed);
+      if (!sw) this.strands(ctx, l.x, l.w, top, this.end(l) - (l.cut ? 3 : 0), l.seed);
     }
     for (const b of this.bits) {
       // the offcut: a little tuft tumbling away
@@ -303,6 +320,8 @@ export class Haircut {
       const bl = Math.max(6, b.len - 5), bw = b.w * 0.45;
       ctx.fillStyle = this.hair;
       ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(bw, 0); ctx.quadraticCurveTo(bw, bl * 0.7, 0, bl); ctx.quadraticCurveTo(-bw, bl * 0.7, -bw, 0); ctx.fill();
+      const bs = this.swatch();
+      if (bs) { ctx.save(); ctx.clip(); ctx.drawImage(bs.canvas, bs.sx, bs.sy + bs.sh * 0.5, bs.sw * 0.3, bs.sh * 0.3, -bw - 1, 0, bw * 2 + 2, bl + 2); ctx.restore(); }
       ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 0.8;
       for (const k of [-0.5, 0, 0.5]) { ctx.beginPath(); ctx.moveTo(bw * k, 1); ctx.lineTo(bw * k * 0.4, bl - 2); ctx.stroke(); }
       ctx.restore();
