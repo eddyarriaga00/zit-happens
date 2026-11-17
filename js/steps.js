@@ -178,6 +178,7 @@ export class Treatment {
   update(dt) {
     const G = this.G;
     this.time += dt;
+    this.idleT = this.holding ? 0 : (this.idleT || 0) + dt;
     if (!this.active) return;
 
     if (this.phase === 'lather') this.progress = this.mean(this.foam) / GOALS.lather;
@@ -376,25 +377,21 @@ export class Treatment {
     const G = this.G;
     const { cols, rows, foam, gel, jit } = this;
 
-    // "you missed a spot": bare patches glow once most of the face is done
-    if ((this.phase === 'lather' || this.phase === 'soothe' || this.phase === 'mask') && this.progress > 0.5 && !this.done) {
+    // "you missed a spot": once most of the face is done and the finger has lifted for a moment,
+    // the bare patches glow softly (no outlines)
+    if ((this.phase === 'lather' || this.phase === 'soothe' || this.phase === 'mask') && this.progress > 0.5 && !this.done && !this.holding && (this.idleT || 0) > 1.1) {
       const arr = this.phase === 'lather' ? foam : gel;
-      const p = 0.5 + 0.5 * Math.sin(this.time * 6);
-      ctx.strokeStyle = `rgba(123,97,255,${0.45 + p * 0.45})`;
-      ctx.fillStyle = `rgba(255,255,255,${0.18 + p * 0.2})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
+      const p = 0.5 + 0.5 * Math.sin(this.time * 4), k = Math.min(1, ((this.idleT || 0) - 1.1) / 0.6);
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const i = row * cols + col;
-          if (!this.mask[i] || arr[i] > 0.3 || (arr === gel && this.hole[i])) continue;
-          const x = (col + 0.5) * CELL, y = (row + 0.5) * CELL;
-          ctx.moveTo(x + CELL * 0.42, y);
-          ctx.arc(x, y, CELL * 0.42, 0, Math.PI * 2);
+          if (!this.mask[i] || arr[i] > 0.7 || (arr === gel && this.hole[i])) continue;
+          const x = (col + 0.5) * CELL, y = (row + 0.5) * CELL, r = CELL * 1.1;
+          const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+          g.addColorStop(0, `rgba(255,196,228,${(0.34 + 0.2 * p) * k})`); g.addColorStop(1, "rgba(255,196,228,0)");
+          ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
         }
       }
-      ctx.fill();
-      ctx.stroke();
     }
 
     // scraps of peeled mask curling away

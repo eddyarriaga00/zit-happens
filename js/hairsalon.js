@@ -254,11 +254,16 @@ export class HairService {
     ctx.globalAlpha = 1;
     // "missed a bit" rings once most of it is done
     const arr = { shampoo: this.foam, dye: this.coat, dry: this.dry }[this.stage];
-    if (arr && this.stageProgress() > 0.5) {
-      ctx.strokeStyle = `rgba(123,97,255,${0.5 + 0.4 * Math.sin(t * 6)})`; ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let i = 0; i < this.cells.length; i++) { if (arr[i] > 0.3) continue; const c = this.cells[i]; ctx.moveTo(c.x + 8, c.y); ctx.arc(c.x, c.y, 8, 0, Math.PI * 2); }
-      ctx.stroke();
+    this.idleT = this.hand ? 0 : (this.idleT || 0) + 1 / 60;
+    if (arr && this.stageProgress() > 0.5 && this.idleT > 1.1) {
+      // soft glows over the parts still to do (no rings), once the finger has lifted for a moment
+      const p = 0.5 + 0.5 * Math.sin(t * 4), k = Math.min(1, (this.idleT - 1.1) / 0.6);
+      for (let i = 0; i < this.cells.length; i++) {
+        if (arr[i] > 0.3) continue; const c = this.cells[i], r = 13;
+        const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r);
+        g.addColorStop(0, `rgba(255,196,228,${(0.34 + 0.2 * p) * k})`); g.addColorStop(1, "rgba(255,196,228,0)");
+        ctx.fillStyle = g; ctx.fillRect(c.x - r, c.y - r, r * 2, r * 2);
+      }
     }
     // the tool in hand
     if (this.hand && this.stage !== 'cut') this.tool(ctx, this.hand.x, this.hand.y, t);
