@@ -347,6 +347,125 @@ function styledWaiting(photo, style, hairHex) {
   return !(im.complete && im.naturalWidth);
 }
 
+
+/** The face as it really is in the painting: which screen pixels are her facial skin, read from the
+ *  picture itself (her own skin colour, joined up from her cheeks), with the eyes, brows, nostrils
+ *  and lips left out as holes. Everything that is put "on her face" uses this. Grid of 2 px. */
+function paintedFaceMap(geo, im, x0, y0, k, w, h, photo) {
+  const S = 0.5, GW = Math.ceil(w * S), GH = Math.ceil(h * S), n = GW * GH;
+  const c = document.createElement('canvas'); c.width = GW; c.height = GH;
+  const q = c.getContext('2d', { willReadFrequently: true });
+  q.imageSmoothingQuality = 'high';
+  q.drawImage(im, x0 * S, y0 * S, im.naturalWidth * k * S, im.naturalHeight * k * S);
+  const d = q.getImageData(0, 0, GW, GH).data;
+  const ih = im.naturalHeight * k, iw = im.naturalWidth * k;
+  const eyeY = geo.eyes[0].y, ed = geo.eyes[1].x - geo.eyes[0].x, cx = (geo.eyes[0].x + geo.eyes[1].x) / 2;
+  const mouthY = y0 + photo.mouth * ih, chinY = y0 + photo.chin * ih, noseY = y0 + photo.nose * ih;
+  // her skin colour, from both cheeks
+  const sample = [];
+  for (const e of geo.eyes) for (let yy = eyeY + ed * 0.38; yy < eyeY + ed * 0.62; yy += 2) for (let xx = e.x - ed * 0.12; xx < e.x + ed * 0.12; xx += 2) {
+    const i = (Math.round(yy * S) * GW + Math.round(xx * S)) * 4; sample.push([d[i], d[i + 1], d[i + 2]]);
+  }
+  const med = (j) => sample.map((v) => v[j]).sort((a, b) => a - b)[sample.length >> 1];
+  const sr = med(0), sg = med(1), sb = med(2), sL = (sr + sg + sb) / 3 || 1, scr = sr / (sr + sg + sb), scg = sg / (sr + sg + sb);
+  // how much her own skin varies in hue sets how close a pixel must be to count as skin
+  let vr = 0;
+  for (const [r, g, b] of sample) { const sum = r + g + b || 1; vr += (r / sum - scr) ** 2 + (g / sum - scg) ** 2; }
+  const tol = Math.max(0.04, Math.min(0.085, 2.6 * Math.sqrt(vr / Math.max(1, sample.length))));
+  // her lips: in the mouth area, the pixels redder than her skin by a good margin
+  const red = (i) => (d[i * 4] - d[i * 4 + 1]) / ((d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) || 1);
+  const skinRed = (sr - sg) / ((sr + sg + sb) || 1);
+  const mbox = [];
+  for (let y = Math.round((mouthY - ed * 0.28) * S); y < (mouthY + ed * 0.3) * S; y++) for (let x = Math.round((cx - ed * 0.62) * S); x < (cx + ed * 0.62) * S; x++) if (x >= 0 && y >= 0 && x < GW && y < GH) mbox.push(red(y * GW + x));
+  mbox.sort((a, b) => a - b);
+  const lipRed = mbox.length ? mbox[Math.floor(mbox.length * 0.95)] : skinRed + 0.1;
+  // the cut between skin and lip is raised until the lips no longer fill most of the mouth area
+  // (on deep skin her skin is nearly as red as her lips)
+  let lipCut = skinRed + (lipRed - skinRed) * 0.4;
+  for (const f of [0.4, 0.5, 0.6, 0.7, 0.8]) {
+    lipCut = skinRed + (lipRed - skinRed) * f;
+    let over = 0; for (const v of mbox) if (v > lipCut) over++;
+    if (over / Math.max(1, mbox.length) < 0.3) break;
+  }
+  const inMouth = (i) => { const x = (i % GW) / S, y = ((i / GW) | 0) / S; return Math.abs(y - mouthY) < ed * 0.3 && Math.abs(x - cx) < ed * 0.62; };
+  const skinish = new Uint8Array(n), lipish = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], sum = r + g + b || 1, L = sum / 3;
+    const dc = Math.hypot(r / sum - scr, g / sum - scg);
+    if (inMouth(i) && lipRed - skinRed > 0.012 && red(i) > lipCut) { lipish[i] = 1; continue; }
+    // same hue as her skin (lit or shaded); brows, lashes and nostrils are far darker
+    skinish[i] = dc < tol && L > sL * 0.55 && L < sL * 1.5 ? 1 : 0;
+  }
+  // joined up from her cheeks and forehead, and only down to her chin and between her ears
+  // (below the mouth the face narrows to the chin along her jaw: the neck beside it is not face)
+  const ok = (x, y) => {
+    const u = Math.abs(x / S - cx) / (ed * 1.12), fy = y / S;
+    if (u >= 1 || fy > chinY + ed * 0.04 || fy < eyeY - ed * 1.35) return false;
+    return fy < chinY + ed * 0.04 - u * u * (chinY - mouthY) * 1.55;
+  };
+  const skin = new Uint8Array(n), st = [];
+  const seed = (fx, fy) => { const i = Math.round(fy * S) * GW + Math.round(fx * S); if (i >= 0 && i < n && skinish[i] && !skin[i]) { skin[i] = 1; st.push(i); } };
+  for (const e of geo.eyes) seed(e.x, eyeY + ed * 0.5);
+  seed(cx, eyeY - ed * 0.6); seed(cx, (mouthY + chinY) / 2);
+  while (st.length) {
+    const i = st.pop(), x = i % GW, y = (i / GW) | 0;
+    for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+      if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+      const j = ny * GW + nx;
+      if (!skin[j] && skinish[j] && ok(nx, ny)) { skin[j] = 1; st.push(j); }
+    }
+  }
+  // tidy it: freckles and pores are skin; specks of skin out in her hair are not
+  const tidy = (src, rad, cut) => {
+    const out = new Uint8Array(n);
+    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+      let s2 = 0, c2 = 0;
+      for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < GW && yy < GH) { s2 += src[yy * GW + xx]; c2++; } }
+      out[y * GW + x] = s2 / c2 >= cut ? 1 : 0;
+    }
+    return out;
+  };
+  let face = tidy(tidy(skin, 2, 0.4), 2, 0.6);
+  // holes: what is not skin but is closed in by skin (eyes, brows, nostrils, lips)
+  const outside = new Uint8Array(n); const st2 = [];
+  const push2 = (i) => { if (!face[i] && !outside[i]) { outside[i] = 1; st2.push(i); } };
+  for (let x = 0; x < GW; x++) { push2(x); push2((GH - 1) * GW + x); }
+  for (let y = 0; y < GH; y++) { push2(y * GW); push2(y * GW + GW - 1); }
+  while (st2.length) { const i = st2.pop(), x = i % GW; if (x > 0) push2(i - 1); if (x < GW - 1) push2(i + 1); if (i >= GW) push2(i - GW); if (i < n - GW) push2(i + GW); }
+  const hole = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (!face[i] && !outside[i]) hole[i] = 1;
+  // her eyes are always kept clear, whatever the colours say (the painting puts them exactly here)
+  for (const e of geo.eyes) {
+    for (let y = Math.floor((e.y - ed * 0.17) * S); y <= (e.y + ed * 0.15) * S; y++) for (let x = Math.floor((e.x - ed * 0.34) * S); x <= (e.x + ed * 0.34) * S; x++) {
+      if (x < 0 || y < 0 || x >= GW || y >= GH) continue;
+      const u = (x / S - e.x) / (ed * 0.34), v = (y / S - e.y) / (ed * 0.16);
+      if (u * u + v * v < 1) { const i = y * GW + x; face[i] = 0; hole[i] = 1; }
+    }
+  }
+  // a little room around each hole, so nothing sits right on a lash line or the edge of her lips
+  const near = tidy(hole, 3, 0.01);
+  // her lips: the hole around the mouth
+  const lipCells = [];
+  for (let i = 0; i < n; i++) if (lipish[i]) { lipCells.push(i); hole[i] = 1; face[i] = 0; }
+  const M = { S, GW, GH, face, hole, near, mouthY, chinY, noseY, eyeY, ed, cx };
+  M.at = (arr, x, y) => { const gx = Math.floor(x * S), gy = Math.floor(y * S); return gx >= 0 && gy >= 0 && gx < GW && gy < GH ? arr[gy * GW + gx] : 0; };
+  M.path = (arr) => {
+    const p = new Path2D();
+    for (let y = 0; y < GH; y++) { let x = 0; while (x < GW) { if (arr[y * GW + x]) { const x1 = x; while (x < GW && arr[y * GW + x]) x++; p.rect(x1 / S - 0.3, y / S - 0.3, (x - x1) / S + 0.6, 1 / S + 0.6); } else x++; } }
+    return p;
+  };
+  if (lipCells.length > 20) {
+    const lm = new Uint8Array(n); for (const i of lipCells) lm[i] = 1;
+    M.lips = tidy(lm, 1, 0.3);
+    let x0b = 1e9, y0b = 1e9, x1b = -1e9, y1b = -1e9;
+    for (const i of lipCells) { const x = (i % GW) / S, y = ((i / GW) | 0) / S; x0b = Math.min(x0b, x); x1b = Math.max(x1b, x); y0b = Math.min(y0b, y); y1b = Math.max(y1b, y); }
+    M.lipsBox = [x0b, y0b, x1b, y1b];
+  }
+  let cnt = 0; for (let i = 0; i < n; i++) cnt += face[i];
+  M.count = cnt;
+  return M;
+}
+
 export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 1) {
   const c = document.createElement('canvas');
   c.width = Math.round(w * dpr);
@@ -1463,6 +1582,35 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     if (y0 + ih * k < h) xr.drawImage(im, 0, ih - 3, iw, 3, 0, y0 + ih * k - 1, w, h - (y0 + ih * k) + 1);   // and her top below
     if (x0 > 0) { xr.drawImage(im, 0, 0, 3, ih, 0, y0, x0 + 1, ih * k); xr.drawImage(im, iw - 3, 0, 3, ih, x0 + iw * k - 1, y0, w - (x0 + iw * k) + 1, ih * k); }
     xr.drawImage(im, x0, y0, iw * k, ih * k);
+    // her real face, read from the painting, drives everything that goes on her skin
+    const FM = paintedFaceMap(geo, im, x0, y0, k, w, h, photo);
+    if (FM.count > 400) {
+      geo.faceMap = FM;
+      const skinAt = (x, y) => FM.at(FM.face, x, y) === 1;
+      const clear = (x, y) => skinAt(x, y) && !FM.at(FM.near, x, y);
+      geo.onSkin = skinAt;
+      geo.blocked = (px, py, r = 0) => { for (const [ox, oy] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r], [r * 0.7, r * 0.7], [-r * 0.7, -r * 0.7], [r * 0.7, -r * 0.7], [-r * 0.7, r * 0.7]]) if (!clear(px + ox, py + oy)) return true; return false; };
+      const pick = (test) => {
+        for (let t = 0; t < 120; t++) { const x = cx + (Math.random() * 2 - 1) * FM.ed * 1.1, y = FM.eyeY - FM.ed * 1.3 + Math.random() * (FM.chinY - FM.eyeY + FM.ed * 1.3); if (clear(x, y) && test(x, y)) return { x, y }; }
+        return null;
+      };
+      const zoneTest = {
+        forehead: (x, y) => y < FM.eyeY - FM.ed * 0.42,
+        nose: (x, y) => Math.abs(x - cx) < FM.ed * 0.24 && y > FM.eyeY && y < FM.noseY + FM.ed * 0.05,
+        cheek: (x, y) => Math.abs(x - cx) > FM.ed * 0.3 && y > FM.eyeY + FM.ed * 0.2 && y < FM.mouthY + FM.ed * 0.1,
+        chin: (x, y) => y > FM.mouthY + FM.ed * 0.12,
+      };
+      geo.anyPoint = () => pick(() => true) || { x: cx, y: FM.eyeY - FM.ed * 0.7 };
+      geo.zonePoint = (zone) => (zoneTest[zone] && pick(zoneTest[zone])) || geo.anyPoint();
+      const facePath = FM.path(FM.face);
+      geo.clipSkin = (ctx) => ctx.clip(facePath);
+      geo.headPath = facePath;
+      if (FM.lips) {
+        geo.lipsPath = FM.path(FM.lips);
+        geo.inLips = (x, y) => FM.at(FM.lips, x, y) === 1;
+        geo.lipsBox = FM.lipsBox;
+      }
+    }
     if (seamTop != null) {
       // the pictures are cropped through the top of her hair: rather than invent a crown above the
       // picture, the top of the painting melts softly into her backdrop
