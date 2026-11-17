@@ -224,13 +224,15 @@ function styledFor(photo, style, hairHex, wet = false) {
     const fcx = (fit[1] + fit[2]) / 2, ed = fit[2] - fit[1], frx = ed * 0.73, fcy = fit[0] + 0.055, fry = 0.145;
     // how strongly coloured her skin is (her cheeks, under the eyes): hair counts as anything well short
     // of that, so silver hair that picks up a warm glow from brown skin is still hair
-    const cheek = [];
+    const cheek = [], cheekL = [];
     for (let y = Math.round((fit[0] + 0.05) * HH); y < (fit[0] + 0.1) * HH; y += 2) for (let x = Math.round(fit[1] * HW); x < fit[2] * HW; x += 2) {
       const i = y * HW + x, mx = Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]), mn = Math.min(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]);
-      cheek.push(mx ? (mx - mn) / mx : 0);
+      cheek.push(mx ? (mx - mn) / mx : 0); cheekL.push((d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 765);
     }
-    cheek.sort((p2, q2) => p2 - q2);
+    cheek.sort((p2, q2) => p2 - q2); cheekL.sort((p2, q2) => p2 - q2);
     const skinSat = cheek[Math.floor(cheek.length / 2)] || 0.3, base = Math.max(0.125, skinSat * 0.52);
+    const skinL = cheekL[Math.floor(cheekL.length / 2)] || 0.6;
+    const faceSkip = new Uint8Array(n);
     const weak = new Uint8Array(n);
     for (let i = 0; i < n; i++) {
       const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
@@ -240,8 +242,11 @@ function styledFor(photo, style, hairHex, wet = false) {
       const fx = (i % HW) / HW - fcx, fy = Math.floor(i / HW) / HH - fcy;
       // nothing on her face is hair: the oval of it, and the band her eyebrows sit in (dark and not
       // very colourful, they would be dyed along with her hair otherwise)
-      if ((fx / frx) ** 2 + (fy / fry) ** 2 < 1) continue;
-      if (Math.abs(fx) < ed * 0.78 && fy + fcy > fit[0] - 0.085 && fy + fcy < fit[0] + 0.03) continue;
+      // (the middle of her face, and each eye with its whites, never count; the sides of her face are
+      // judged by colour like everything else, so hair lying against her cheeks is dyed too)
+      const ex2 = Math.min(Math.abs(fx + ed / 2), Math.abs(fx - ed / 2)), ey2 = Math.floor(i / HW) / HH - fit[0];
+      if ((fx / (ed * 0.5)) ** 2 + (fy / fry) ** 2 < 1 || (ex2 / (ed * 0.3)) ** 2 + (ey2 / 0.035) ** 2 < 1) { faceSkip[i] = 1; continue; }
+      if (Math.abs(fx) < ed * 0.78 && fy + fcy > fit[0] - 0.085 && fy + fcy < fit[0] + 0.03) { faceSkip[i] = 1; continue; }
       al[i] = Math.max(0, Math.min(1, (lim - sat) / 0.055)) * 255;
       weak[i] = sat < Math.min(lim * 1.45, skinSat * 0.8) ? 1 : 0;
     }
@@ -269,21 +274,40 @@ function styledFor(photo, style, hairHex, wet = false) {
     blur(al, 2, 2);
     // the cut-out is pulled in a pixel or two, so no rim of backdrop comes with her
     const solid = blur(Float32Array.from(bg, (v) => (v ? 0 : 255)), 2, 1);
-    const hairA = new Uint8ClampedArray(n);
+    // where hair meets skin (fine baby hairs, wisps over her neck and shoulders) a pixel is part hair,
+    // part skin: how much is hair is read from how much of her skin's colour it has lost, so those
+    // wisps are dyed in proportion instead of staying silver and outlining her face
+    const zone = blur(Float32Array.from(al), 7, 2);
+    const hairA = new Uint8ClampedArray(n), tintA = new Uint8ClampedArray(n);
+    const src0 = hq.getImageData(0, 0, HW, HH).data;
+    // the dye reaches a couple of pixels past the solid hair, so the painting's bright rim along the
+    // hairline is covered by the new colour and fades straight into skin
+    const reach = blur(Float32Array.from(al, (v) => Math.max(0, Math.min(1, (v / 255 - 0.3) / 0.4)) * 255), 2, 1);
+    const hl = new Float32Array(n), hwt = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const w2 = Math.max(0, Math.min(1, (al[i] / 255 - 0.3) / 0.4)); hwt[i] = w2; hl[i] = w2 * (src0[i * 4] + src0[i * 4 + 1] + src0[i * 4 + 2]) / 765; }
+    blur(hl, 6, 2); blur(hwt, 6, 2);
     for (let i = 0; i < n; i++) {
       hairA[i] = Math.max(0, Math.min(1, (al[i] / 255 - 0.3) / 0.4)) * 255;
-      d[i * 4] = hairA[i]; d[i * 4 + 1] = Math.max(0, Math.min(1, (solid[i] / 255 - 0.62) / 0.3)) * 255; d[i * 4 + 2] = 0; d[i * 4 + 3] = 255;
+      let soft = 0;
+      if (!faceSkip[i] && !bg[i] && zone[i] > 8) {
+        const r = src0[i * 4], g = src0[i * 4 + 1], b = src0[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b), sat = mx ? (mx - mn) / mx : 0;
+        soft = Math.max(0, Math.min(1, (skinSat * 0.92 - sat) / Math.max(0.05, skinSat * 0.92 - 0.04))) ** 0.6 * Math.min(1, zone[i] / 70) * 255;
+      }
+      tintA[i] = Math.max(hairA[i], soft, faceSkip[i] || bg[i] ? 0 : Math.min(255, reach[i] * 1.9));
+      d[i * 4] = tintA[i]; d[i * 4 + 1] = Math.max(0, Math.min(1, (solid[i] / 255 - 0.62) / 0.3)) * 255;
+      d[i * 4 + 2] = (hwt[i] > 0.02 ? hl[i] / hwt[i] : 0.5) * 255;      // how light her hair is around here
+      d[i * 4 + 3] = 255;
     }
     hq.putImageData(id, 0, 0);
     const fc = document.createElement('canvas'); fc.width = FW; fc.height = FH;
     const fq = fc.getContext('2d', { willReadFrequently: true }); fq.imageSmoothingQuality = 'high'; fq.drawImage(hc, 0, 0, FW, FH);
     const md = fq.getImageData(0, 0, FW, FH).data, N = FW * FH;
-    const mh = new Uint8Array(N), ms = new Uint8Array(N);
-    for (let i = 0; i < N; i++) { mh[i] = md[i * 4]; ms[i] = md[i * 4 + 1]; }
+    const mh = new Uint8Array(N), ms = new Uint8Array(N), ml = new Uint8Array(N);
+    for (let i = 0; i < N; i++) { mh[i] = md[i * 4]; ms[i] = md[i * 4 + 1]; ml[i] = md[i * 4 + 2]; }
     fq.drawImage(im, 0, 0);
-    e.base = { src: fq.getImageData(0, 0, FW, FH), mh, ms, hairA, HW, HH };
+    e.base = { src: fq.getImageData(0, 0, FW, FH), mh, ms, ml, hairA, HW, HH, skinL };
   }
-  const { src, mh, ms, hairA, HW, HH } = e.base, N = FW * FH, sd = src.data;
+  const { src, mh, ms, ml, hairA, HW, HH, skinL } = e.base, N = FW * FH, sd = src.data;
   const hv = parseInt(hairHex.slice(1), 16), hr = hv >> 16, hg = (hv >> 8) & 255, hb = hv & 255;
   const dark = 1 - (hr + hg + hb) / 765;
   const cv = document.createElement('canvas'); cv.width = FW; cv.height = FH;
@@ -291,10 +315,17 @@ function styledFor(photo, style, hairHex, wet = false) {
   for (let i = 0; i < N; i++) {
     const j = i * 4, r = sd[j], g = sd[j + 1], b = sd[j + 2], a = mh[i];
     if (a) {
-      const t = Math.max(0, Math.min(1, ((r + g + b) / 765 - 0.3) / 0.65)), k = a / 255;
+      // the pixel is k parts silver hair and the rest skin: take out the silver it holds and put the
+      // dyed hair in its place, leaving the skin share as it was
+      const k = a / 255, Lp = (r + g + b) / 765;
+      // (at the edge the hair's own lightness is taken from the solid hair beside it: the painting's
+      // bright rim would otherwise come out as a pale line round her face)
+      const Lh = Math.max(0, Math.min(1, k > 0.98 ? Lp : Math.min((Lp - (1 - k) * skinL) / Math.max(0.08, k), ml[i] / 255 + 0.06)));
+      const t = Math.max(0, Math.min(1, (Lh - 0.3) / 0.65));
       // wet hair is darker and clumps into sharper, brighter streaks
-      const body = wet ? 0.27 + 0.6 * t * t : 0.4 + 0.72 * t, spec = wet ? (70 + 70 * dark) * t ** 7 : (40 + 60 * dark) * t * t * t * t;
-      o[j] = r + (hr * body + spec - r) * k; o[j + 1] = g + (hg * body + spec - g) * k; o[j + 2] = b + (hb * body + spec - b) * k;
+      const body = wet ? 0.27 + 0.6 * t * t : 0.4 + 0.72 * t, spec = (wet ? (70 + 70 * dark) * t ** 7 : (40 + 60 * dark) * t * t * t * t) * k * k;
+      if (k > 0.98) { const gry = Lh * 255; o[j] = r + hr * body + spec - gry; o[j + 1] = g + hg * body + spec - gry; o[j + 2] = b + hb * body + spec - gry; }
+      else { o[j] = r + (hr * body + spec - r) * k; o[j + 1] = g + (hg * body + spec - g) * k; o[j + 2] = b + (hb * body + spec - b) * k; }
     } else { o[j] = r; o[j + 1] = g; o[j + 2] = b; }
     o[j + 3] = ms[i];
   }

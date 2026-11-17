@@ -596,8 +596,10 @@ function startSalon(kind, vip = null) {
   G.combo = 0;
   G.stats = freshStats();
   G.paused = false;
-  const client = { ...(vip ? vip.def : LEVELS[Math.floor(Math.random() * LEVELS.length)]), zone: 'forehead' };
-  newScene(vip ? vip.seed : Math.floor(Math.random() * 1e9), client);
+  const pre = !vip && kind === 'hair' && G.nextHair;   // the client picked when the salon opened
+  G.nextHair = null;
+  const client = { ...(vip ? vip.def : pre ? pre.def : LEVELS[Math.floor(Math.random() * LEVELS.length)]), zone: 'forehead' };
+  newScene(vip ? vip.seed : pre ? pre.seed : Math.floor(Math.random() * 1e9), client);
   if (kind === 'haircut') { G.look = { ...G.look, style: 'long', photoFace: true }; paintSkin(); }   // needs a fringe to trim
   if (kind === 'hair') {
     // your salon: its walls follow the Decor level, its stations decide the services
@@ -660,6 +662,10 @@ function onSalonStage(sv) {
 // the salon hub: your stations, what they do, and what the next level costs
 function showSalon() {
   const lv = save.salon;
+  // pick the next client now and start fetching her hairstyle paintings, so she is ready in the chair
+  const def = LEVELS[Math.floor(Math.random() * LEVELS.length)], seed = Math.floor(Math.random() * 1e9);
+  G.nextHair = { def, seed };
+  styledList((def && def.mix ? SKIN_TONES[def.skin] : null) || SKIN_TONES[save.settings.skin] || SKIN_TONES[1], seed);
   let html = `<div class="lv-top"><span>${salonTitle(lv)} · level ${salonLevel(lv)}</span><span><img class="coin" src="ui/coin.png" alt="coins"> ${save.coins.toLocaleString()}</span></div>
     <img class="salon-view" alt="Your salon" src="${salonPicture(lv, 340, 220, mySalon())}">
     <p class="salon-note">${save.salonClients} client${save.salonClients === 1 ? '' : 's'} served. Upgrade stations to offer more and earn bigger tips.</p>`;
