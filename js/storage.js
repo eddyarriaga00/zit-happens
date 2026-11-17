@@ -45,7 +45,7 @@ const DEFAULTS = {
   pus: 'classic',
   pusOwned: ['classic'],
   stars: {},        // level -> best stars
-  settings: { sound: true, haptics: true, skin: 1, steps: true },
+  settings: { sound: true, haptics: true, skin: 1, steps: true, zoom: false, volume: 40 },
 };
 
 export function load() {

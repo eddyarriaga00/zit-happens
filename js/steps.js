@@ -68,6 +68,7 @@ export class Treatment {
     this.fresh = true;
     this.progress = 0;
     this.done = false;
+    this.doneAt = null;
     this.holding = 0;
     if (phase === 'peel') this.peelStart = Math.max(0.01, this.filmMean());
     if (phase === 'rinse') {
@@ -124,9 +125,7 @@ export class Treatment {
     // brush size is for a thumb, whatever size the pimples are drawn at
     const s = (G.baseScale || 1) * 1.15 * Math.sqrt(G.spaMult || 1);
     if (this.phase === 'lather') {
-      if (!sup.ready('soap')) { sup.nag('soap', 'open the cleanser & pump it'); return; }
-      const d = sup.hitDollops(x, y);
-      this.paint(this.foam, x, y, (d ? 70 : 38) * s, d ? 1 : 0.5);
+      if (!this.spread('soap', this.foam, x, y, s, 'open the cleanser')) return;
       audio.scrub();
       if (Math.random() < 0.15) audio.bloop();
     } else if (this.phase === 'rinse') {
@@ -138,14 +137,10 @@ export class Treatment {
       G.fx.wipe(x, y, 42 * s, 1);
       audio.wipe(0.8);
     } else if (this.phase === 'soothe') {
-      if (!sup.ready('gel')) { sup.nag('gel', 'open the gel & squeeze some out'); return; }
-      const d = sup.hitDollops(x, y);
-      this.paint(this.gel, x, y, (d ? 70 : 38) * s, d ? 1 : 0.6);
+      if (!this.spread('gel', this.gel, x, y, s, 'open the gel')) return;
       audio.squish(0.1);
     } else if (this.phase === 'mask') {
-      if (!sup.ready('mask')) { sup.nag('mask', 'open the mask & scoop some out'); return; }
-      const d = sup.hitDollops(x, y);
-      this.paint(this.gel, x, y, (d ? 70 : 38) * s, d ? 1 : 0.6);
+      if (!this.spread('mask', this.gel, x, y, s, 'open the mask')) return;
       audio.squish(0.15);
     } else if (this.phase === 'dry') {
       this.fan += 0.0025;                       // waving a finger over it fans it dry
@@ -162,6 +157,21 @@ export class Treatment {
     } else return;
     this.tick++;
     if (this.tick % 6 === 0) buzz('light');
+  }
+
+  /** Spreads what is on her fingertip (scooped from the jar) where the finger goes: even, and only
+   *  as far as one scoop reaches. About two scoops cover a face. False when there is nothing on it. */
+  spread(type, arr, x, y, s, openMsg) {
+    const sup = this.G.sup;
+    sup.hand = { x, y };
+    if (!sup.ready(type)) { sup.nag(type, openMsg); return false; }
+    const sc = sup.scoop;
+    if (!sc || sc.type !== type || sc.left <= 0) { sup.nag(type, sc && sc.type === type ? 'scoop some more' : 'scoop some out with your finger'); return false; }
+    const k = 0.35 + 0.65 * Math.min(1, sc.left * 2.5);          // the last of it goes on thinner
+    const added = this.paint(arr, x, y, 40 * s, (type === 'soap' ? 0.5 : 0.6) * k);
+    sc.left -= added / (this.cells * 0.5 + 1);
+    if (sc.left <= 0) { sc.left = 0; sup.ranOut(type); }
+    return true;
   }
 
   // ---- sim ----
@@ -208,6 +218,7 @@ export class Treatment {
       else if (this.phase === 'rinse') this.foam.fill(0);
       else if (this.phase === 'soothe' || this.phase === 'mask') fill(this.gel, 1);
       else if (this.phase === 'peel') this.gel.fill(0);
+      this.doneAt = this.time;
       G.onStepDone(this.phase);
     }
   }
@@ -285,7 +296,12 @@ export class Treatment {
         ctx.clip('evenodd');
       }
       const v = Math.round(36 + 44 * dryK);
+      // once the gel step is finished it soaks into her skin and fades away
+      const soak = this.phase === 'soothe' && this.doneAt != null ? Math.max(0, 1 - (this.time - this.doneAt) / 1.4) : 1;
+      if (soak <= 0) { ctx.restore(); return this.drawRest(ctx); }
+      ctx.globalAlpha *= soak;
       ctx.fillStyle = this.phase === 'soothe' ? 'rgba(140,225,195,0.42)' : `rgba(${v},${v},${v + 8},0.95)`;
+      const film = new Path2D();
       ctx.beginPath();
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
@@ -293,11 +309,14 @@ export class Treatment {
           if (gel[i] <= 0.05) continue;
           const x = (col + 0.3 + jit[i * 4] * 0.4) * CELL, y = (row + 0.3 + jit[i * 4 + 1] * 0.4) * CELL;
           const r = CELL * (0.55 + 0.4 * gel[i]);
-          ctx.moveTo(x + r, y);
-          ctx.arc(x, y, r, 0, Math.PI * 2);
+          film.moveTo(x + r, y);
+          film.arc(x, y, r, 0, Math.PI * 2);
         }
       }
-      ctx.fill();
+      ctx.fill(film);
+      // the shading below only ever sits on the film itself: never on bare skin, and nothing is left
+      // behind once the mask is peeled off
+      ctx.clip(film);
       if (g && g.headPath) {
         // the film follows the face underneath: light on the high points while wet, the nose and
         // mouth still readable through it, and fine cracks once a mask has dried
@@ -308,14 +327,17 @@ export class Treatment {
           bg.addColorStop(0, col); bg.addColorStop(1, col.replace(/[\d.]+\)$/, '0)'));
           ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(0, 0, ru * g.hw, 0, Math.PI * 2); ctx.fill(); ctx.restore();
         };
-        const dk = this.phase === 'soothe' ? 0.12 : 0.3;
+        // a see-through gel over her painted face shows the face's own shading: only an opaque mask needs it drawn
+        const dk = this.phase === 'soothe' ? (g.photo ? 0 : 0.12) : 0.3;
         for (const d of [-1, 1]) {
-          blob(d * 0.17, 0.2, 0.07, 0.2, `rgba(0,0,0,${dk})`);                 // sides of the nose
-          blob(d * 0.09, 0.375, 0.06, 0.025, `rgba(0,0,0,${dk * 1.6})`);       // nostrils
+          if (dk) {
+            blob(d * 0.17, 0.2, 0.07, 0.2, `rgba(0,0,0,${dk})`);                 // sides of the nose
+            blob(d * 0.09, 0.375, 0.06, 0.025, `rgba(0,0,0,${dk * 1.6})`);       // nostrils
+            blob(d * 0.8, 0.45, 0.2, 0.25, `rgba(0,0,0,${dk * 0.6})`);           // the face turning away
+          }
           blob(d * 0.6, 0.12, 0.2, 0.07, `rgba(255,255,255,${0.2 * wetK})`);   // cheekbones
-          blob(d * 0.8, 0.45, 0.2, 0.25, `rgba(0,0,0,${dk * 0.6})`);           // the face turning away
         }
-        blob(0, 0.36, 0.2, 0.03, `rgba(0,0,0,${dk})`);                          // under the nose
+        if (dk) blob(0, 0.36, 0.2, 0.03, `rgba(0,0,0,${dk})`);                  // under the nose
         blob(-0.05, -0.4, 0.4, 0.13, `rgba(255,255,255,${0.2 * wetK})`);        // forehead
         blob(0, 0.1, 0.035, 0.2, `rgba(255,255,255,${0.26 * wetK})`);           // bridge of the nose
         blob(0, 0.3, 0.08, 0.05, `rgba(255,255,255,${0.26 * wetK})`);           // tip of the nose
@@ -347,6 +369,12 @@ export class Treatment {
       }
       ctx.stroke();      ctx.restore();
     }
+    this.drawRest(ctx);
+  }
+
+  drawRest(ctx) {
+    const G = this.G;
+    const { cols, rows, foam, gel, jit } = this;
 
     // "you missed a spot": bare patches glow once most of the face is done
     if ((this.phase === 'lather' || this.phase === 'soothe' || this.phase === 'mask') && this.progress > 0.5 && !this.done) {

@@ -1,7 +1,8 @@
 // The things on the tray: cleanser bottle, wet wipes, cotton pad jar, gel tube,
 // steamer and the bin. Each one has to be opened / switched on and used by hand.
 //
-//   bottle / tube : tap to open, tap to pump dollops onto the face (3 pumps)
+//   jar / tube    : open it, then tap it to scoop some onto your finger and spread it with that
+//                   finger; scoop again when it runs out (about three scoops cover a face)
 //   wipes / pads  : tap to open, tap to pull one out; it gets dirty as you wipe
 //   bin           : tap to throw the dirty one away
 //   steamer       : tap to switch on
@@ -9,12 +10,11 @@
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
 
-const PUMPS = 3;
 // How each container opens: drag direction and the instruction shown in the close-up.
 const OPEN = {
   pads: { dx: 0, dy: -1, text: 'Lift the lid off' },
   wipes: { dx: 1, dy: 0, text: 'Peel the seal back' },
-  soap: { dx: 1, dy: 0, text: 'Twist the pump to unlock' },
+  soap: { dx: 0, dy: -1, text: 'Lift the lid off' },
   gel: { dx: 0, dy: 1, text: 'Pull the cap off' },
   mask: { dx: 0, dy: -1, text: 'Lift the lid off' },
 };
@@ -43,6 +43,7 @@ export class Supplies {
     this.cloth = null;      // { kind: 'wipes' | 'pads', dirt: 0..1 }
     this.hand = null;       // where the finger holding the cloth is
     this.dollops = [];
+    this.scoop = null;      // what is on her fingertip: { type, left: 1..0 }
     this.flying = [];       // cloths arcing into the bin
     this.opened = {};       // containers stay open for the rest of the patient
     this.nagT = 0;
@@ -71,6 +72,7 @@ export class Supplies {
     this.closeup = null;
     this.items = [];
     this.dollops = [];
+    this.scoop = null;
     if (key === 'lather') this.items.push(make('soap', R));
     if (key === 'rinse') this.items.push(make('wipes', R), make('bin', L));
     if (key === 'steam') this.items.push(make('steamer', G.W / 2));
@@ -88,7 +90,7 @@ export class Supplies {
   ready(type) {
     const it = this.item(type);
     if (!it) return true;   // nothing to operate (shouldn't block play)
-    return type === 'steamer' ? it.on : it.pumps >= PUMPS;
+    return type === 'steamer' ? it.on : it.open;
   }
 
   /** Floating reminder next to the thing that needs doing. */
@@ -186,18 +188,14 @@ export class Supplies {
     const t = it.type;
     if (t === 'soap' || t === 'gel' || t === 'mask') {
       if (!it.open) return this.startCloseup(it);
-      if (it.pumps >= PUMPS) return;
-      it.pumps++;
+      // a scoop of it on your fingertip, and that same finger carries on spreading it
+      const first = !it.pumps;
+      it.pumps = (it.pumps || 0) + 1;
       it.press = 1;
+      this.scoop = { type: t, left: 1, t: 0 };
       audio.squish(0.8); audio.bloop(); buzz('medium');
-      // a dollop flies out and lands on the face
-      const top = G.safeTop + 130, bottom = G.H - G.safeBottom - 190;
-      this.dollops.push({
-        x: it.x, y: it.y - 40,
-        ...(() => { const p = G.geo ? G.geo.anyPoint() : { x: 50 + Math.random() * (G.W - 100), y: top + Math.random() * Math.max(60, bottom - top) }; return { tx: p.x, ty: p.y }; })(),
-        t: 0, r: (16 + Math.random() * 8) * G.scale, color: t === 'soap' ? '#ffffff' : t === 'mask' ? '#2e2e38' : '#8fe3c2',
-      });
-      if (it.pumps === PUMPS) G.fx.text(G.W / 2, G.H * 0.42, t === 'soap' ? 'now rub it in!' : 'now spread it!', '#8dffa8', 20);
+      if (first) G.fx.text(G.W / 2, G.H * 0.42, t === 'soap' ? 'now rub it in!' : 'now spread it on!', '#8dffa8', 20);
+      return 'grab';
     } else if (t === 'wipes' || t === 'pads') {
       if (!it.open) return this.startCloseup(it);
       const name = t === 'pads' ? 'pad' : 'wipe';
@@ -218,6 +216,13 @@ export class Supplies {
     this.closeup = { it, p: 0, p0: 0, id: null, sx: 0, sy: 0, t: 0, done: 0 };
     audio.click();
     buzz('light');
+  }
+
+  /** The fingertip is empty: the jar or tube pulses for another scoop. */
+  ranOut(type) {
+    const it = this.item(type);
+    if (it) it.bounce = 1;
+    if (this.nagT <= 0) { this.nagT = 1.2; this.G.fx.text(Math.max(110, Math.min(this.G.W - 110, it ? it.x : this.G.W / 2)), (it ? it.y : this.G.H - 160) - 64, 'scoop some more', '#ffe7a8', 15); }
   }
 
   /** Rubbing over a dollop works it into the skin. */
@@ -266,9 +271,12 @@ export class Supplies {
   /** Which item should pulse to show "do this next". */
   nextUp() {
     const k = this.key;
-    if (k === 'lather' && !this.ready('soap')) return 'soap';
-    if (k === 'soothe' && !this.ready('gel')) return 'gel';
-    if (k === 'mask' && !this.ready('mask')) return 'mask';
+    const empty = (t) => !this.scoop || this.scoop.type !== t || this.scoop.left <= 0;
+    const t = this.G.treat;
+    if (t && t.done) return null;
+    if (k === 'lather' && (!this.ready('soap') || empty('soap'))) return 'soap';
+    if (k === 'soothe' && (!this.ready('gel') || empty('gel'))) return 'gel';
+    if (k === 'mask' && (!this.ready('mask') || empty('mask'))) return 'mask';
     if (k === 'steam' && !this.ready('steamer')) return 'steamer';
     if (k === 'rinse' || k === 'pads') {
       const pack = this.item(k === 'rinse' ? 'wipes' : 'pads');
@@ -318,6 +326,25 @@ export class Supplies {
       ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.beginPath(); ctx.ellipse(x - r * 0.3, y - r * 0.4, r * 0.3, r * 0.16, -0.5, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // what is on her fingertip while she spreads it
+    const sc = this.scoop;
+    if (sc && sc.left > 0 && this.hand) {
+      const col = sc.type === 'soap' ? ['#ffffff', '#dfe8f4'] : sc.type === 'mask' ? ['#3a3a46', '#16161c'] : ['#b9f3dc', '#6fcfab'];
+      const r = 7 + 9 * Math.sqrt(sc.left), x = this.hand.x + 2, y = this.hand.y - 3;
+      ctx.fillStyle = 'rgba(60,20,10,0.18)';
+      ctx.beginPath(); ctx.ellipse(x + 2, y + 4, r, r * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+      const bg = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, 1, x, y, r * 1.2);
+      bg.addColorStop(0, col[0]); bg.addColorStop(1, col[1]);
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.6, y + r * 0.25, r * 0.55, 0, Math.PI * 2);
+      ctx.arc(x - r * 0.55, y + r * 0.3, r * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.beginPath(); ctx.ellipse(x - r * 0.3, y - r * 0.4, r * 0.32, r * 0.16, -0.5, 0, Math.PI * 2); ctx.fill();
     }
 
     // cloths on their way to the bin
@@ -460,38 +487,13 @@ export class Supplies {
   // Containers take p = how far open (0 shut .. 1 open), so the close-up can
   // show the lid, seal or cap moving under your finger.
   draw_soap(ctx, it, p) {
-    // a clear pump bottle: you can see the cleanser inside, light down one side, a printed label
-    const lg = (x0, x1, stops) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); for (const [o, c] of stops) g.addColorStop(o, c); return g; };
-    ctx.fillStyle = 'rgba(20,30,60,0.22)';
-    ctx.beginPath(); ctx.ellipse(1, 31, 19, 3.5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = lg(-17, 17, [[0, '#7fb6dc'], [0.18, '#d5edfb'], [0.45, '#a9d6f2'], [0.8, '#8cc3e6'], [1, '#5f9cc6']]);
-    rr(ctx, -17, -14, 34, 44, 9); ctx.fill();
-    ctx.fillStyle = lg(-15, 15, [[0, 'rgba(60,140,205,0.55)'], [0.3, 'rgba(110,185,235,0.5)'], [1, 'rgba(40,110,175,0.6)']]);   // the cleanser
-    rr(ctx, -15, -4 + (it.pumps || 0) * 2, 30, 32 - (it.pumps || 0) * 2, 7); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    rr(ctx, -13, -9, 4, 32, 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
-    rr(ctx, 9, -8, 3, 30, 1.5); ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    rr(ctx, -11, 2, 22, 17, 3); ctx.fill();
-    ctx.fillStyle = '#3f86cf';
-    ctx.beginPath(); ctx.moveTo(0, 5); ctx.quadraticCurveTo(5, 11, 0, 14.5); ctx.quadraticCurveTo(-5, 11, 0, 5); ctx.fill();   // a water drop
-    ctx.fillStyle = '#9db4c8'; ctx.fillRect(-7, 16, 14, 1.2);
-    // collar and pump
-    ctx.fillStyle = lg(-7, 7, [[0, '#c5d3de'], [0.4, '#ffffff'], [1, '#aab9c6']]);
-    rr(ctx, -7, -22, 14, 9, 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(120,140,160,0.5)'; ctx.lineWidth = 0.6;
-    for (const xx of [-4, -1.5, 1, 3.5]) { ctx.beginPath(); ctx.moveTo(xx, -21); ctx.lineTo(xx, -14); ctx.stroke(); }
-    // pump head: twists out and pops up when unlocked, dips when pressed
-    const hy = lerp(-23, -30, p) + Math.sin(it.press * Math.PI) * 6;
-    const len = lerp(4, 20, p);
-    ctx.fillStyle = '#b9cbd9';
-    rr(ctx, -1.5, hy + 2, 3, -hy - 20, 1); ctx.fill();
-    ctx.fillStyle = lg(-len, 5, [[0, '#dfe8ef'], [0.5, '#ffffff'], [1, '#c9d6e0']]);
-    rr(ctx, -5, hy - 4, 10, 8, 2); ctx.fill();
-    rr(ctx, -len, hy - 8, len + 5, 6, 3); ctx.fill();
-    ctx.fillStyle = 'rgba(120,140,160,0.4)'; ctx.fillRect(-len, hy - 3.2, len + 5, 0.8);
-    this.pips(ctx, it);
+    // a glass jar of whipped foaming cleanser with a pearly lid
+    this.jar(ctx, it, p, {
+      glass: [[0, '#b8d4ea'], [0.2, '#eef7ff'], [0.45, '#cfe4f5'], [0.85, '#b3cfe6'], [1, '#93b4d0']],
+      label: [[0, '#5aa0d8'], [0.4, '#8cc6f0'], [1, '#4b8fc8']],
+      rim: '#e9f2fa', goo: '#ffffff', gooHi: 'rgba(200,220,240,0.9)', whipped: true,
+      lid: [[0, '#c9d4e2'], [0.25, '#ffffff'], [0.5, '#e6edf5'], [0.8, '#cdd8e5'], [1, '#aab8c8']], lidLine: 'rgba(120,140,170,0.3)',
+    });
   }
 
   draw_gel(ctx, it, p) {
@@ -529,32 +531,50 @@ export class Supplies {
 
   draw_mask(ctx, it, p) {
     // a squat glass jar of charcoal mask with a brushed gold lid
+    this.jar(ctx, it, p, {
+      glass: [[0, '#1f1f27'], [0.2, '#55555f'], [0.45, '#34343e'], [0.85, '#26262e'], [1, '#15151b']],
+      label: [[0, '#239d92'], [0.4, '#49d6c9'], [1, '#1f8f85']],
+      rim: '#4a4a55', goo: '#121217', gooHi: 'rgba(255,255,255,0.35)',
+      lid: [[0, '#b98f2f'], [0.25, '#fbe6a2'], [0.5, '#e9c46a'], [0.8, '#c99b3a'], [1, '#9c7422']], lidLine: 'rgba(120,85,20,0.35)',
+    });
+  }
+
+  jar(ctx, it, p, C) {
     const lg = (x0, x1, stops) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); for (const [o, c] of stops) g.addColorStop(o, c); return g; };
     ctx.fillStyle = 'rgba(10,10,20,0.25)';
     ctx.beginPath(); ctx.ellipse(1, 27, 24, 3.5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = lg(-22, 22, [[0, '#1f1f27'], [0.2, '#55555f'], [0.45, '#34343e'], [0.85, '#26262e'], [1, '#15151b']]);
+    ctx.fillStyle = lg(-22, 22, C.glass);
     rr(ctx, -22, -8, 44, 34, 9); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.28)';
     rr(ctx, -18, -3, 4, 24, 2); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.1)';
     rr(ctx, 13, -3, 3, 24, 1.5); ctx.fill();
-    ctx.fillStyle = lg(-12, 12, [[0, '#239d92'], [0.4, '#49d6c9'], [1, '#1f8f85']]);
+    ctx.fillStyle = lg(-12, 12, C.label);
     rr(ctx, -12, 4, 24, 12, 3); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(-8, 7.5, 16, 1.4); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(-6, 11, 12, 1.1);
-    if (p > 0) {                                   // the goo inside, glossy
-      ctx.fillStyle = '#4a4a55';
+    if (p > 0) {                                   // what is inside, with a dip where a finger has scooped
+      ctx.fillStyle = C.rim;
       ctx.beginPath(); ctx.ellipse(0, -8, 21, 6, 0, 0, Math.PI * 2); ctx.fill();   // the rim of the glass
-      ctx.fillStyle = '#121217';
+      ctx.fillStyle = C.goo;
       ctx.beginPath(); ctx.ellipse(0, -8, 18.5, 4.6, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      if (C.whipped) {
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        for (const [x, y, r] of [[-7, -10, 4], [2, -11, 4.5], [9, -9, 3.5], [-2, -7, 3]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+        ctx.strokeStyle = 'rgba(160,185,210,0.5)'; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.arc(2, -11, 4.5, 0.3, 2.4); ctx.arc(-7, -10, 4, 0.4, 2.3); ctx.stroke();
+      }
+      if (it.pumps) {
+        const d = Math.min(1, it.pumps / 4);
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        ctx.beginPath(); ctx.ellipse(4, -8, 4 + 4 * d, 1.6 + 1.2 * d, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = C.gooHi;
       ctx.beginPath(); ctx.ellipse(-6, -9.2, 7, 1.5, -0.1, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.15)';
-      ctx.beginPath(); ctx.ellipse(7, -6.6, 4, 1, 0.1, 0, Math.PI * 2); ctx.fill();
     }
     const lid = (x, y, w, h, r) => {
-      ctx.fillStyle = lg(x, x + w, [[0, '#b98f2f'], [0.25, '#fbe6a2'], [0.5, '#e9c46a'], [0.8, '#c99b3a'], [1, '#9c7422']]);
+      ctx.fillStyle = lg(x, x + w, C.lid);
       rr(ctx, x, y, w, h, r); ctx.fill();
-      ctx.strokeStyle = 'rgba(120,85,20,0.35)'; ctx.lineWidth = 0.5;
+      ctx.strokeStyle = C.lidLine; ctx.lineWidth = 0.5;
       for (let xx = x + 3; xx < x + w - 2; xx += 2.5) { ctx.beginPath(); ctx.moveTo(xx, y + 2); ctx.lineTo(xx, y + h - 1); ctx.stroke(); }
       ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(x + 3, y + 1.2, w - 6, 1);
     };
@@ -566,7 +586,6 @@ export class Supplies {
       lid(-24, -18, 48, 12, 5);
       ctx.restore();
     }
-    this.pips(ctx, it);
   }
 
   draw_wipes(ctx, it, p) {
@@ -724,12 +743,5 @@ export class Supplies {
     ctx.fillText('OPEN ME', 0, 38);
   }
 
-  /** pump counter under a bottle */
-  pips(ctx, it) {
-    if (!it.open) return;
-    for (let i = 0; i < PUMPS; i++) {
-      ctx.fillStyle = i < it.pumps ? '#8dffa8' : 'rgba(255,255,255,0.35)';
-      ctx.beginPath(); ctx.arc((i - 1) * 11, 37, 4, 0, Math.PI * 2); ctx.fill();
-    }
-  }
+  pips() { /* (scoops have no count: scoop as often as you need) */ }
 }

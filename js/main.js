@@ -25,6 +25,7 @@ const toolfx = new ToolFX();
 let save = store.load();
 audio.setSoundEnabled(save.settings.sound);
 setHapticsEnabled(save.settings.haptics);
+audio.setVolume((save.settings.volume ?? 40) / 100);
 
 const up = (id) => save.upgrades[id] || 0;       // shop upgrade level
 const tone = () => G.tone || SKIN_TONES[save.settings.skin] || SKIN_TONES[1];
@@ -248,11 +249,12 @@ const camPill = () => ({ x: G.W / 2, y: playBottom() - 30, w: 172, h: 34 });
 function drawCamPill(ctx) {
   if (!camCan() || (cam.tk === 1 && (!workLeft() || G.tool === 'pad'))) return;
   const b = camPill(), inn = cam.tk > 1;
-  const label = inn ? 'Step back' : 'Tap a spot to lean in';
+  // leaning in is hers to choose: by default a tap works on the spot, and the pill offers the zoom
+  const label = inn ? 'Step back' : save.settings.zoom ? 'Tap a spot to lean in' : G.zoomArm ? 'Now tap where to zoom' : '🔍 Zoom in';
   ctx.save();
   ctx.font = '800 13px ui-rounded, -apple-system, system-ui, sans-serif';
   const w = ctx.measureText(label).width + (inn ? 46 : 30);
-  ctx.globalAlpha = inn ? 0.95 : 0.62 + 0.2 * Math.sin(G.time * 3);
+  ctx.globalAlpha = inn || !save.settings.zoom ? 0.95 : 0.62 + 0.2 * Math.sin(G.time * 3);
   ctx.fillStyle = inn ? 'rgba(255,255,255,0.94)' : 'rgba(30,22,50,0.55)';
   ctx.beginPath(); ctx.roundRect(b.x - w / 2, b.y - b.h / 2, w, b.h, b.h / 2); ctx.fill();
   ctx.fillStyle = inn ? '#3a2f66' : '#ffffff';
@@ -409,7 +411,7 @@ function startLevel(n) {
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
-  if (G.treat) toast('Step 1: Open the cleanser, pump it, then rub 🫧', 3400);
+  if (G.treat) toast('Step 1: Open the cleanser, scoop some with your finger, rub it in 🫧', 3400);
   else toast(toolHint(n), 2800);
 }
 
@@ -504,7 +506,7 @@ function afterWipe() {
   const peel = G.rx ? G.rx.finish === 'mask' : G.level % 2 === 0;
   G.treat.start(peel ? 'mask' : 'soothe');
   refreshTools();
-  toast(peel ? `Step ${stepNo('fin')}: Open the charcoal mask, scoop it on, spread it 🖤` : `Step ${stepNo('fin')}: Open the gel, squeeze some out, spread it 🌿`, 3400);
+  toast(peel ? `Step ${stepNo('fin')}: Open the charcoal mask, scoop some with your finger, spread it 🖤` : `Step ${stepNo('fin')}: Open the gel, squeeze some onto your finger, spread it 🌿`, 3400);
 }
 
 function startZen() {
@@ -891,7 +893,8 @@ function checkLevelDone() {
   if (G.spawnQueue.length) return;
   if (G.pimples.every((p) => p.state === 'done')) {
     G.allDone = true;
-    if (G.fx.cleanliness() >= cleanTarget()) {
+    // the last spot's mess is hers to wipe: only move on by itself when there is truly nothing left
+    if (G.fx.messLeft() <= 0.02) {
       setTimeout(afterWipe, 900);
     } else {
       $('btn-finish').textContent = G.treat ? 'Next step →' : 'All done ✨ Finish';
@@ -1014,7 +1017,11 @@ canvas.addEventListener('pointerdown', (e) => {
     if (cam.tk > 1) {
       // leaned in: the pill steps back (a finger beside a pimple at the edge of her face must not)
       if (Math.abs(sx - b.x) < b.w / 2 && Math.abs(sy - b.y) < b.h / 2 + 6) { camOut(); audio.click(); return idle(e.pointerId, x, y); }
-    } else if (G.tool !== 'pad' && G.tool !== 'spray' && G.tool !== 'patch' && workLeft() && pointers.size === 0 && sy > playTop() - 30 && sy < playBottom() + 10) {
+    } else if (!save.settings.zoom && workLeft() && G.tool !== 'pad' && Math.abs(sx - b.x) < b.w / 2 && Math.abs(sy - b.y) < b.h / 2 + 6) {
+      G.zoomArm = !G.zoomArm; audio.click(); buzz('light');           // the pill: next tap picks where to zoom
+      return idle(e.pointerId, x, y);
+    } else if ((save.settings.zoom || G.zoomArm) && G.tool !== 'pad' && G.tool !== 'spray' && G.tool !== 'patch' && workLeft() && pointers.size === 0 && sy > playTop() - 30 && sy < playBottom() + 10) {
+      G.zoomArm = false;
       camIn(x, y); audio.click(); buzz('light');
       return idle(e.pointerId, x, y);
     }
@@ -1308,7 +1315,7 @@ function wipeAt(x, y, speed, big = false) {
     audio.wipe(Math.min(1, speed / 40));
     if (Math.random() < 0.3) buzz('light');
   }
-  if (G.allDone && !G.ended && G.fx.cleanliness() >= cleanTarget()) {
+  if (G.allDone && !G.ended && (G.fx.cleanliness() >= Math.max(0.99, cleanTarget()) || G.fx.messLeft() <= 0.02)) {
     G.fx.sparkleBurst(x, y, 14);
     audio.sparkle();
     (G.mode === 'ear' ? endEar : afterWipe)();
@@ -1740,6 +1747,8 @@ function renderSettings() {
   $('set-sound').checked = save.settings.sound;
   $('set-haptics').checked = save.settings.haptics;
   $('set-steps').checked = save.settings.steps;
+  if ($('set-zoom')) $('set-zoom').checked = !!save.settings.zoom;
+  if ($('set-volume')) $('set-volume').value = save.settings.volume ?? 40;
   const wrap = $('skin-tones');
   wrap.innerHTML = '';
   SKIN_TONES.forEach((t, i) => {
@@ -1834,6 +1843,16 @@ $('set-steps').addEventListener('change', (e) => {
   save.settings.steps = e.target.checked;
   store.save(save);
 });
+$('set-zoom')?.addEventListener('change', (e) => {
+  save.settings.zoom = e.target.checked;
+  store.save(save);
+});
+$('set-volume')?.addEventListener('input', (e) => {
+  save.settings.volume = Number(e.target.value);
+  audio.setVolume(save.settings.volume / 100);
+  store.save(save);
+});
+$('set-volume')?.addEventListener('change', () => { audio.unlock(); audio.pop(0.6); });
 $('set-haptics').addEventListener('change', (e) => {
   save.settings.haptics = e.target.checked;
   setHapticsEnabled(save.settings.haptics);

@@ -612,3 +612,6 @@ button.tile:active i { transform: scale(1.15) rotate(-6deg); }
 #results.visit #res-title { font-size: 21px; font-style: italic; }
 #results.visit #btn-res-menu { background: none; box-shadow: none; color: var(--muted); font-size: 14px; padding: 6px; min-height: 0; }
 #results.visit .before-after, #results.visit ul.goals { display: none; }   /* between treatments it is a short "next up" card; the full picture comes with her review */
+
+/* volume slider in settings */
+.field.volume input[type=range] { padding: 0; border: 0; background: none; accent-color: var(--accent); height: 28px; }

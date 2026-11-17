@@ -5,12 +5,20 @@ let ctx = null;
 let master = null;
 let noiseBuf = null;
 let enabled = true;
+let volume = 0.4;
+const level = () => (enabled ? 0.9 * volume : 0);
 let oozeNodes = null;
 let lastSquish = 0;
 
 export function setSoundEnabled(on) {
   enabled = on;
-  if (master) master.gain.value = on ? 0.9 : 0;
+  if (master) master.gain.value = level();
+}
+
+/** 0..1, set from the volume slider. */
+export function setVolume(v) {
+  volume = Math.max(0, Math.min(1, v));
+  if (master) master.gain.value = level();
 }
 
 export function unlock() {
@@ -19,7 +27,7 @@ export function unlock() {
     if (!AC) return;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = enabled ? 0.9 : 0;
+    master.gain.value = level();
     const comp = ctx.createDynamicsCompressor();
     master.connect(comp).connect(ctx.destination);
     // a little room reverb makes every pop and squish feel closer and wetter
