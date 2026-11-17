@@ -25,7 +25,7 @@ export class Makeup {
     this.areas = {
       lips: { path: g.lipsPath, has: (x, y) => g.inLips(x, y), box: g.lipsBox },
       blush: { path: many(g.cheeks), has: (x, y) => g.cheeks.some((e) => inEll(e, x, y)), box: boxOf(g.cheeks) },
-      shadow: { path: many(g.lids), has: (x, y) => g.lids.some((e) => inEll(e, x, y)), box: boxOf(g.lids) },
+      shadow: { path: many(this.lidEll()), has: (x, y) => this.lidEll().some((e) => inEll(e, x, y)), box: boxOf(this.lidEll()) },
     };
     for (const a of Object.values(this.areas)) {
       a.cells = new Map();
@@ -36,6 +36,14 @@ export class Makeup {
     }
     this.tick = 0;
     this.hintT = 0;
+  }
+
+  /** Half-height of her open eye (from the distance between her eyes, which fits every painting). */
+  eyeOpen() { const e = this.G.geo.eyes; return Math.abs(e[1].x - e[0].x) * 0.085; }
+  /** Her eyelids: from the lash line up to just under the brow. */
+  lidEll() {
+    const g = this.G.geo, ed = Math.abs(g.eyes[1].x - g.eyes[0].x);
+    return g.photo ? g.eyes.map((e) => ({ x: e.x, y: e.y - ed * 0.07, rx: ed * 0.3, ry: ed * 0.1 })) : g.lids;
   }
 
   setProduct(p) { this.product = p; }
@@ -120,60 +128,50 @@ export class Makeup {
   }
 
   draw(ctx) {
+    const G = this.G, g = G.geo, dpr = G.dpr || 2;
+    // each product is laid down on its own layer, then blended into the painting the way real
+    // make-up sits on skin: the colour soaks in and her own lip lines, shading and texture show through
+    if (!this.layer || this.layer.width !== Math.round(G.W * dpr)) { this.layer = document.createElement('canvas'); this.layer.width = Math.round(G.W * dpr); this.layer.height = Math.round(G.H * dpr); }
+    const L = this.layer, x = L.getContext('2d');
     for (const name of ['blush', 'shadow', 'lips']) {
       const a = this.areas[name];
       if (!a.dabs.length) continue;
-      ctx.save();
-      if (name === 'lips') ctx.clip(a.path);
-      // eyeshadow goes on the closed lid; once her eyes are open it only shows above them
-      if (name === 'shadow' && (this.G.lidK || 0) < 0.6 && this.G.geo.eyePaths) {
-        const hole = new Path2D();
-        hole.rect(0, 0, this.G.W, this.G.H);
-        for (const ep of this.G.geo.eyePaths) hole.addPath(ep);
-        ctx.clip(hole, 'evenodd');
-      }
+      x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, L.width, L.height); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
       if (name === 'lips') {
-        // lipstick is a stain, not paint: the lip's own creases and shape show through it
-        ctx.globalAlpha = 0.74;
-        for (const d of a.dabs) { ctx.fillStyle = d.c; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill(); }
-        const b = a.box, cov = this.coverage('lips'), bw = b[2] - b[0], bh = b[3] - b[1], mx = (b[0] + b[2]) / 2, seamY = b[1] + bh * 0.36;
-        if (cov > 0.4) {
-          ctx.globalAlpha = Math.min(1, (cov - 0.4) / 0.4);
-          // the upper lip turns away from the light, the lower one catches it
-          const sh = ctx.createLinearGradient(0, b[1], 0, b[3]);
-          sh.addColorStop(0, 'rgba(30,0,10,0.3)'); sh.addColorStop(0.36, 'rgba(30,0,10,0.16)'); sh.addColorStop(0.5, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(30,0,10,0.14)');
-          ctx.fillStyle = sh; ctx.fillRect(b[0], b[1], bw, bh);
-          ctx.strokeStyle = 'rgba(50,8,18,0.5)'; ctx.lineWidth = 1.4;
-          ctx.beginPath(); ctx.moveTo(b[0], seamY - 1);
-          ctx.quadraticCurveTo(mx - bw * 0.25, seamY - 2, mx - bw * 0.07, seamY + 1.5);
-          ctx.quadraticCurveTo(mx, seamY + 3, mx + bw * 0.07, seamY + 1.5);
-          ctx.quadraticCurveTo(mx + bw * 0.25, seamY - 2, b[2], seamY - 1);
-          ctx.stroke();
-          // gloss: a soft pool of light on the fullest part of the lower lip, and a glint on the bow
-          const gy = b[1] + bh * 0.66, gr = bw * 0.24;
-          ctx.save(); ctx.translate(mx - bw * 0.04, gy); ctx.scale(1, 0.28);
-          const gg = ctx.createRadialGradient(0, 0, 0, 0, 0, gr);
-          gg.addColorStop(0, 'rgba(255,255,255,0.6)'); gg.addColorStop(1, 'rgba(255,255,255,0)');
-          ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(0, 0, gr, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
-          ctx.fillStyle = 'rgba(255,255,255,0.3)';
-          ctx.beginPath(); ctx.ellipse(mx, b[1] + bh * 0.16, bw * 0.05, 1.6, 0, 0, Math.PI * 2); ctx.fill();
-        }
+        for (const d of a.dabs) { x.fillStyle = d.c; x.beginPath(); x.arc(d.x, d.y, d.r, 0, Math.PI * 2); x.fill(); }
+        x.globalCompositeOperation = 'destination-in';
+        if (g.lipsMask) { x.imageSmoothingQuality = 'high'; x.drawImage(g.lipsMask.canvas, 0, 0, g.lipsMask.w, g.lipsMask.h); } else x.fill(a.path);
       } else {
-        // soft, buildable powder
         // powder has no edge: each dab fades the further it lands from the middle of the cheek or lid
-        const ells = name === 'blush' ? this.G.geo.cheeks : this.G.geo.lids;
+        const ells = name === 'blush' ? g.cheeks : this.lidEll();
         for (const d of a.dabs) {
           let e = 9;
           for (const q of ells) e = Math.min(e, ((d.x - q.x) / q.rx) ** 2 + ((d.y - q.y) / q.ry) ** 2);
           const k = Math.max(0, Math.min(1, 1.15 - e));
           if (k <= 0) continue;
-          const g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r);
-          g.addColorStop(0, hexA(d.c, (name === 'blush' ? 0.06 : 0.2) * k));
-          g.addColorStop(1, hexA(d.c, 0));
-          ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
+          const gr = x.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r);
+          gr.addColorStop(0, hexA(d.c, (name === 'blush' ? 0.11 : 0.34) * k));
+          gr.addColorStop(1, hexA(d.c, 0));
+          x.fillStyle = gr;
+          x.beginPath(); x.arc(d.x, d.y, d.r, 0, Math.PI * 2); x.fill();
         }
+        // eyeshadow goes on the closed lid; once her eyes are open it only shows above them
+        if (name === 'shadow' && (G.lidK || 0) < 0.6) {
+          x.globalCompositeOperation = 'destination-out'; x.fillStyle = '#000';
+          for (const e of g.eyes) { x.beginPath(); x.ellipse(e.x, e.y + this.eyeOpen() * 0.1, this.eyeOpen() * 0.27 / 0.1, this.eyeOpen(), 0, 0, Math.PI * 2); x.fill(); }
+        }
+      }
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (name === 'lips') {
+        // the shade's colour, with the lips' own light and dark kept, then a touch of depth
+        ctx.globalCompositeOperation = 'color'; ctx.globalAlpha = 0.85; ctx.drawImage(L, 0, 0);
+        ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.45; ctx.drawImage(L, 0, 0);
+        ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.35; ctx.drawImage(L, 0, 0);
+      } else {
+        ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 1; ctx.drawImage(L, 0, 0);
+        ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.6; ctx.drawImage(L, 0, 0);
       }
       ctx.restore();
     }

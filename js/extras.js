@@ -242,12 +242,12 @@ export class Strip {
     // blackheads still in the skin
     for (const q of this.plugs) {
       if (q.state === 'out') continue;
-      ctx.fillStyle = 'rgba(40,26,20,0.85)';
-      ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 7); ctx.fill();
-      ctx.strokeStyle = 'rgba(120,70,50,0.35)'; ctx.lineWidth = 0.5;
-      ctx.beginPath(); ctx.arc(q.x, q.y, q.r + 0.7, 0, 7); ctx.stroke();
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';      // an oily glint on each plug
-      ctx.beginPath(); ctx.arc(q.x - q.r * 0.3, q.y - q.r * 0.35, q.r * 0.3, 0, 7); ctx.fill();
+      // an open pore with a dark, oxidised plug: a soft shadowy dip, darkest in the middle
+      const rr = q.r * 0.85, pg = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, rr * 1.9);
+      pg.addColorStop(0, 'rgba(48,30,22,0.9)'); pg.addColorStop(0.4, 'rgba(70,44,32,0.62)'); pg.addColorStop(0.75, 'rgba(110,70,55,0.16)'); pg.addColorStop(1, 'rgba(110,70,55,0)');
+      ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(q.x, q.y, rr * 1.9, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';      // a tiny oily glint
+      ctx.beginPath(); ctx.arc(q.x - rr * 0.3, q.y - rr * 0.35, rr * 0.22, 0, 7); ctx.fill();
     }
     if (s === 'wet' || s === 'place') {
       ctx.fillStyle = 'rgba(255,255,255,0.13)';

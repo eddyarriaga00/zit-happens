@@ -455,8 +455,29 @@ function paintedFaceMap(geo, im, x0, y0, k, w, h, photo) {
     return p;
   };
   if (lipCells.length > 20) {
-    const lm = new Uint8Array(n); for (const i of lipCells) lm[i] = 1;
-    M.lips = tidy(lm, 1, 0.3);
+    let lm = new Uint8Array(n); for (const i of lipCells) lm[i] = 1;
+    lm = tidy(lm, 1, 0.3);
+    // only the lips themselves: the biggest joined patch (stray red at the jaw is dropped)
+    const lab = new Int32Array(n).fill(-1); let best = -1, bestN = 0;
+    for (let i = 0; i < n; i++) {
+      if (!lm[i] || lab[i] >= 0) continue;
+      const st3 = [i]; lab[i] = i; let cnt3 = 0;
+      while (st3.length) { const j = st3.pop(); cnt3++; const x = j % GW; for (const kk of [j - 1, j + 1, j - GW, j + GW]) { if (kk < 0 || kk >= n || (kk === j - 1 && x === 0) || (kk === j + 1 && x === GW - 1)) continue; if (lm[kk] && lab[kk] < 0) { lab[kk] = i; st3.push(kk); } } }
+      if (cnt3 > bestN) { bestN = cnt3; best = i; }
+    }
+    for (let i = 0; i < n; i++) if (lm[i] && lab[i] !== best) { lm[i] = 0; }
+    lipCells.length = 0; for (let i = 0; i < n; i++) if (lm[i]) lipCells.push(i);
+    M.lips = lm;
+    // a soft-edged version for colouring her lips (stretched up smoothly, so no stair-steps)
+    const lc = document.createElement('canvas'); lc.width = GW; lc.height = GH;
+    const lq = lc.getContext('2d'), ld = lq.createImageData(GW, GH);
+    for (let i = 0; i < n; i++) if (lm[i]) { ld.data[i * 4 + 3] = 255; }
+    lq.putImageData(ld, 0, 0);
+    const lc2 = document.createElement('canvas'); lc2.width = Math.ceil(GW / 2); lc2.height = Math.ceil(GH / 2);
+    const lq2 = lc2.getContext('2d'); lq2.imageSmoothingQuality = 'high'; lq2.drawImage(lc, 0, 0, lc2.width, lc2.height);
+    const lc3 = document.createElement('canvas'); lc3.width = GW; lc3.height = GH;
+    const lq3 = lc3.getContext('2d'); lq3.imageSmoothingQuality = 'high'; lq3.drawImage(lc2, 0, 0, GW, GH); lq3.drawImage(lc, 0, 0);
+    M.lipsMask = lc3;
     let x0b = 1e9, y0b = 1e9, x1b = -1e9, y1b = -1e9;
     for (const i of lipCells) { const x = (i % GW) / S, y = ((i / GW) | 0) / S; x0b = Math.min(x0b, x); x1b = Math.max(x1b, x); y0b = Math.min(y0b, y); y1b = Math.max(y1b, y); }
     M.lipsBox = [x0b, y0b, x1b, y1b];
@@ -1609,6 +1630,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
         geo.lipsPath = FM.path(FM.lips);
         geo.inLips = (x, y) => FM.at(FM.lips, x, y) === 1;
         geo.lipsBox = FM.lipsBox;
+        geo.lipsMask = { canvas: FM.lipsMask, w: FM.GW / FM.S, h: FM.GH / FM.S };
       }
     }
     if (seamTop != null) {
