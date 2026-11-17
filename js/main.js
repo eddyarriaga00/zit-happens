@@ -1,7 +1,7 @@
 import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
 import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL, AWARDS, rankFor } from './levels.js';
 import { lookFor, portraitURL } from './faces.js';
-import { renderFaceScene, drawLids, drawMood, drawEyes, photosReady, photosLoaded, onStyledArt, styledList, styledSwatch, styledLayer } from './facescene.js';
+import { renderFaceScene, drawLids, drawMood, drawWince, drawEyes, photosReady, photosLoaded, onStyledArt, styledList, styledSwatch, styledLayer } from './facescene.js';
 import { Makeup, Haircut, LIP_SHADES } from './salon.js';
 import { HairService, STATIONS, WALLS, salonLevel, salonTitle, salonPicture, salonBackdrop } from './hairsalon.js';
 import { Strip, Brows } from './extras.js';
@@ -1039,6 +1039,9 @@ canvas.addEventListener('pointerdown', (e) => {
   toolDown(e.pointerId, x, y);
 });
 
+/** How much her face screws up right now: a sharp squeeze, an ouch, a pluck. */
+function winceK() { return Math.min(1, Math.max((G.wince || 0) * 3, G.moodK < 0 ? -G.moodK * 1.2 : 0)); }
+window.__winceK = winceK;
 function hint(p, msg) { G.fx.text(p.x, p.y - p.r * 2.4, msg, '#ffe7a8', 15); }
 const idle = (id, x, y) => pointers.set(id, { kind: 'none', x, y });
 
@@ -1438,7 +1441,7 @@ function render() {
   // how shut her eyes are and what her face is doing this frame (the zoomed modes draw these too)
   G.lidK = Math.max(G.shut || 0, G.wince > 0 ? Math.min(1, G.wince * 6) : G.blinkA > 0 ? Math.sin(Math.PI * (1 - G.blinkA / 0.16)) : 0);
   G.moodK = G.mood && !(G.treat && G.treat.active) ? G.mood.k * Math.sin(Math.PI * Math.min(1, G.mood.t / G.mood.len)) ** 0.6 : 0;
-  if (G.geo) { drawEyes(ctx, G.geo, G.gazeX || 0, G.gazeY || 0); drawLids(ctx, G.geo, G.lidK); drawMood(ctx, G.geo, G.moodK); }
+  if (G.geo) { drawEyes(ctx, G.geo, G.gazeX || 0, G.gazeY || 0); drawLids(ctx, G.geo, G.lidK); drawMood(ctx, G.geo, G.moodK); drawWince(ctx, G.geo, winceK()); }
   else if (!G.skin) { ctx.fillStyle = '#eec1a2'; ctx.fillRect(0, 0, W, H); }   // back and shoulder scenes have no face geometry but do have painted skin
 
   ctx.save();

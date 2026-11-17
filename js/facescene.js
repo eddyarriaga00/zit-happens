@@ -28,6 +28,8 @@ if (typeof Image !== 'undefined') for (const ph of PHOTOS) {
   ph.shut = new Image(); ph.shut.src = ph.src.replace('.jpg', 'c.jpg');
   // and with a soft smile, for when she is pleased
   ph.smile = new Image(); ph.smile.src = ph.src.replace('.jpg', 's.jpg');
+  // and wincing, for a squeeze that stings
+  ph.wince = new Image(); ph.wince.src = ph.src.replace('.jpg', 'w.jpg');
   // unpacked ahead of time, so the first level that shows her does not stall while the picture decodes
   ph.img.addEventListener('load', () => { try { const d = ph.img.decode && ph.img.decode(); if (d && d.catch) d.catch(() => {}); } catch { /* fine */ } });
 }
@@ -1686,6 +1688,23 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       pq.fillStyle = g; pq.fillRect(-srx, -srx, srx * 2, srx * 2);
       geo.smile = { canvas: pc, x: px0, y: py0, w: pw, h: phh };
     }
+    // her wince comes from a fourth painting: brows, eyes, nose and mouth all move together, so the
+    // whole middle of her face is laid over, feathered wide so it melts into the rest
+    if (photo.wince && photo.wince.complete && photo.wince.naturalWidth) {
+      const wrx = hw * 0.86, wry = hh * 0.6, wcx = cx, wcy = Y(ey + 0.27);
+      const px0 = wcx - wrx, py0 = wcy - wry, pw = wrx * 2, phh = wry * 2;
+      const pc = document.createElement('canvas'); pc.width = Math.ceil(pw * dpr); pc.height = Math.ceil(phh * dpr);
+      const pq = pc.getContext('2d');
+      pq.setTransform(dpr, 0, 0, dpr, -px0 * dpr, -py0 * dpr);
+      pq.imageSmoothingQuality = 'high';
+      pq.drawImage(photo.wince, x0, y0, iw * k, ih * k);
+      pq.globalCompositeOperation = 'destination-in';
+      pq.translate(wcx, wcy); pq.scale(1, wry / wrx);
+      const g = pq.createRadialGradient(0, 0, 0, 0, 0, wrx);
+      g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.6, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      pq.fillStyle = g; pq.fillRect(-wrx, -wrx, wrx * 2, wrx * 2);
+      geo.wince = { canvas: pc, x: px0, y: py0, w: pw, h: phh };
+    }
     geo.eyeCol = null;            // her painted eyes stay as painted
     geo.photo = true;
     geo.photoHair = look.photoFace ? null : photo.hair;
@@ -1782,8 +1801,18 @@ export function drawLids(ctx, geo, closed) {
 }
 
 /** A passing expression drawn live over the painted face: k = 1 pleased .. -1 pained. */
+/** Her painted wince, faded in by how much it stings (0..1). */
+export function drawWince(ctx, geo, k) {
+  if (!geo || !geo.wince || k < 0.03) return;
+  const a = Math.min(1, k);
+  ctx.save(); ctx.globalAlpha = a * a * (3 - 2 * a); ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(geo.wince.canvas, geo.wince.x, geo.wince.y, geo.wince.w, geo.wince.h);
+  ctx.restore();
+}
+
 export function drawMood(ctx, geo, k) {
   if (Math.abs(k) < 0.03 || !geo.lipsBox) return;
+  if (k < 0 && geo.wince) return;            // the painted wince shows it instead
   if (k > 0 && geo.smile && !geo.noSmile) {
     // a painted smile, eased in
     const a = Math.min(1, k);

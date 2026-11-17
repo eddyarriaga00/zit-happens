@@ -439,9 +439,9 @@ export class Pimple {
       return;
     }
     if (this.hairOut <= 0) {
-      // curled up under the skin
-      ctx.globalAlpha = 0.75;
-      ctx.lineWidth = 1.8 * this.scale;
+      // curled up under the skin: only a shadow of it shows through
+      ctx.globalAlpha = 0.36;
+      ctx.lineWidth = 1.0 * this.scale;
       ctx.beginPath();
       for (let i = 0; i <= 20; i++) {
         const k = i / 20, a = this.seed + k * 7, rr = r * (0.12 + k * 0.5);

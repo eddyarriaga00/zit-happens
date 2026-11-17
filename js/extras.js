@@ -4,7 +4,7 @@
 import * as audio from './audio.js';
 import { buzz } from './haptics.js';
 import { drawTweezers } from './tools.js';
-import { drawLids, drawMood, drawEyes } from './facescene.js';
+import { drawLids, drawMood, drawEyes, drawWince } from './facescene.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -31,7 +31,7 @@ class Zoom {
     ctx.imageSmoothingQuality = 'high';
     if (G.skin) ctx.drawImage(G.skin, 0, 0, G.W, G.H);
     // she is alive in close-up too: blinking, wincing, smiling
-    if (G.geo) { drawEyes(ctx, G.geo, G.gazeX || 0, G.gazeY || 0); drawLids(ctx, G.geo, G.lidK || 0); drawMood(ctx, G.geo, G.moodK || 0); }
+    if (G.geo) { drawEyes(ctx, G.geo, G.gazeX || 0, G.gazeY || 0); drawLids(ctx, G.geo, G.lidK || 0); drawMood(ctx, G.geo, G.moodK || 0); drawWince(ctx, G.geo, Math.min(1, Math.max((G.wince || 0) * 3, (G.moodK || 0) < 0 ? -G.moodK * 1.2 : 0))); }
   }
 }
 
