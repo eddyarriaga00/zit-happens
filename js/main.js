@@ -572,7 +572,7 @@ function endEar() {
   save.bestScore = Math.max(save.bestScore, score);
   save.earsCleaned++;
   const earCoins = earnCoins(score, stars);
-  $('res-goals').innerHTML = `<div class="coins-won">+${earCoins} 🪙</div>${awardsHtml(checkAwards())}`;
+  $('res-goals').innerHTML = `<div class="coins-won">+${earCoins} <img class="coin" src="ui/coin.png" alt="coins"></div>${awardsHtml(checkAwards())}`;
   save.earStars[G.level] = Math.max(save.earStars[G.level] || 0, stars);
   store.save(save);
   $('res-title').textContent = ['', 'Hear that?', 'Clean ears!', 'Crystal clear!'][stars];
@@ -660,14 +660,14 @@ function onSalonStage(sv) {
 // the salon hub: your stations, what they do, and what the next level costs
 function showSalon() {
   const lv = save.salon;
-  let html = `<div class="lv-top"><span>${salonTitle(lv)} · level ${salonLevel(lv)}</span><span>🪙 ${save.coins.toLocaleString()}</span></div>
+  let html = `<div class="lv-top"><span>${salonTitle(lv)} · level ${salonLevel(lv)}</span><span><img class="coin" src="ui/coin.png" alt="coins"> ${save.coins.toLocaleString()}</span></div>
     <img class="salon-view" alt="Your salon" src="${salonPicture(lv, 340, 220, mySalon())}">
     <p class="salon-note">${save.salonClients} client${save.salonClients === 1 ? '' : 's'} served. Upgrade stations to offer more and earn bigger tips.</p>`;
   for (const st of STATIONS) {
     const cur = lv[st.id] ?? st.start, max = st.start + st.costs.length, cost = st.costs[cur - st.start];
     const pips = Array.from({ length: max }, (_, i) => `<i class="${i < cur ? 'on' : ''}"></i>`).join('');
     html += `<div class="shop-item"><i class="shop-ico">${SHOP_ICONS[st.id] || '✨'}</i><div><b>${st.name}</b><small>${st.desc[cur]}</small><div class="pips">${pips}</div></div>
-      <button class="buy" data-st="${st.id}" ${cost == null || save.coins < cost ? 'disabled' : ''}>${cost == null ? 'MAX' : `${cur === 0 ? 'Buy' : 'Up'} ${cost} 🪙`}</button></div>`;
+      <button class="buy" data-st="${st.id}" ${cost == null || save.coins < cost ? 'disabled' : ''}>${cost == null ? 'MAX' : `${cur === 0 ? 'Buy' : 'Up'} ${cost} <img class="coin" src="ui/coin.png" alt="coins">`}</button></div>`;
   }
   $('salon-name').textContent = mySalon();
   $('salon-body').innerHTML = html;
@@ -731,7 +731,7 @@ function endSalon() {
   $('btn-next').firstChild.textContent = 'Another client';
   $('res-title').textContent = (kind === 'hair' ? ['', 'A bit uneven', 'Lovely hair!', 'Salon perfect!'] : kind === 'makeup' ? ['', 'A bit smudged', 'Looking lovely', 'Flawless glam!'] : G.salon.titles || ['', 'It\'ll grow back', 'Neat trim', 'Salon perfect!'])[stars];
   [...$('res-stars').children].forEach((el, i) => el.classList.toggle('on', i < stars));
-  $('res-grid').innerHTML = [stat(`${sc}%`, G.salon.statLabel || (kind === 'hair' ? 'happiness' : kind === 'makeup' ? 'coverage' : 'precision')), stat(`+${coins} 🪙`, 'coins earned')].join('');
+  $('res-grid').innerHTML = [stat(`${sc}%`, G.salon.statLabel || (kind === 'hair' ? 'happiness' : kind === 'makeup' ? 'coverage' : 'precision')), stat(`+${coins} <img class="coin" src="ui/coin.png" alt="coins">`, 'coins earned')].join('');
   $('res-goals').innerHTML = unlock + awardsHtml(checkAwards());
   audio.fanfare();
   buzz('medium');
@@ -814,7 +814,7 @@ function showReview() {
   store.save(save);
   $('res-title').textContent = five === 5 ? 'Five-star visit!' : five === 4 ? 'She loved it' : five === 3 ? 'Not bad at all' : 'Could be better';
   [...$('res-stars').children].forEach((el, i) => el.classList.toggle('on', i < Math.round(avg)));
-  $('res-grid').innerHTML = [stat(`<span class="five">${'★'.repeat(five)}<i>${'★'.repeat(5 - five)}</i></span>`, 'her rating'), stat(`+${tip} 🪙`, (c.daily ? 'VIP tip ×2' : 'her tip') + (loyal ? ` · regular +${Math.round(loyal * 100)}%` : ''))].join('');
+  $('res-grid').innerHTML = [stat(`<span class="five">${'★'.repeat(five)}<i>${'★'.repeat(5 - five)}</i></span>`, 'her rating'), stat(`+${tip} <img class="coin" src="ui/coin.png" alt="coins">`, (c.daily ? 'VIP tip ×2' : 'her tip') + (loyal ? ` · regular +${Math.round(loyal * 100)}%` : ''))].join('');
   $('res-goals').innerHTML = `${visitStrip(c, -1)}<div class="visit-nth">${was.v ? `Visit ${was.v + 1} · she's a regular now` : 'Her first visit'}</div><div class="before-after"><figure><img class="portrait small" alt="" src="${portraitURL(c.def, { mood: 'worried', zone: c.def.zone }, 120)}"><figcaption>before</figcaption></figure><span>→</span><figure><img class="portrait small" alt="" src="${portraitURL(c.def, { mood: 'happy', clear: true }, 120)}"><figcaption>after</figcaption></figure></div>
   <div class="review">“${esc(text)}”<small>${esc(c.def.name)}</small></div>${awardsHtml(checkAwards())}`;
   $('btn-next').firstChild.textContent = 'Next VIP client';
@@ -943,7 +943,7 @@ function endLevel() {
     stat(score.toLocaleString(), 'score'),
     stat(`${s.perfects}/${s.total}`, 'perfect pops'),
     stat(`${Math.round(clean * 100)}%`, `clean (+${cleanBonus})`),
-    stat(`+${coins} 🪙`, 'coins earned'),
+    stat(`+${coins} <img class="coin" src="ui/coin.png" alt="coins">`, 'coins earned'),
   ].join('');
   $('res-goals').innerHTML = `<div class="before-after"><figure><img class="portrait small" alt="" src="${portraitURL(def, { mood: 'worried', zone: def.zone }, 120)}"><figcaption>before</figcaption></figure><span>→</span><figure><img class="portrait small" alt="" src="${portraitURL(def, { mood: 'happy', clear: true }, 120)}"><figcaption>after</figcaption></figure></div>
   ${reward ? `<div class="reward"><b>🎁 New: ${reward.name}</b><span>${reward.desc}</span></div>` : ''}${awardsHtml(newAwards)}
@@ -1565,7 +1565,7 @@ function showScreen(name) {
     $('vip-title').textContent = vdone ? 'VIP walk-in' : `Today's VIP: ${vd.name}`;
     $('vip-sub').textContent = vdone ? `${vd.name}'s done ✓ · see another client` : regular(vd.name).v ? `Regular · visit ${regular(vd.name).v + 1} · double tip` : 'Full visit · 4 treatments · double tip';
     $('play-level').textContent = `Level ${save.level} · ${levelDef(save.level).name}`;
-    $('menu-coins').textContent = `🪙 ${save.coins.toLocaleString()}`;
+    $('menu-coins').innerHTML = `<img class="coin" src="ui/coin.png" alt="coins"> ${save.coins.toLocaleString()}`;
     $('hello').textContent = greeting();
     $('streak').textContent = `${rankFor(awardCount())} · 🏆 ${awardCount()}/${AWARDS.length}${save.streak > 1 ? ` · 🔥 ${save.streak} days` : ''}`;
     $('ear-level').textContent = `Level ${save.earLevel}`;
@@ -1603,7 +1603,7 @@ photosReady.then(() => {
 });
 function showLevels() {
   const total = Object.values(save.stars).reduce((a, b) => a + b, 0);
-  let html = `<div class="lv-top"><span>★ ${total} / ${LEVELS.length * 3}</span><span>🪙 ${save.coins.toLocaleString()}</span></div>`;
+  let html = `<div class="lv-top"><span>★ ${total} / ${LEVELS.length * 3}</span><span><img class="coin" src="ui/coin.png" alt="coins"> ${save.coins.toLocaleString()}</span></div>`;
   for (const ch of CHAPTERS) {
     html += `<h3>${ch.name}</h3><div class="lv-grid">`;
     for (let n = ch.from; n <= ch.to; n++) {
@@ -1663,18 +1663,18 @@ function openIntro(n) {
 }
 
 function showShop() {
-  let html = `<div class="lv-top"><span>Shop</span><span>🪙 ${save.coins.toLocaleString()}</span></div>`;
+  let html = `<div class="lv-top"><span>Shop</span><span><img class="coin" src="ui/coin.png" alt="coins"> ${save.coins.toLocaleString()}</span></div>`;
   for (const u of UPGRADES) {
     const lv = up(u.id), cost = u.costs[lv];
     const pips = u.costs.map((_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
     html += `<div class="shop-item"><i class="shop-ico">${SHOP_ICONS[u.id] || '✨'}</i><div><b>${u.name}</b><small>${u.desc}</small><div class="pips">${pips}</div></div>
-      <button class="buy" data-up="${u.id}" ${cost == null || save.coins < cost ? 'disabled' : ''}>${cost == null ? 'MAX' : `${cost} 🪙`}</button></div>`;
+      <button class="buy" data-up="${u.id}" ${cost == null || save.coins < cost ? 'disabled' : ''}>${cost == null ? 'MAX' : `${cost} <img class="coin" src="ui/coin.png" alt="coins">`}</button></div>`;
   }
   html += '<h3>Pus style</h3><div class="pus-row">';
   for (const p of PUS_STYLES) {
     const owned = save.pusOwned.includes(p.id);
     html += `<button class="pus ${save.pus === p.id ? 'active' : ''}" data-pus="${p.id}" ${!owned && save.coins < p.cost ? 'disabled' : ''}>
-      <i style="background:${p.swatch}"></i><span>${p.name}</span><small>${owned ? (save.pus === p.id ? 'using' : 'owned') : `${p.cost} 🪙`}</small></button>`;
+      <i style="background:${p.swatch}"></i><span>${p.name}</span><small>${owned ? (save.pus === p.id ? 'using' : 'owned') : `${p.cost} <img class="coin" src="ui/coin.png" alt="coins">`}</small></button>`;
   }
   html += '</div>';
   $('shop-body').innerHTML = html;

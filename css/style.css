@@ -615,3 +615,16 @@ button.tile:active i { transform: scale(1.15) rotate(-6deg); }
 
 /* volume slider in settings */
 .field.volume input[type=range] { padding: 0; border: 0; background: none; accent-color: var(--accent); height: 28px; }
+
+/* painted icons */
+button.tile i img { width: 100%; height: 100%; object-fit: contain; display: block; filter: drop-shadow(0 2px 2px rgba(80, 40, 120, 0.18)); }
+button.tile i { overflow: visible; padding: 3px; box-sizing: border-box; }
+button.tile.wide i { padding: 2px; }
+button.small img { width: 22px; height: 22px; vertical-align: -6px; margin-right: 5px; object-fit: contain; }
+.tool img.real { width: 32px; height: 32px; object-fit: contain; display: block; margin: 0 auto; filter: drop-shadow(0 1.5px 1.5px rgba(40, 20, 90, 0.22)); }
+img.coin { width: 1.15em; height: 1.15em; vertical-align: -0.22em; object-fit: contain; }
+.logo-zit { background: none !important; box-shadow: none !important; }
+.logo-zit img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(220, 90, 140, 0.35)); animation: logo-bob 3.2s ease-in-out infinite; }
+@keyframes logo-bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-4px) rotate(3deg); } }
+#menu .row button.small { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 8px 2px; font-size: 12.5px; line-height: 1.1; white-space: nowrap; }
+#menu .row button.small img { width: 26px; height: 26px; margin: 0; vertical-align: 0; }
