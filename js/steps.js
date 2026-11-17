@@ -102,6 +102,7 @@ export class Treatment {
           const i = row * this.cols + col;
           if (!this.mask[i]) continue;
           const v = Math.max(0, Math.min(1, arr[i] + amt));
+          if (v !== arr[i]) this.ver = (this.ver || 0) + 1;
           delta += v - arr[i];
           arr[i] = v;
         }
@@ -218,7 +219,7 @@ export class Treatment {
       if (this.phase === 'lather') fill(this.foam, 1);
       else if (this.phase === 'rinse') this.foam.fill(0);
       else if (this.phase === 'soothe' || this.phase === 'mask') fill(this.gel, 1);
-      else if (this.phase === 'peel') this.gel.fill(0);
+      else if (this.phase === 'peel') { this.gel.fill(0); this.ver = (this.ver || 0) + 1; }
       this.doneAt = this.time;
       G.onStepDone(this.phase);
     }
@@ -277,59 +278,78 @@ export class Treatment {
       ctx.fill();
     }
 
-    // soothing gel: glossy mint film
+    // soothing gel or charcoal mask: painted into a layer of its own, then cut to her skin with a soft
+    // edge (no stair-steps at the jaw, nostrils left covered, eyes, brows and lips left bare)
     if (FILM.includes(this.phase)) {
-      // mint gel, or a charcoal mask that goes from wet and glossy to dry and matte
       const dryK = this.phase === 'dry' ? this.progress : this.phase === 'peel' ? 1 : 0;
-      // a mask or gel goes on the skin of the face only: it stops at the jaw and hairline,
-      // and leaves the eyes, brows and lips bare, the way a real one is applied
-      ctx.save();
-      const g = G.geo;
-      if (g && g.headPath) {
-        g.clipSkin(ctx);          // follows the real hairline, so nothing sits on her hair
-        ctx.beginPath(); ctx.rect(0, 0, G.W, G.H);
-        for (const e of g.eyes) {
-          ctx.moveTo(e.x + e.rx * 1.3, e.y - e.ry * 0.2); ctx.ellipse(e.x, e.y - e.ry * 0.2, e.rx * 1.3, e.ry * 2.0, 0, 0, Math.PI * 2);
-          ctx.moveTo(e.x + g.hw * 0.31, g.browY); ctx.ellipse(e.x, g.browY - g.hh * 0.012, g.hw * 0.31, g.hh * 0.045, 0, 0, Math.PI * 2);
-        }
-        const lb = g.lipsBox, lx = (lb[0] + lb[2]) / 2, ly = (lb[1] + lb[3]) / 2;
-        ctx.moveTo(lx + (lb[2] - lb[0]) * 0.56, ly); ctx.ellipse(lx, ly, (lb[2] - lb[0]) * 0.56, (lb[3] - lb[1]) * 0.66, 0, 0, Math.PI * 2);
-        ctx.clip('evenodd');
-      }
-      const v = Math.round(36 + 44 * dryK);
-      // once the gel step is finished it soaks into her skin and fades away
       const soak = this.phase === 'soothe' && this.doneAt != null ? Math.max(0, 1 - (this.time - this.doneAt) / 1.4) : 1;
-      if (soak <= 0) { ctx.restore(); return this.drawRest(ctx); }
-      ctx.globalAlpha *= soak;
-      ctx.fillStyle = this.phase === 'soothe' ? 'rgba(140,225,195,0.42)' : `rgba(${v},${v},${v + 8},0.95)`;
+      if (soak <= 0) return this.drawRest(ctx);
+      const g = G.geo, gelP = this.phase === 'soothe';
+      const R = Math.min(2, G.dpr || 1);
+      const fc = this.fc || (this.fc = document.createElement('canvas'));
+      if (fc.width !== Math.ceil(G.W * R) || fc.height !== Math.ceil(G.H * R)) { fc.width = Math.ceil(G.W * R); fc.height = Math.ceil(G.H * R); }
+      const f = fc.getContext('2d');
+      f.setTransform(1, 0, 0, 1, 0, 0); f.globalCompositeOperation = 'source-over'; f.globalAlpha = 1;
+      f.clearRect(0, 0, fc.width, fc.height);
+      f.setTransform(R, 0, 0, R, 0, 0);
+      // the film: soft, uneven dabs where the spatula or finger has been
       const film = new Path2D();
-      ctx.beginPath();
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const i = row * cols + col;
           if (gel[i] <= 0.05) continue;
           const x = (col + 0.3 + jit[i * 4] * 0.4) * CELL, y = (row + 0.3 + jit[i * 4 + 1] * 0.4) * CELL;
-          const r = CELL * (0.55 + 0.4 * gel[i]);
+          const r = CELL * (0.62 + 0.38 * gel[i]);
           film.moveTo(x + r, y);
           film.arc(x, y, r, 0, Math.PI * 2);
         }
       }
-      ctx.fill(film);
-      // the shading below only ever sits on the film itself: never on bare skin, and nothing is left
-      // behind once the mask is peeled off
-      ctx.clip(film);
+      // drawn small, stretched back up and its edge firmed again: where it stops is a smooth spread
+      // edge, not a row of bumps or a blur (only redone when the film has changed)
+      const fl = this.fl || (this.fl = document.createElement('canvas'));
+      const fm = this.fm || (this.fm = document.createElement('canvas'));
+      const LS = 0.2, MS = 0.5;
+      if (fl.width !== Math.ceil(G.W * LS)) { fl.width = Math.ceil(G.W * LS); fl.height = Math.ceil(G.H * LS); fm.width = Math.ceil(G.W * MS); fm.height = Math.ceil(G.H * MS); this.flVer = -1; }
+      if (this.flVer !== this.ver) {
+        this.flVer = this.ver;
+        const lq = fl.getContext('2d', { willReadFrequently: true });      // all on the CPU: no waiting on the GPU to read it back
+        lq.setTransform(1, 0, 0, 1, 0, 0); lq.clearRect(0, 0, fl.width, fl.height);
+        lq.setTransform(LS, 0, 0, LS, 0, 0); lq.fillStyle = '#000'; lq.fill(film);
+        const mq = fm.getContext('2d', { willReadFrequently: true });
+        mq.clearRect(0, 0, fm.width, fm.height); mq.imageSmoothingQuality = 'high';
+        mq.drawImage(fl, 0, 0, fm.width, fm.height);
+        const id = mq.getImageData(0, 0, fm.width, fm.height), d = id.data;
+        for (let k = 3; k < d.length; k += 4) { const a = d[k]; if (a) { const t = Math.max(0, Math.min(1, (a - 70) / 90)); d[k] = 255 * t * t * (3 - 2 * t); } }
+        mq.putImageData(id, 0, 0);
+      }
+      // charcoal is a matte grey-black, a little lighter and chalkier as it dries
+      const v = Math.round(52 + 40 * dryK);
+      f.imageSmoothingQuality = 'high';
+      f.drawImage(fm, 0, 0, G.W, G.H);
+      f.globalCompositeOperation = 'source-in';
+      f.fillStyle = gelP ? 'rgba(176,240,218,0.15)' : `rgb(${v},${v},${v + 6})`;      // gel is clear, with a hint of mint
+      f.fillRect(0, 0, G.W, G.H);
+      f.globalCompositeOperation = gelP ? 'source-over' : 'source-atop';      // gel shine is brighter than the gel itself (cut back to it below)
+      // a fine, even grain, like clay
+      if (!gelP) {
+        const gr = this.grain || (this.grain = (() => {
+          const c = document.createElement('canvas'); c.width = c.height = 96; const q = c.getContext('2d'), d = q.createImageData(96, 96);
+          for (let k = 0; k < d.data.length; k += 4) { const n = Math.random(); d.data[k] = d.data[k + 1] = d.data[k + 2] = n < 0.5 ? 0 : 255; d.data[k + 3] = Math.abs(n - 0.5) * 2 * 22; }
+          q.putImageData(d, 0, 0); return f.createPattern(c, 'repeat');
+        })());
+        f.fillStyle = gr; f.fillRect(0, 0, G.W, G.H);
+      }
       if (g && g.headPath) {
         // the film follows the face underneath: light on the high points while wet, the nose and
         // mouth still readable through it, and fine cracks once a mask has dried
-        const wetK = this.phase === 'soothe' ? 0.8 : 1 - dryK;
-        const blob = (u, v, ru, rv, col) => {
-          ctx.save(); ctx.translate(g.cx + u * g.hw, g.cy + v * g.hh); ctx.scale(1, (rv * g.hh) / (ru * g.hw));
-          const bg = ctx.createRadialGradient(0, 0, 0, 0, 0, ru * g.hw);
+        const wetK = gelP ? 0.55 : 1 - dryK;
+        const blob = (u, vv, ru, rv, col) => {
+          f.save(); f.translate(g.cx + u * g.hw, g.cy + vv * g.hh); f.scale(1, (rv * g.hh) / (ru * g.hw));
+          const bg = f.createRadialGradient(0, 0, 0, 0, 0, ru * g.hw);
           bg.addColorStop(0, col); bg.addColorStop(1, col.replace(/[\d.]+\)$/, '0)'));
-          ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(0, 0, ru * g.hw, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+          f.fillStyle = bg; f.beginPath(); f.arc(0, 0, ru * g.hw, 0, Math.PI * 2); f.fill(); f.restore();
         };
-        // a see-through gel over her painted face shows the face's own shading: only an opaque mask needs it drawn
-        const dk = this.phase === 'soothe' ? (g.photo ? 0 : 0.12) : 0.3;
+        const dk = gelP ? (g.photo ? 0 : 0.12) : 0.3;
         for (const d of [-1, 1]) {
           if (dk) {
             blob(d * 0.17, 0.2, 0.07, 0.2, `rgba(0,0,0,${dk})`);                 // sides of the nose
@@ -343,32 +363,64 @@ export class Treatment {
         blob(0, 0.1, 0.035, 0.2, `rgba(255,255,255,${0.26 * wetK})`);           // bridge of the nose
         blob(0, 0.3, 0.08, 0.05, `rgba(255,255,255,${0.26 * wetK})`);           // tip of the nose
         blob(0, 0.85, 0.2, 0.07, `rgba(255,255,255,${0.16 * wetK})`);           // chin
-        if (dryK > 0.3 && this.phase !== 'soothe') {
-          ctx.strokeStyle = `rgba(190,190,200,${0.3 * (dryK - 0.3) / 0.7})`; ctx.lineWidth = 0.7; ctx.lineCap = 'round';
-          ctx.beginPath();
-          for (let i = 0; i < 26; i++) {
-            const a = jit[i * 4] * 6.28, u = (jit[i * 4 + 1] * 2 - 1) * 0.85, v = jit[i * 4 + 2] * 1.6 - 0.65;
-            let x = g.cx + u * g.hw, y = g.cy + v * g.hh;
-            ctx.moveTo(x, y);
-            for (let k = 0; k < 3; k++) { x += Math.cos(a + (jit[i * 4 + 3] - 0.5) * 2 * k) * 9; y += Math.sin(a + (jit[i * 4 + 3] - 0.5) * 2 * k) * 9; ctx.lineTo(x, y); }
+        if (gelP) {
+          // wet gel: small bright glints scattered where it lies thick, catching the light from above-left
+          for (let row = 0; row < rows; row++) {
+            for (let col = (row & 1); col < cols; col += 2) {
+              const i = row * cols + col;
+              if (gel[i] <= 0.45 || jit[i * 4] < 0.55) continue;
+              const x = (col + jit[i * 4 + 2]) * CELL, y = (row + jit[i * 4 + 3]) * CELL, rr = 2.5 + (jit[i * 4 + 1] ** 2) * 9;
+              f.save(); f.translate(x, y); f.rotate(-0.5); f.scale(1, 0.4);
+              const sg = f.createRadialGradient(0, 0, 0, 0, 0, rr);
+              sg.addColorStop(0, `rgba(255,255,255,${(0.2 + 0.25 * jit[i * 4 + 1]) * gel[i]})`); sg.addColorStop(1, 'rgba(255,255,255,0)');
+              f.fillStyle = sg; f.beginPath(); f.arc(0, 0, rr, 0, Math.PI * 2); f.fill(); f.restore();
+            }
           }
-          ctx.stroke();
+        }
+        if (dryK > 0.3 && !gelP) {
+          f.strokeStyle = `rgba(190,190,200,${0.3 * (dryK - 0.3) / 0.7})`; f.lineWidth = 0.7; f.lineCap = 'round';
+          f.beginPath();
+          for (let i = 0; i < 26; i++) {
+            const a = jit[i * 4] * 6.28, u = (jit[i * 4 + 1] * 2 - 1) * 0.85, vv = jit[i * 4 + 2] * 1.6 - 0.65;
+            let x = g.cx + u * g.hw, y = g.cy + vv * g.hh;
+            f.moveTo(x, y);
+            for (let k = 0; k < 3; k++) { x += Math.cos(a + (jit[i * 4 + 3] - 0.5) * 2 * k) * 9; y += Math.sin(a + (jit[i * 4 + 3] - 0.5) * 2 * k) * 9; f.lineTo(x, y); }
+          }
+          f.stroke();
         }
       }
-      ctx.strokeStyle = `rgba(255,255,255,${this.phase === 'soothe' ? 0.35 : 0.3 * (1 - dryK)})`;
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      for (let row = 0; row < rows; row += 2) {
-        for (let col = 0; col < cols; col += 2) {
-          const i = row * cols + col;
-          if (gel[i] <= 0.5) continue;
-          const x = (col + jit[i * 4 + 2]) * CELL, y = (row + jit[i * 4 + 3]) * CELL;
-          ctx.moveTo(x, y);
-          ctx.lineTo(x + 10, y - 5);
-        }
+      // keep it to where it was spread, then to her skin
+      f.globalCompositeOperation = 'destination-in';
+      if (gelP) f.drawImage(fm, 0, 0, G.W, G.H);
+      if (g && g.skinMask) {
+        f.imageSmoothingQuality = 'high';
+        f.drawImage(g.skinMask.canvas, 0, 0, g.skinMask.w, g.skinMask.h);
+      } else if (g && g.headPath) {
+        f.save(); f.fillStyle = '#000'; g.clipSkin(f); f.fillRect(0, 0, G.W, G.H); f.restore();
       }
-      ctx.stroke();      ctx.restore();
+      if (g && g.headPath) {
+        // eyes, brows and lips stay bare, with a soft edge
+        f.globalCompositeOperation = 'destination-out';
+        const hole = (x, y, rx, ry) => {
+          const k = ry / rx;
+          f.save(); f.translate(x, y); f.scale(1, k);
+          const hg = f.createRadialGradient(0, 0, rx * 0.8, 0, 0, rx * 1.08);
+          hg.addColorStop(0, 'rgba(0,0,0,1)'); hg.addColorStop(1, 'rgba(0,0,0,0)');
+          f.fillStyle = hg; f.beginPath(); f.arc(0, 0, rx * 1.08, 0, Math.PI * 2); f.fill(); f.restore();
+        };
+        for (const e of g.eyes) {
+          hole(e.x, e.y + e.ry * 0.15, e.rx * 1.32, e.ry * 2.35);      // down past the lash line of her closed eyes
+          hole(e.x, g.browY - g.hh * 0.012, g.hw * 0.31, g.hh * 0.045);
+        }
+        const lb = g.lipsBox, lx = (lb[0] + lb[2]) / 2, ly = (lb[1] + lb[3]) / 2;
+        hole(lx, ly, (lb[2] - lb[0]) * 0.56, (lb[3] - lb[1]) * 0.66);
+      }
+      f.globalCompositeOperation = 'source-over';
+      ctx.save();
+      ctx.globalAlpha *= soak * (gelP ? 1 : 0.97);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(fc, 0, 0, G.W, G.H);
+      ctx.restore();
     }
     this.drawRest(ctx);
   }

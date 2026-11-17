@@ -1628,6 +1628,19 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
       const facePath = FM.path(FM.face);
       geo.clipSkin = (ctx) => ctx.clip(facePath);
       geo.headPath = facePath;
+      {
+        // a soft-edged picture of all her face skin (nostrils and other small holes filled in), for
+        // layers like a mask that must stop at the jaw and hairline without a stair-stepped edge
+        const { GW, GH, face, hole } = FM, sc = document.createElement('canvas'); sc.width = GW; sc.height = GH;
+        const sq = sc.getContext('2d'), sd = sq.createImageData(GW, GH);
+        for (let i = 0; i < GW * GH; i++) if (face[i] || hole[i]) sd.data[i * 4 + 3] = 255;
+        sq.putImageData(sd, 0, 0);
+        const s2 = document.createElement('canvas'); s2.width = Math.ceil(GW / 4); s2.height = Math.ceil(GH / 4);
+        const q2 = s2.getContext('2d'); q2.imageSmoothingQuality = 'high'; q2.drawImage(sc, 0, 0, s2.width, s2.height);
+        const s3 = document.createElement('canvas'); s3.width = GW; s3.height = GH;
+        const q3 = s3.getContext('2d'); q3.imageSmoothingQuality = 'high'; q3.drawImage(s2, 0, 0, GW, GH);
+        geo.skinMask = { canvas: s3, w: GW / FM.S, h: GH / FM.S };
+      }
       if (FM.lips) {
         geo.lipsPath = FM.path(FM.lips);
         geo.inLips = (x, y) => FM.at(FM.lips, x, y) === 1;
