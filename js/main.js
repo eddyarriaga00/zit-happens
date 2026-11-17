@@ -269,6 +269,18 @@ function drawCamPill(ctx) {
 }
 
 // ---------------------------------------------------------------- spawning
+// the average colour of her painted skin around a spot, so the redness can match her tone
+function skinUnder(x, y, rad) {
+  const c = G.skin;
+  if (!c || !c.getContext) return null;
+  try {
+    const k = c.width / G.W, s = Math.max(2, Math.round(rad * k));
+    const d = c.getContext('2d', { willReadFrequently: true }).getImageData(Math.round(x * k - s), Math.round(y * k - s), s * 2, s * 2).data;
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let i = 0; i < d.length; i += 16) if (d[i + 3] > 200) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+    return n ? [r / n, g / n, b / n] : null;
+  } catch (e) { return null; }
+}
 function placePimple(type) {
   if (type === 'stray') {
     if (!G.geo) return {};          // nothing to pluck on a back or shoulder
@@ -301,6 +313,7 @@ function placePimple(type) {
     }
     if (ok) {
       const p = new Pimple(type, x, y, G.scale);
+      p.setSkin(skinUnder(x, y, rMax * 2));
       if (G.rx && G.mode === 'level' && !p.T.hair) { p.stagePus *= G.rx.pus || 1; p.fillTime *= G.rx.fill || 1; }
       G.pimples.push(p);
       if (G.stats) G.stats.total++;

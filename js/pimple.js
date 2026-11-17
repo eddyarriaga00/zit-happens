@@ -466,6 +466,23 @@ export class Pimple {
     ctx.fill();
   }
 
+  /** The skin under this spot. On deeper skin, inflammation reads as a darker, warmer brown-red, not a pink glow. */
+  setSkin(rgb) {
+    if (!rgb) return;
+    const L = 0.3 * rgb[0] + 0.59 * rgb[1] + 0.11 * rgb[2];
+    this.deep = Math.max(0, Math.min(1, (168 - L) / 80));
+    this.skinRGB = rgb;
+  }
+
+  /** An inflamed colour: the usual red on light skin, a deep warm red-brown of her own tone on darker skin. */
+  red(base, a) {
+    const d = this.deep || 0;
+    if (!d) return `rgba(${base[0]},${base[1]},${base[2]},${a})`;
+    const s = this.skinRGB, m = [s[0] * 0.86, s[1] * 0.5, s[2] * 0.48];
+    const c = base.map((v, i) => Math.round(v * (1 - d) + m[i] * d));
+    return `rgba(${c[0]},${c[1]},${c[2]},${a * (1 + d * 0.35)})`;
+  }
+
   draw(ctx, t) {
     if (this.T.stray) {      // no bump, just the hair
       if (this.state !== 'done') {
@@ -514,9 +531,9 @@ export class Pimple {
       const a = this.seed + i * 1.9, off = i ? haloR * 0.3 : 0;
       const hx = x + Math.cos(a) * off, hy = y + Math.sin(a) * off, hr2 = haloR * (i ? 0.72 : 1);
       const halo = ctx.createRadialGradient(hx, hy, 0, hx, hy, hr2);
-      halo.addColorStop(0, `rgba(196,52,48,${(i ? 0.2 : 0.4) * inflame})`);
-      halo.addColorStop(0.55, `rgba(205,70,62,${(i ? 0.09 : 0.19) * inflame})`);
-      halo.addColorStop(1, 'rgba(205,70,62,0)');
+      halo.addColorStop(0, this.red([196, 52, 48], (i ? 0.2 : 0.4) * inflame));
+      halo.addColorStop(0.55, this.red([205, 70, 62], (i ? 0.09 : 0.19) * inflame));
+      halo.addColorStop(1, this.red([205, 70, 62], 0));
       ctx.fillStyle = halo;
       ctx.beginPath();
       ctx.arc(hx, hy, hr2, 0, Math.PI * 2);
@@ -530,7 +547,7 @@ export class Pimple {
         const a = this.seed * 1.7 + i * 1.13, k = 0.36 + ((this.seed * 13 + i * 7) % 10) / 40;
         const x0 = x + Math.cos(a) * r0 * 1.15, y0 = y + Math.sin(a) * r0 * 1.15;
         const x1 = x + Math.cos(a + 0.25) * haloR * k, y1 = y + Math.sin(a + 0.25) * haloR * k;
-        ctx.strokeStyle = `rgba(176,44,50,${0.15 * inflame})`; ctx.lineWidth = 0.6;
+        ctx.strokeStyle = this.red([176, 44, 50], 0.15 * inflame * (1 - (this.deep || 0) * 0.7)); ctx.lineWidth = 0.6;
         ctx.beginPath(); ctx.moveTo(x0, y0);
         ctx.quadraticCurveTo((x0 + x1) / 2 + Math.sin(a * 3) * r0 * 0.3, (y0 + y1) / 2 + Math.cos(a * 3) * r0 * 0.3, x1, y1);
         ctx.stroke();
@@ -588,10 +605,11 @@ export class Pimple {
     // swollen, angry skin
     const pr = this.pressure;
     // swollen skin: a soft, uneven red blotch that fades into her skin, not a ball
-    disc(x, y, bumpR * 1.05, [[0, `rgba(208,${Math.round(84 - pr * 26)},${Math.round(76 - pr * 22)},0.62)`], [0.55, 'rgba(210,92,82,0.34)'], [1, 'rgba(210,92,82,0)']], bumpR * 0.1);
-    disc(x + bumpR * 0.18 * Math.cos(this.seed), y + bumpR * 0.18 * Math.sin(this.seed), bumpR * 0.8, [[0, 'rgba(196,70,64,0.22)'], [1, 'rgba(196,70,64,0)']]);
-    // light falling across the raised skin, gently
-    disc(x - bumpR * 0.2, y - bumpR * 0.24, bumpR * 0.75, [[0, 'rgba(255,236,226,0.26)'], [1, 'rgba(255,236,226,0)']]);
+    disc(x, y, bumpR * 1.05, [[0, this.red([208, Math.round(84 - pr * 26), Math.round(76 - pr * 22)], 0.62)], [0.55, this.red([210, 92, 82], 0.34)], [1, this.red([210, 92, 82], 0)]], bumpR * 0.1);
+    disc(x + bumpR * 0.18 * Math.cos(this.seed), y + bumpR * 0.18 * Math.sin(this.seed), bumpR * 0.8, [[0, this.red([196, 70, 64], 0.22)], [1, this.red([196, 70, 64], 0)]]);
+    // light falling across the raised skin, gently (a warm sheen of her own colour on deeper skin)
+    const lt = this.deep ? this.skinRGB.map((v, i) => Math.round(255 * (1 - this.deep) + Math.min(255, v * 1.45 + 30) * this.deep)) : [255, 236, 226];
+    disc(x - bumpR * 0.2, y - bumpR * 0.24, bumpR * 0.75, [[0, `rgba(${lt[0]},${lt[1]},${lt[2]},0.26)`], [1, `rgba(${lt[0]},${lt[1]},${lt[2]},0)`]]);
     // tight, shiny skin: a small soft sheen
     const shg = ctx.createRadialGradient(x - bumpR * 0.32, y - bumpR * 0.38, 0, x - bumpR * 0.32, y - bumpR * 0.38, bumpR * 0.26);
     shg.addColorStop(0, `rgba(255,255,255,${0.16 + pr * 0.22})`); shg.addColorStop(1, 'rgba(255,255,255,0)');

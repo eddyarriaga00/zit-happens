@@ -1717,7 +1717,7 @@ export function drawLids(ctx, geo, closed) {
   if (closed <= 0.02) return;
   if (geo.shut) {
     // painted closed eyes, faded in. Quick at first, so a blink reads as a blink
-    const a = Math.min(1, closed * 1.7);
+    const a = Math.max(0, Math.min(1, (closed - 0.12) / 0.4));   // a short crossfade, so the open and shut eyes never show doubled for long
     ctx.save(); ctx.globalAlpha = a * a * (3 - 2 * a); ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(geo.shut.canvas, geo.shut.x, geo.shut.y, geo.shut.w, geo.shut.h);
     ctx.restore();

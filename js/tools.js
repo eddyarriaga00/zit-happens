@@ -1,6 +1,9 @@
 // The tools as you see them in your hand: needle jab, tweezers gripping a hair,
 // finger pressure dents while squeezing, and the antiseptic spray mist.
 
+const GLOVE = new Image();
+GLOVE.src = 'ui/glove.png';
+
 export class ToolFX {
   constructor() {
     this.stabs = [];
@@ -31,6 +34,7 @@ export class ToolFX {
 
   draw(ctx, pointers, tool) {
     // finger pressure dents while pinching, and tweezers on a hair
+    const fingers = [];
     for (const [, p] of pointers) {
       if (p.kind === 'pinch') {
         const q = p.pin.p;
@@ -40,18 +44,7 @@ export class ToolFX {
         g.addColorStop(1, 'rgba(150,50,40,0)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(p.x, p.y, 50, 0, Math.PI * 2); ctx.fill();
-        // your gloved fingertip, pressing in toward the pimple
-        const fa = Math.atan2(q.y - p.y, q.x - p.x);
-        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(fa); ctx.scale(1 / (this.k || 1), 1 / (this.k || 1));   // your finger stays finger-sized however far in the camera is
-        ctx.fillStyle = 'rgba(30,15,15,0.16)'; ctx.beginPath(); ctx.roundRect(-76, -17, 100, 44, 22); ctx.fill();
-        const gl = ctx.createLinearGradient(0, -22, 0, 22);
-        gl.addColorStop(0, 'rgba(176,216,240,0.72)'); gl.addColorStop(0.5, 'rgba(120,176,220,0.7)'); gl.addColorStop(1, 'rgba(84,138,190,0.72)');
-        ctx.fillStyle = gl; ctx.beginPath(); ctx.roundRect(-80, -21, 104, 42, 21); ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(-66, -12); ctx.lineTo(6, -12); ctx.stroke();
-        ctx.strokeStyle = 'rgba(60,110,160,0.35)'; ctx.lineWidth = 1;
-        for (const k of [-34, -30]) { ctx.beginPath(); ctx.moveTo(k, -16); ctx.quadraticCurveTo(k + 3, 0, k, 16); ctx.stroke(); }   // creases at the knuckle
-        ctx.restore();
+        fingers.push(p);
         // skin bunching up toward the pimple
         const a = Math.atan2(q.y - p.y, q.x - p.x);
         const d = Math.hypot(q.x - p.x, q.y - p.y);
@@ -74,6 +67,21 @@ export class ToolFX {
         const a = q.hairAngle, L = Math.max(10, q.hairOut * q.hairLen);
         this.tweezers(ctx, q.x + Math.cos(a) * L, q.y + Math.sin(a) * L, a);
       }
+    }
+
+    // your gloved fingertips go on top of the skin they press into
+    for (const p of fingers) {
+      const q = p.pin.p;
+      const fa = Math.atan2(q.y - p.y, q.x - p.x);
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(fa); ctx.scale(1 / (this.k || 1), 1 / (this.k || 1));   // your finger stays finger-sized however far in the camera is
+      if (GLOVE.complete && GLOVE.naturalWidth) {
+        // the painted gloved finger, its tip at your touch
+        const h = 40, w = GLOVE.naturalWidth * h / GLOVE.naturalHeight;
+        ctx.shadowColor = 'rgba(40,15,15,0.28)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 5;
+        ctx.globalAlpha = 0.94; ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(GLOVE, 16 - w, -h / 2, w, h);
+      }
+      ctx.restore();
     }
 
     for (const s of this.stabs) this.needle(ctx, s);
