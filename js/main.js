@@ -424,7 +424,7 @@ function startLevel(n) {
   showScreen(null);
   $('hud').classList.remove('hidden');
   $('btn-finish').classList.add('hidden');
-  if (G.treat) toast('Step 1: Open the cleanser, scoop some with your finger, rub it in 🫧', 3400);
+  if (G.treat) toast('Step 1: Open the cleanser, dip the spatula in, spread it on 🫧', 3400);
   else toast(toolHint(n), 2800);
 }
 
@@ -519,7 +519,7 @@ function afterWipe() {
   const peel = G.rx ? G.rx.finish === 'mask' : G.level % 2 === 0;
   G.treat.start(peel ? 'mask' : 'soothe');
   refreshTools();
-  toast(peel ? `Step ${stepNo('fin')}: Open the charcoal mask, scoop some with your finger, spread it 🖤` : `Step ${stepNo('fin')}: Open the gel, squeeze some onto your finger, spread it 🌿`, 3400);
+  toast(peel ? `Step ${stepNo('fin')}: Open the charcoal mask, dip the spatula in, spread it on 🖤` : `Step ${stepNo('fin')}: Open the gel, squeeze some onto your finger, spread it 🌿`, 3400);
 }
 
 function startZen() {
@@ -1256,7 +1256,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (ptr.kind === 'pinch') { ptr.x = x; ptr.y = y; updatePinch(ptr.pin); return; }
   if (ptr.kind === 'tweeze') { ptr.p.fx = x; ptr.p.fy = y; }
   if (ptr.kind === 'salon') G.salon?.move(e.pointerId, x, y, ptr.x, ptr.y);
-  if (ptr.kind === 'treat') G.treat?.move(ptr.x, ptr.y, x, y);
+  if (ptr.kind === 'treat') { G.sup.dipAt(...touchXY(e)); G.treat?.move(ptr.x, ptr.y, x, y); }
   if (ptr.kind === 'ear') G.ear?.move(e.pointerId, x, y);
   if (ptr.kind === 'wipe') {
     const dist = Math.hypot(x - ptr.x, y - ptr.y);

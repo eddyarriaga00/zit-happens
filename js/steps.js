@@ -166,7 +166,7 @@ export class Treatment {
     sup.hand = { x, y };
     if (!sup.ready(type)) { sup.nag(type, openMsg); return false; }
     const sc = sup.scoop;
-    if (!sc || sc.type !== type || sc.left <= 0) { sup.nag(type, sc && sc.type === type ? 'scoop some more' : 'scoop some out with your finger'); return false; }
+    if (!sc || sc.type !== type || sc.left <= 0) { sup.nag(type, type === 'gel' ? (sc && sc.type === type ? 'scoop some more' : 'scoop some out with your finger') : 'dip the spatula in the jar'); return false; }
     const k = 0.35 + 0.65 * Math.min(1, sc.left * 2.5);          // the last of it goes on thinner
     const added = this.paint(arr, x, y, 40 * s, (type === 'soap' ? 0.5 : 0.6) * k);
     sc.left -= added / (this.cells * 0.5 + 1);

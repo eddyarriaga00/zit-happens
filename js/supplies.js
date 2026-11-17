@@ -19,6 +19,10 @@ const OPEN = {
   mask: { dx: 0, dy: -1, text: 'Lift the lid off' },
 };
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
+// the painted face spatula: cleanser and mask come out of their jars on it
+const SPATULA = new Image();
+SPATULA.src = 'ui/spatula.png';
+const SPAT = { lather: 'soap', mask: 'mask' };
 const HIT = 46;
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -193,8 +197,9 @@ export class Supplies {
       it.pumps = (it.pumps || 0) + 1;
       it.press = 1;
       this.scoop = { type: t, left: 1, t: 0 };
+      if (t !== 'gel') this.dip = { t: 0, x: it.x, y: it.y };
       audio.squish(0.8); audio.bloop(); buzz('medium');
-      if (first) G.fx.text(G.W / 2, G.H * 0.42, t === 'soap' ? 'now rub it in!' : 'now spread it on!', '#8dffa8', 20);
+      if (first) G.fx.text(G.W / 2, G.H * 0.42, t === 'gel' ? 'now spread it on!' : 'now spread it on with the spatula!', '#8dffa8', 20);
       return 'grab';
     } else if (t === 'wipes' || t === 'pads') {
       if (!it.open) return this.startCloseup(it);
@@ -212,6 +217,57 @@ export class Supplies {
     }
   }
 
+  /** The spatula passing back over the open jar dips it in again and loads it up. */
+  dipAt(x, y) {
+    const t = SPAT[this.key], it = t && this.item(t);
+    if (!it || !it.open || Math.hypot(it.x - x, it.y - y) > HIT * 0.85) return false;
+    if (this.scoop && this.scoop.type === t && this.scoop.left > 0.9) return false;
+    this.scoop = { type: t, left: 1, t: 0 };
+    it.pumps = (it.pumps || 0) + 1; it.press = 1; it.bounce = 1;
+    audio.squish(0.8); audio.bloop(); buzz('medium');
+    return true;
+  }
+
+  /** The painted spatula, blade first, with what it scooped sitting on the blade. */
+  drawSpatula(ctx) {
+    const t = SPAT[this.key], jar = this.item(t);
+    if (!jar || !SPATULA.complete || !SPATULA.naturalWidth) return;
+    const sc = this.scoop && this.scoop.type === t ? this.scoop : null;
+    let tx, ty, a;
+    if (this.hand) {
+      tx = this.hand.x; ty = this.hand.y; a = -Math.PI / 2 - 0.42;      // held from below, blade up to the skin
+      if (this.dip) {
+        const e = clamp01(this.dip.t / 0.3), k = 1 - (1 - e) * (1 - e);
+        tx = lerp(jar.x, tx, k); ty = lerp(jar.y - 6, ty, k);          // up out of the jar
+      }
+    } else { tx = jar.x + 6; ty = jar.y + 4; a = Math.PI / 2 - 0.45; }   // standing in the jar, handle up
+    const L = 150, H = L * SPATULA.naturalHeight / SPATULA.naturalWidth;
+    ctx.save();
+    ctx.translate(tx, ty); ctx.rotate(a);
+    ctx.shadowColor = 'rgba(40,15,25,0.3)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 4;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(SPATULA, 6 - L, -H / 2, L, H);
+    ctx.shadowColor = 'rgba(0,0,0,0)';
+    if (sc && sc.left > 0) {
+      // the scoop on the blade: thick and glossy when fresh, a thin smear by the end
+      const col = t === 'soap' ? ['#ffffff', '#dfe8f4'] : ['#3a3a46', '#16161c'];
+      const r = H * (0.22 + 0.2 * Math.sqrt(sc.left)), cx = -L * 0.15, cy = 0;
+      ctx.fillStyle = 'rgba(60,20,30,0.16)';
+      ctx.beginPath(); ctx.ellipse(cx - 1, cy + 2, r * 1.1, r * 0.95, 0, 0, Math.PI * 2); ctx.fill();
+      const bg = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.4, 1, cx, cy, r * 1.2);
+      bg.addColorStop(0, col[0]); bg.addColorStop(1, col[1]);
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.arc(cx - r * 0.7, cy + r * 0.2, r * 0.6, 0, Math.PI * 2);
+      ctx.arc(cx + r * 0.45, cy - r * 0.3, r * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.beginPath(); ctx.ellipse(cx - r * 0.2, cy - r * 0.45, r * 0.32, r * 0.14, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   startCloseup(it) {
     this.closeup = { it, p: 0, p0: 0, id: null, sx: 0, sy: 0, t: 0, done: 0 };
     audio.click();
@@ -222,7 +278,7 @@ export class Supplies {
   ranOut(type) {
     const it = this.item(type);
     if (it) it.bounce = 1;
-    if (this.nagT <= 0) { this.nagT = 1.2; this.G.fx.text(Math.max(110, Math.min(this.G.W - 110, it ? it.x : this.G.W / 2)), (it ? it.y : this.G.H - 160) - 64, 'scoop some more', '#ffe7a8', 15); }
+    if (this.nagT <= 0) { this.nagT = 1.2; this.G.fx.text(Math.max(110, Math.min(this.G.W - 110, it ? it.x : this.G.W / 2)), (it ? it.y : this.G.H - 160) - 64, type === 'gel' ? 'scoop some more' : 'dip the spatula again', '#ffe7a8', 15); }
   }
 
   /** Rubbing over a dollop works it into the skin. */
@@ -254,6 +310,7 @@ export class Supplies {
       if (c.done) { c.done += dt; if (c.done > 0.55) this.closeup = null; }
     }
     for (const d of this.dollops) d.t = Math.min(1, d.t + dt * 2.6);
+    if (this.dip && (this.dip.t += dt) > 0.3) this.dip = null;
     if (this.cloth) this.cloth.pull = Math.min(1, this.cloth.pull + dt * 5);
     for (let i = this.flying.length - 1; i >= 0; i--) {
       const f = this.flying[i];
@@ -288,6 +345,7 @@ export class Supplies {
   // ---- drawing
   draw(ctx) {
     const next = this.nextUp();
+    if (SPAT[this.key] && !this.hand) this.drawSpatula(ctx);      // put down: it stands in the jar, behind its front
     for (const it of this.items) {
       const s = 1 + Math.sin(it.bounce * Math.PI) * 0.14;
       ctx.save();
@@ -328,9 +386,11 @@ export class Supplies {
       ctx.beginPath(); ctx.ellipse(x - r * 0.3, y - r * 0.4, r * 0.3, r * 0.16, -0.5, 0, Math.PI * 2); ctx.fill();
     }
 
-    // what is on her fingertip while she spreads it
+    // cleanser and mask go on with the spatula: resting by the jar, or in your hand
     const sc = this.scoop;
-    if (sc && sc.left > 0 && this.hand) {
+    if (SPAT[this.key]) { if (this.hand) this.drawSpatula(ctx); }
+    // what is on her fingertip while she spreads it (the gel tube)
+    else if (sc && sc.left > 0 && this.hand) {
       const col = sc.type === 'soap' ? ['#ffffff', '#dfe8f4'] : sc.type === 'mask' ? ['#3a3a46', '#16161c'] : ['#b9f3dc', '#6fcfab'];
       const r = 7 + 9 * Math.sqrt(sc.left), x = this.hand.x + 2, y = this.hand.y - 3;
       ctx.fillStyle = 'rgba(60,20,10,0.18)';
