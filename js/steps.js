@@ -308,7 +308,7 @@ export class Treatment {
       // edge, not a row of bumps or a blur (only redone when the film has changed)
       const fl = this.fl || (this.fl = document.createElement('canvas'));
       const fm = this.fm || (this.fm = document.createElement('canvas'));
-      const LS = 0.2, MS = 0.5;
+      const LS = 0.13, MS = 0.5;
       if (fl.width !== Math.ceil(G.W * LS)) { fl.width = Math.ceil(G.W * LS); fl.height = Math.ceil(G.H * LS); fm.width = Math.ceil(G.W * MS); fm.height = Math.ceil(G.H * MS); this.flVer = -1; }
       if (this.flVer !== this.ver) {
         this.flVer = this.ver;
@@ -319,7 +319,7 @@ export class Treatment {
         mq.clearRect(0, 0, fm.width, fm.height); mq.imageSmoothingQuality = 'high';
         mq.drawImage(fl, 0, 0, fm.width, fm.height);
         const id = mq.getImageData(0, 0, fm.width, fm.height), d = id.data;
-        for (let k = 3; k < d.length; k += 4) { const a = d[k]; if (a) { const t = Math.max(0, Math.min(1, (a - 70) / 90)); d[k] = 255 * t * t * (3 - 2 * t); } }
+        for (let k = 3; k < d.length; k += 4) { const a = d[k]; if (a) { const t = Math.max(0, Math.min(1, (a - 90) / 80)); d[k] = 255 * t * t * (3 - 2 * t); } }
         mq.putImageData(id, 0, 0);
       }
       // charcoal is a matte grey-black, a little lighter and chalkier as it dries
@@ -338,6 +338,19 @@ export class Treatment {
           q.putImageData(d, 0, 0); return f.createPattern(c, 'repeat');
         })());
         f.fillStyle = gr; f.fillRect(0, 0, G.W, G.H);
+      }
+      if (!g && !gelP) {
+        // on a back or shoulders: the wet mask catches the light across the shoulder blades and the
+        // spine, and turns away into shadow at the sides
+        const wet = 1 - dryK;
+        for (const [u, vv, rr, a] of [[0.3, 0.32, 0.3, 0.16], [0.72, 0.3, 0.26, 0.13], [0.5, 0.6, 0.14, 0.08]]) {
+          const hg = f.createRadialGradient(G.W * u, G.H * vv, 0, G.W * u, G.H * vv, G.W * rr);
+          hg.addColorStop(0, `rgba(255,255,255,${a * (0.35 + 0.65 * wet)})`); hg.addColorStop(1, 'rgba(255,255,255,0)');
+          f.fillStyle = hg; f.fillRect(0, 0, G.W, G.H);
+        }
+        const sg = f.createLinearGradient(0, 0, G.W, 0);
+        sg.addColorStop(0, 'rgba(0,0,0,0.28)'); sg.addColorStop(0.22, 'rgba(0,0,0,0)'); sg.addColorStop(0.78, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,0.28)');
+        f.fillStyle = sg; f.fillRect(0, 0, G.W, G.H);
       }
       if (g && g.headPath) {
         // the film follows the face underneath: light on the high points while wet, the nose and
@@ -392,9 +405,13 @@ export class Treatment {
       // keep it to where it was spread, then to her skin
       f.globalCompositeOperation = 'destination-in';
       if (gelP) f.drawImage(fm, 0, 0, G.W, G.H);
+      const bodyMask = !g && G.skinAt ? this.bodyMask() : null;
       if (g && g.skinMask) {
         f.imageSmoothingQuality = 'high';
         f.drawImage(g.skinMask.canvas, 0, 0, g.skinMask.w, g.skinMask.h);
+      } else if (bodyMask) {
+        f.imageSmoothingQuality = 'high';
+        f.drawImage(bodyMask, 0, 0, G.W, G.H);
       } else if (g && g.headPath) {
         f.save(); f.fillStyle = '#000'; g.clipSkin(f); f.fillRect(0, 0, G.W, G.H); f.restore();
       }
@@ -423,6 +440,25 @@ export class Treatment {
       ctx.restore();
     }
     this.drawRest(ctx);
+  }
+
+  /** A soft-edged picture of where the painted back or shoulders are bare skin (not her top or the wall). */
+  bodyMask() {
+    if (this.bm !== undefined) return this.bm;
+    const G = this.G, st = 3, w = Math.ceil(G.W / st), h = Math.ceil(G.H / st);
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const q = c.getContext('2d'), d = q.createImageData(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (G.skinAt((x + 0.5) * st, (y + 0.5) * st)) d.data[(y * w + x) * 4 + 3] = 255;
+    q.putImageData(d, 0, 0);
+    const s2 = document.createElement('canvas'); s2.width = Math.ceil(w / 3); s2.height = Math.ceil(h / 3);
+    const q2 = s2.getContext('2d'); q2.imageSmoothingQuality = 'high'; q2.drawImage(c, 0, 0, s2.width, s2.height);
+    const s3 = document.createElement('canvas'); s3.width = w; s3.height = h;
+    const q3 = s3.getContext('2d'); q3.imageSmoothingQuality = 'high'; q3.drawImage(s2, 0, 0, w, h);
+    // pulled in a little, so the soft edge sits on her skin and never smudges onto her top
+    const id = q3.getImageData(0, 0, w, h), dd = id.data;
+    for (let k = 3; k < dd.length; k += 4) { const t = Math.max(0, Math.min(1, (dd[k] - 150) / 90)); dd[k] = 255 * t * t * (3 - 2 * t); }
+    q3.putImageData(id, 0, 0);
+    return (this.bm = s3);
   }
 
   drawRest(ctx) {

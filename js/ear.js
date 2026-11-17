@@ -12,6 +12,20 @@ import { rgba, SKIN_TONES } from './skin.js';
 const EAR_ART = { files: ['body/ear1.jpg', 'body/ear2.jpg', 'body/ear3.jpg'], cx: 0.44, cy: 0.478, r: 0.16, lobe: [0.325, 0.715] };
 if (typeof Image !== 'undefined') EAR_ART.imgs = EAR_ART.files.map((src) => { const im = new Image(); im.src = src; return im; });
 
+// a painted look down the canal (soft pink tunnel, pearly eardrum in the middle) and a sheet of six
+// painted wax lumps: three fresh amber ones, two older brown ones and a dry cracked one
+const img = (src) => { if (typeof Image === 'undefined') return null; const im = new Image(); im.src = src; return im; };
+const CANAL = img('body/canal.jpg');
+const WAXART = img('body/wax.png');
+const ready = (im) => im && im.complete && im.naturalWidth > 0;
+let WAXDARK = null;      // the same lumps as dark silhouettes, for wax sitting deep in the canal
+function waxDark() {
+  if (WAXDARK || !ready(WAXART)) return WAXDARK;
+  const c = document.createElement('canvas'); c.width = WAXART.naturalWidth; c.height = WAXART.naturalHeight;
+  const q = c.getContext('2d'); q.drawImage(WAXART, 0, 0); q.globalCompositeOperation = 'source-in'; q.fillStyle = 'rgb(28,8,6)'; q.fillRect(0, 0, c.width, c.height);
+  return (WAXDARK = c);
+}
+
 const WAX = [
   ['#f6d277', '#cf9226'],
   ['#e8a840', '#a9621a'],
@@ -58,7 +72,7 @@ export class Ear {
     if (this.flip) this.cx = G.W - this.cx;
     this.cy = this.ey + 0.1 * this.eh / 2;
     this.R = this.ew * 0.24;                                // canal opening
-    this.Rd = this.R * 0.25;                                // eardrum
+    this.Rd = this.R * 0.32;                                // eardrum
     this.chunks = [];
     this.ouches = 0;
     this.pulled = 0;
@@ -514,7 +528,68 @@ export class Ear {
     if (!painted) this.drawOuterEar(ctx);
     ctx.restore();
 
-    // canal
+    if (ready(CANAL)) this.drawCanalArt(ctx);
+    else this.drawCanalDrawn(ctx, painted);
+    if (this.flash > 0) {
+      ctx.fillStyle = `rgba(230,30,50,${this.flash * 1.4})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, Rd * 1.15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // fine, pale little hairs at the opening
+    ctx.strokeStyle = ready(CANAL) ? 'rgba(90,55,40,0.26)' : 'rgba(60,30,20,0.45)';
+    ctx.lineWidth = ready(CANAL) ? 0.6 : 1;
+    for (const h of this.hairs) {
+      const x0 = cx + Math.cos(h.a) * R, y0 = cy + Math.sin(h.a) * R;
+      const x1 = cx + Math.cos(h.a + h.bend * 0.3) * (R - h.len), y1 = cy + Math.sin(h.a + h.bend * 0.3) * (R - h.len);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo((x0 + x1) / 2 + h.bend * 14, (y0 + y1) / 2 + h.bend * 14, x1, y1);
+      ctx.stroke();
+    }
+    ctx.save();
+    if (this.flip) { ctx.translate(this.G.W, 0); ctx.scale(-1, 1); }
+    if (!painted) this.drawFlaps(ctx);
+    ctx.restore();
+    // freshly rinsed: the canal glistens
+    if (this.wetT > 0) {
+      ctx.fillStyle = `rgba(210,235,255,${0.1 * Math.min(1, this.wetT)})`;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(255,255,255,${0.35 * Math.min(1, this.wetT)})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, -2.4, -1.5); ctx.stroke();
+    }
+  }
+
+  /** The painted canal, its eardrum centred on the real one, melting into her own ear's colour at the entrance. */
+  drawCanalArt(ctx) {
+    const { cx, cy, R } = this;
+    const D = R * 2.24;
+    if (!this.canalC || this.canalC.R !== R || this.canalC.rim !== this.rim) {
+      const dpr = Math.min(3, this.G.dpr || 2), c = document.createElement('canvas');
+      c.width = c.height = Math.ceil(D * dpr);
+      const x = c.getContext('2d'); x.scale(dpr, dpr);
+      const S = R * 1.12 / 0.484;                        // the painting's tunnel reaches just past the opening
+      x.imageSmoothingQuality = 'high';
+      x.drawImage(CANAL, D / 2 - S / 2 + S * 0.012, D / 2 - S / 2 - S * 0.021, S, S);     // its eardrum sits a hair low and left
+      if (this.rim) {
+        // the entrance takes on the colour of her ear around it
+        const tg = x.createRadialGradient(D / 2, D / 2, R * 0.6, D / 2, D / 2, R * 1.1);
+        tg.addColorStop(0, `rgba(${this.rim},0)`); tg.addColorStop(0.65, `rgba(${this.rim},0.35)`); tg.addColorStop(1, `rgba(${this.rim},0.9)`);
+        x.fillStyle = tg; x.fillRect(0, 0, D, D);
+      }
+      x.globalCompositeOperation = 'destination-in';
+      const m = x.createRadialGradient(D / 2, D / 2, R * 0.9, D / 2, D / 2, R * 1.1);
+      m.addColorStop(0, '#000'); m.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = m; x.fillRect(0, 0, D, D);
+      this.canalC = { c, R, rim: this.rim };
+    }
+    ctx.drawImage(this.canalC.c, cx - D / 2, cy - D / 2, D, D);
+  }
+
+  /** The canal drawn by hand, until the painting has loaded. */
+  drawCanalDrawn(ctx, painted) {
+    const { cx, cy, R, Rd } = this;
     const g = ctx.createRadialGradient(cx, cy, Rd * 0.5, cx, cy, R * 1.08);
     g.addColorStop(0, '#2b0e0e');
     g.addColorStop(0.45, '#5e2620');
@@ -591,35 +666,6 @@ export class Ear {
     cone.addColorStop(0, 'rgba(255,255,255,0.55)'); cone.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = cone;
     ctx.beginPath(); ctx.arc(lx, ly, Rd * 0.45, 0, Math.PI * 2); ctx.fill();
-    if (this.flash > 0) {
-      ctx.fillStyle = `rgba(230,30,50,${this.flash * 1.4})`;
-      ctx.beginPath();
-      ctx.arc(cx, cy, Rd * 1.15, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // hairs
-    ctx.strokeStyle = 'rgba(60,30,20,0.45)';
-    ctx.lineWidth = 1;
-    for (const h of this.hairs) {
-      const x0 = cx + Math.cos(h.a) * R, y0 = cy + Math.sin(h.a) * R;
-      const x1 = cx + Math.cos(h.a + h.bend * 0.3) * (R - h.len), y1 = cy + Math.sin(h.a + h.bend * 0.3) * (R - h.len);
-      ctx.beginPath();
-      ctx.moveTo(x0, y0);
-      ctx.quadraticCurveTo((x0 + x1) / 2 + h.bend * 14, (y0 + y1) / 2 + h.bend * 14, x1, y1);
-      ctx.stroke();
-    }
-    ctx.save();
-    if (this.flip) { ctx.translate(this.G.W, 0); ctx.scale(-1, 1); }
-    if (!painted) this.drawFlaps(ctx);
-    ctx.restore();
-    // freshly rinsed: the canal glistens
-    if (this.wetT > 0) {
-      ctx.fillStyle = `rgba(210,235,255,${0.1 * Math.min(1, this.wetT)})`;
-      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = `rgba(255,255,255,${0.35 * Math.min(1, this.wetT)})`; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, -2.4, -1.5); ctx.stroke();
-    }
   }
 
   /** The painted ear, placed so its hollow sits exactly under the drawn canal. False until it has loaded. */
@@ -903,6 +949,27 @@ export class Ear {
       ctx.translate(c.x, c.y);
       if (c.state === 'out') ctx.globalAlpha = Math.max(0, 1 - c.t / 0.7);
       ctx.rotate(c.rot);
+      if (ready(WAXART)) {
+        // a painted lump: fresh amber, older brown, or dry and cracked until the drops soften it
+        if (c.spr == null) c.spr = c.kind === 'hard' ? 3 + Math.floor(Math.random() * 3) : (c.col === WAX[3] ? 3 + Math.floor(Math.random() * 2) : Math.floor(Math.random() * 3));
+        // rock-hard wax is old, brown and crumbly; once the drops have softened it, it goes back to amber goo
+        const spr = c.kind === 'hard' && c.soft ? c.spr - 3 : c.spr, CS = WAXART.naturalHeight, sz = r * 2.5;
+        ctx.save();
+        ctx.shadowColor = 'rgba(25,6,4,0.45)'; ctx.shadowBlur = r * 0.35; ctx.shadowOffsetY = r * 0.18;
+        ctx.drawImage(WAXART, spr * CS, 0, CS, CS, -sz / 2, -sz / 2, sz, sz);
+        ctx.restore();
+        const dk = waxDark();
+        const shade = depth * 0.5 + (c.kind === 'hard' && c.soft ? 0.22 : 0);      // softened old wax stays a darker amber
+        if (dk && shade > 0.03) { ctx.globalAlpha *= shade; ctx.drawImage(dk, spr * CS, 0, CS, CS, -sz / 2, -sz / 2, sz, sz); }
+        if (c.kind === 'hard' && !c.soft && c.softT > 0) {
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = 'rgba(255,236,170,0.8)';
+          for (let i = 0; i < 6; i++) { const k = (this.time * 1.5 + i / 6) % 1; ctx.beginPath(); ctx.arc(Math.cos(i * 2.4) * r * 0.6, Math.sin(i * 1.9) * r * 0.6 - k * 6, 1.5 + k * 2.5, 0, Math.PI * 2); ctx.fill(); }
+        }
+        ctx.restore();
+        this.drawLoosen(ctx, c, r);
+        continue;
+      }
       // shadow
       ctx.save();
       ctx.translate(2, 4);
@@ -962,8 +1029,13 @@ export class Ear {
         ctx.fill();
       }
       ctx.restore();
+      this.drawLoosen(ctx, c, r);
+    }
+    this.drawRimHint(ctx);
+  }
 
-      // loosen ring
+  /** The ring that fills while a stuck lump is being worked loose. */
+  drawLoosen(ctx, c, r) {
       if (c.state === 'stuck' && c.prog > 0.02) {
         const R = r + 12;
         ctx.lineCap = 'round';
@@ -977,18 +1049,17 @@ export class Ear {
         ctx.arc(c.hx, c.hy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(c.prog / c.stick, 0, 1));
         ctx.stroke();
       }
-    }
+  }
 
+  drawRimHint(ctx) {
     // hint: glow the rim while something loose is being dragged
     if (this.chunks.some((c) => c.state === 'loose' && c.held != null)) {
-      const p = 0.5 + 0.5 * Math.sin(this.time * 8);
-      ctx.strokeStyle = `rgba(125,255,154,${0.25 + p * 0.35})`;
-      ctx.lineWidth = 6;
-      ctx.setLineDash([10, 12]);
-      ctx.beginPath();
-      ctx.arc(this.cx, this.cy, this.R * 1.04, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      // a soft glow just outside the opening: pull it out past here
+      const p = 0.5 + 0.5 * Math.sin(this.time * 5), R = this.R;
+      const gg = ctx.createRadialGradient(this.cx, this.cy, R * 0.98, this.cx, this.cy, R * 1.3);
+      gg.addColorStop(0, `rgba(255,236,170,${0.32 + p * 0.25})`); gg.addColorStop(1, 'rgba(255,236,170,0)');
+      ctx.fillStyle = gg;
+      ctx.beginPath(); ctx.arc(this.cx, this.cy, R * 1.3, 0, Math.PI * 2); ctx.arc(this.cx, this.cy, R * 0.98, 0, Math.PI * 2, true); ctx.fill();
     }
   }
 }
