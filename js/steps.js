@@ -227,7 +227,7 @@ export class Treatment {
   wet() {
     const G = this.G;
     this.beads = [];
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < 22; i++) {
       const p = G.geo ? G.geo.anyPoint() : { x: Math.random() * G.W, y: G.H * (0.15 + Math.random() * 0.7) };
       this.beads.push({ x: p.x, y: p.y, r: 1.5 + Math.random() * 3.2, t: 5 + Math.random() * 6, v: 2 + Math.random() * 9 });
     }
@@ -416,10 +416,7 @@ export class Treatment {
       const a = Math.min(1, b.t / 1.5);
       ctx.fillStyle = `rgba(255,255,255,${0.16 * a})`;
       ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r, b.r * 1.25, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = `rgba(60,30,25,${0.22 * a})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(b.x, b.y + b.r * 0.15, b.r, 0.25, Math.PI - 0.25); ctx.stroke();
-      ctx.fillStyle = `rgba(255,255,255,${0.85 * a})`;
+      ctx.fillStyle = `rgba(255,255,255,${0.6 * a})`;
       ctx.beginPath(); ctx.arc(b.x - b.r * 0.35, b.y - b.r * 0.45, Math.max(0.7, b.r * 0.26), 0, Math.PI * 2); ctx.fill();
     }
 

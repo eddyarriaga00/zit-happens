@@ -16,8 +16,7 @@ everything else live up to them. Items are in the order I intend to do them; eac
 - [x] **Scalp** (v117): painted parting in three tones (body/scalp1-3.jpg); flakes, lice, nits and clips stay drawn.
 - [x] **Hair Salon hair** (v119): every girl painted herself in each style (hair/gN_style.jpg, silver hair,
       tinted in the game). 60 of 65 done; ChatGPT's daily image limit stopped it.
-      - [ ] Still to paint: the bob (short) for girls 9, 10, 11, 12, 13. Same prompt, upload faces/girlN.jpg,
-            then run _fit.js to get the eye positions and add them to STYLE_FIT in js/facescene.js.
+      - [x] All 65 painted (bobs for girls 9-13 added in v123).
       - [x] Fringe in the cut stage is made from her own painted hair (v120). Open: hair that changes length when cut.
 - [ ] **Menu and thumbnails**: crop portraits properly for the round thumbnails and the VIP card.
 

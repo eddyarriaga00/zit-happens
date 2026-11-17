@@ -181,10 +181,12 @@ export class Makeup {
     // show where the current product goes until it is mostly on
     const cur = this.areas[this.product];
     if (this.coverage(this.product) < 0.8) {
+      // a soft glow where it goes, not a dashed line
+      const p = 0.5 + 0.5 * Math.sin(this.G.time * 4);
       ctx.save();
-      ctx.setLineDash([6, 6]);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = `rgba(255,255,255,${0.55 + 0.35 * Math.sin(this.G.time * 6)})`;
+      ctx.fillStyle = `rgba(255,240,250,${0.08 + 0.08 * p})`; ctx.fill(cur.path);
+      ctx.shadowColor = 'rgba(255,200,230,0.9)'; ctx.shadowBlur = 10;
+      ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(255,255,255,${0.25 + 0.25 * p})`;
       ctx.stroke(cur.path);
       ctx.restore();
     }

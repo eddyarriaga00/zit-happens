@@ -429,12 +429,13 @@ export class Pimple {
     ctx.strokeStyle = '#2a1a12';
     if (this.T.stray) {
       // a loose hair poking out; it lengthens as the tweezers draw it out
+      // fine and tapering, not a bold squiggle
       const L = 9 * this.scale + this.hairOut * this.hairLen, a = this.hairAngle;
-      ctx.lineWidth = 1.7 * this.scale;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.quadraticCurveTo(x + Math.cos(a) * L * 0.5 + 2, y + Math.sin(a) * L * 0.5, x + Math.cos(a) * L, y + Math.sin(a) * L);
-      ctx.stroke();
+      const ex = x + Math.cos(a) * L, ey = y + Math.sin(a) * L, qx = x + Math.cos(a) * L * 0.5 + Math.sin(a) * 2, qy = y + Math.sin(a) * L * 0.5 - Math.cos(a) * 2;
+      ctx.strokeStyle = 'rgba(42,26,18,0.75)'; ctx.lineWidth = 0.7 * this.scale;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(qx, qy, ex, ey); ctx.stroke();
+      ctx.lineWidth = 1.2 * this.scale;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo((x + qx) / 2, (y + qy) / 2, (x + qx * 2 + ex) / 4, (y + qy * 2 + ey) / 4); ctx.stroke();
       return;
     }
     if (this.hairOut <= 0) {
@@ -504,7 +505,7 @@ export class Pimple {
     if (this.state === 'idle') swell *= 1 + Math.sin(this.time * 3 + this.seed) * 0.03;
 
     const r = r0 * swell * appear;
-    const inflame = (this.state === 'done' ? (1 - this.heal) * 0.5 : 0.45 + this.pressure * 0.35) * (T.hard ? 0.3 : 1);
+    const inflame = (this.state === 'done' ? (1 - this.heal) * 0.5 : 0.45 + this.pressure * 0.35) * (T.hard ? 0.3 : 1) * (this.type === 'black' ? 0.35 : 1);
 
     // 1. inflamed halo
     // irregular, blotchy redness rather than a neat circle
@@ -579,23 +580,24 @@ export class Pimple {
     if (this.held != null && this.pressure > 0.15) {
       disc(x, y, bumpR * 2.0, [[0, 'rgba(255,246,236,0)'], [0.55, `rgba(255,246,236,${0.24 * this.pressure})`], [1, 'rgba(255,246,236,0)']]);
     }
+    // a blackhead is an open pore, nearly flat: only a hint of a bump
+    const flat = this.type === 'black';
+    if (flat) ctx.globalAlpha *= 0.3;
     // shadow cast to the lower right
-    disc(x + bumpR * 0.22, y + bumpR * 0.3, bumpR * 1.15, [[0, 'rgba(70,22,16,0.34)'], [1, 'rgba(70,22,16,0)']], bumpR * 0.3);
+    disc(x + bumpR * 0.14, y + bumpR * 0.2, bumpR * 1.1, [[0, 'rgba(90,30,22,0.16)'], [1, 'rgba(90,30,22,0)']], bumpR * 0.3);
     // swollen, angry skin
     const pr = this.pressure;
-    disc(x, y, bumpR, [[0, `rgba(204,${Math.round(74 - pr * 26)},${Math.round(66 - pr * 22)},0.8)`], [0.62, 'rgba(206,80,70,0.5)'], [1, 'rgba(206,80,70,0)']], bumpR * 0.1);
-    // light falling across the dome
-    disc(x - bumpR * 0.22, y - bumpR * 0.26, bumpR * 0.85, [[0, 'rgba(255,232,220,0.5)'], [1, 'rgba(255,232,220,0)']]);
-    // where the dome meets the skin: a thin dark crease on the shadow side
-    ctx.strokeStyle = 'rgba(96,30,24,0.09)'; ctx.lineWidth = Math.max(1.5, bumpR * 0.2);
-    ctx.beginPath(); ctx.arc(x, y, bumpR * 0.84, 0.05, 1.8); ctx.stroke();
-    // a second, softer catch of light low on the dome
-    disc(x + bumpR * 0.3, y + bumpR * 0.34, bumpR * 0.3, [[0, 'rgba(255,225,215,0.22)'], [1, 'rgba(255,225,215,0)']]);
-    // tight, shiny skin
-    ctx.fillStyle = `rgba(255,255,255,${0.25 + pr * 0.3})`;
-    ctx.beginPath();
-    ctx.ellipse(x - bumpR * 0.36, y - bumpR * 0.42, bumpR * 0.2, bumpR * 0.1, -0.7, 0, Math.PI * 2);
-    ctx.fill();
+    // swollen skin: a soft, uneven red blotch that fades into her skin, not a ball
+    disc(x, y, bumpR * 1.05, [[0, `rgba(208,${Math.round(84 - pr * 26)},${Math.round(76 - pr * 22)},0.62)`], [0.55, 'rgba(210,92,82,0.34)'], [1, 'rgba(210,92,82,0)']], bumpR * 0.1);
+    disc(x + bumpR * 0.18 * Math.cos(this.seed), y + bumpR * 0.18 * Math.sin(this.seed), bumpR * 0.8, [[0, 'rgba(196,70,64,0.22)'], [1, 'rgba(196,70,64,0)']]);
+    // light falling across the raised skin, gently
+    disc(x - bumpR * 0.2, y - bumpR * 0.24, bumpR * 0.75, [[0, 'rgba(255,236,226,0.26)'], [1, 'rgba(255,236,226,0)']]);
+    // tight, shiny skin: a small soft sheen
+    const shg = ctx.createRadialGradient(x - bumpR * 0.32, y - bumpR * 0.38, 0, x - bumpR * 0.32, y - bumpR * 0.38, bumpR * 0.26);
+    shg.addColorStop(0, `rgba(255,255,255,${0.16 + pr * 0.22})`); shg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = shg;
+    ctx.beginPath(); ctx.arc(x - bumpR * 0.32, y - bumpR * 0.38, bumpR * 0.26, 0, Math.PI * 2); ctx.fill();
+    if (flat) ctx.globalAlpha /= 0.3;
 
     // 3. head / opening
     if (this.state === 'popped' || this.state === 'empty') {
@@ -621,30 +623,35 @@ export class Pimple {
       this.drawHair(ctx, x, y, r);
     } else {
       let hr;
-      if (this.type === 'black') hr = r0 * 0.55;
+      if (this.type === 'black') hr = r0 * 0.42;
       else if (this.type === 'cyst' || this.type === 'boss') hr = r0 * (0.18 + this.pressure * 0.32);
       else hr = r0 * (0.42 + this.pressure * 0.28);
       hr *= appear;
-      const hg = ctx.createRadialGradient(x - hr * 0.35, y - hr * 0.4, hr * 0.1, x, y, hr);
+      const hg = ctx.createRadialGradient(x - hr * 0.25, y - hr * 0.3, hr * 0.05, x, y, hr);
       if (this.type === 'black') {
-        hg.addColorStop(0, '#6b5444');
-        hg.addColorStop(0.6, T.head);
-        hg.addColorStop(1, T.headRim);
+        hg.addColorStop(0, '#5a4636');
+        hg.addColorStop(0.55, T.head);
+        hg.addColorStop(0.85, rgba(T.headRim, 0.8));
+        hg.addColorStop(1, rgba(T.headRim, 0));
       } else {
-        // pus seen through thin, stretched skin: soft edge, no outline
-        hg.addColorStop(0, '#fffdf0');
-        hg.addColorStop(0.5, T.head);
-        hg.addColorStop(0.82, T.headRim);
+        // pus seen through thin, stretched skin: creamy, uneven, soft at the edge
+        hg.addColorStop(0, '#fffbea');
+        hg.addColorStop(0.45, T.head);
+        hg.addColorStop(0.78, rgba(T.headRim, 0.85));
         hg.addColorStop(1, rgba(T.headRim, 0));
       }
       ctx.fillStyle = hg;
       ctx.beginPath();
-      ctx.arc(x, y, hr, 0, Math.PI * 2);
+      if (this.type === 'black') ctx.arc(x, y, hr, 0, Math.PI * 2);
+      else for (let i = 0; i <= 10; i++) {                      // not a perfect circle
+        const a = i / 10 * Math.PI * 2, rr2 = hr * (1 + 0.14 * Math.sin(a * 3 + this.seed) + 0.08 * Math.sin(a * 5 + this.seed * 2));
+        ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr2, y + Math.sin(a) * rr2 * 0.9);
+      }
       ctx.fill();
-      // glint
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      // a small wet glint
+      ctx.fillStyle = this.type === 'black' ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.7)';
       ctx.beginPath();
-      ctx.ellipse(x - hr * 0.35, y - hr * 0.4, hr * 0.2, hr * 0.11, -0.6, 0, Math.PI * 2);
+      ctx.ellipse(x - hr * 0.3, y - hr * 0.35, hr * 0.14, hr * 0.08, -0.6, 0, Math.PI * 2);
       ctx.fill();
       // just before it goes, a bead of pus pushes through
       if (this.type !== 'black' && this.pressure > 0.72) {

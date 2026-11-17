@@ -261,13 +261,13 @@ export class Strip {
         ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.arc(c.x - r * 0.3, c.y - r * 0.4, r * 0.28, 0, 7); ctx.fill();
       });
       ctx.fillStyle = 'rgba(255,255,255,0.13)';
-      if (s === 'wet') {
-        ctx.setLineDash([4, 4]); ctx.strokeStyle = `rgba(255,255,255,${0.5 + 0.3 * Math.sin(this.t * 4)})`; ctx.lineWidth = 1.2;
-        ctx.stroke(this.path); ctx.setLineDash([]);
-      } else {
-        ctx.setLineDash([4, 4]); ctx.strokeStyle = `rgba(255,255,255,${0.6 + 0.35 * Math.sin(this.t * 5)})`; ctx.lineWidth = 1.6;
-        ctx.stroke(this.path); ctx.setLineDash([]);
-      }
+      // a soft glow round the area to work on, instead of a dashed outline
+      const p = 0.5 + 0.5 * Math.sin(this.t * (s === 'wet' ? 4 : 5));
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 8 / this.z.k;
+      ctx.strokeStyle = `rgba(255,255,255,${0.22 + 0.25 * p})`; ctx.lineWidth = 1 / this.z.k * 1.4;
+      ctx.stroke(this.path);
+      ctx.restore();
     }
     if (s === 'press' || s === 'set' || s === 'peel') {
       // the part still stuck down

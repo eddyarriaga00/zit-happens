@@ -151,11 +151,11 @@ const STYLE_FIT = {
   g6_long: [0.359, 0.3664, 0.6354], g6_pony: [0.359, 0.3664, 0.6354], g6_bun: [0.3792, 0.3731, 0.6286], g6_curly: [0.3443, 0.3757, 0.6259], g6_short: [0.3413, 0.3704, 0.6313],
   g7_long: [0.3255, 0.3694, 0.6294], g7_pony: [0.3569, 0.3667, 0.6321], g7_bun: [0.3569, 0.3667, 0.6321], g7_curly: [0.3569, 0.3667, 0.6321], g7_short: [0.357, 0.3654, 0.6334],
   g8_long: [0.3535, 0.3654, 0.6334], g8_pony: [0.3568, 0.3681, 0.6307], g8_bun: [0.3741, 0.3694, 0.6294], g8_curly: [0.357, 0.3654, 0.6334], g8_short: [0.357, 0.3654, 0.6334],
-  g9_long: [0.357, 0.3654, 0.6334], g9_pony: [0.357, 0.3654, 0.6334], g9_bun: [0.3775, 0.3694, 0.6294], g9_curly: [0.357, 0.3654, 0.6334],
-  g10_long: [0.357, 0.3654, 0.6334], g10_pony: [0.3567, 0.3694, 0.6294], g10_bun: [0.357, 0.3654, 0.6334], g10_curly: [0.3568, 0.3681, 0.6307],
-  g11_long: [0.3287, 0.3721, 0.6267], g11_pony: [0.357, 0.3654, 0.6334], g11_bun: [0.3704, 0.3721, 0.6267], g11_curly: [0.357, 0.3654, 0.6334],
-  g12_long: [0.357, 0.3654, 0.6334], g12_pony: [0.3426, 0.3721, 0.6267], g12_bun: [0.3569, 0.3667, 0.6321], g12_curly: [0.357, 0.3654, 0.6334],
-  g13_long: [0.357, 0.3654, 0.6334], g13_pony: [0.357, 0.3654, 0.6334], g13_bun: [0.3569, 0.3667, 0.6321], g13_curly: [0.3286, 0.3735, 0.6254],
+  g9_long: [0.357, 0.3654, 0.6334], g9_pony: [0.357, 0.3654, 0.6334], g9_bun: [0.3775, 0.3694, 0.6294], g9_curly: [0.357, 0.3654, 0.6334], g9_short: [0.3643, 0.3652, 0.6439],
+  g10_long: [0.357, 0.3654, 0.6334], g10_pony: [0.3567, 0.3694, 0.6294], g10_bun: [0.357, 0.3654, 0.6334], g10_curly: [0.3568, 0.3681, 0.6307], g10_short: [0.3643, 0.3652, 0.6439],
+  g11_long: [0.3287, 0.3721, 0.6267], g11_pony: [0.357, 0.3654, 0.6334], g11_bun: [0.3704, 0.3721, 0.6267], g11_curly: [0.357, 0.3654, 0.6334], g11_short: [0.3606, 0.364, 0.6347],
+  g12_long: [0.357, 0.3654, 0.6334], g12_pony: [0.3426, 0.3721, 0.6267], g12_bun: [0.3569, 0.3667, 0.6321], g12_curly: [0.357, 0.3654, 0.6334], g12_short: [0.3606, 0.364, 0.6347],
+  g13_long: [0.357, 0.3654, 0.6334], g13_pony: [0.357, 0.3654, 0.6334], g13_bun: [0.3569, 0.3667, 0.6321], g13_curly: [0.3286, 0.3735, 0.6254], g13_short: [0.3571, 0.3693, 0.6399],
 };
 const STYLED = new Map();
 let styledCb = null;
@@ -1433,28 +1433,14 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     if (x0 > 0) { xr.drawImage(im, 0, 0, 3, ih, 0, y0, x0 + 1, ih * k); xr.drawImage(im, iw - 3, 0, 3, ih, x0 + iw * k - 1, y0, w - (x0 + iw * k) + 1, ih * k); }
     xr.drawImage(im, x0, y0, iw * k, ih * k);
     if (seamTop != null) {
-      // the pictures are cropped through the top of her hair, so above the picture the hair is rounded
-      // off: a dome over the span where hair meets the edge, filled by carrying its top rows upward
+      // the pictures are cropped through the top of her hair: rather than invent a crown above the
+      // picture, the top of the painting melts softly into her backdrop
       const q = photo.bg || '244,190,205';
       xr.fillStyle = `rgb(${q})`; xr.fillRect(0, 0, w, seamTop + 0.5);
-      const sg = xr.createLinearGradient(0, seamTop, 0, seamTop + 40);        // the backdrop melts into the picture's own
-      sg.addColorStop(0, `rgba(${q},1)`); sg.addColorStop(1, `rgba(${q},0)`);
-      const cap = photo.cap;
-      for (const [a, b] of cap ? [[0, cap[0] - 0.03], [cap[1] + 0.03, 1]] : [[0, 1]]) if (b > a) { xr.fillStyle = sg; xr.fillRect(x0 + a * iw * k, seamTop - 0.5, (b - a) * iw * k, 41); }
-      if (cap) {
-        // the top of her hair is part of a circle about 0.43 picture-widths across its radius: carry that same curve on
-        const mx = x0 + (cap[0] + cap[1]) / 2 * iw * k, rx = (cap[1] - cap[0]) / 2 * iw * k, Rr = Math.max(rx * 1.02, 0.43 * iw * k), ry = Math.min(seamTop - 4, Rr - Math.sqrt(Rr * Rr - rx * rx));
-        if (ry > 2) {
-          xr.save();
-          // a low arc that tapers to nothing at each end (a half-ellipse stands up straight at its ends and read as a block)
-          xr.beginPath(); xr.moveTo(mx - rx, seamTop + 1); xr.quadraticCurveTo(mx, seamTop - ry * 2, mx + rx, seamTop + 1); xr.closePath(); xr.clip();
-          xr.drawImage(im, 0, 0, iw, 3, x0, seamTop - ry - 1, iw * k, ry + 3);
-          const dg = xr.createLinearGradient(0, seamTop - ry, 0, seamTop);        // it turns away from the light at the top
-          dg.addColorStop(0, 'rgba(0,0,0,0.22)'); dg.addColorStop(0.5, 'rgba(0,0,0,0.07)'); dg.addColorStop(1, 'rgba(0,0,0,0)');
-          xr.fillStyle = dg; xr.fillRect(mx - rx, seamTop - ry - 1, rx * 2, ry + 2);
-          xr.restore();
-        }
-      }
+      const fadeH = Math.min(90, ih * k * 0.09);
+      const sg = xr.createLinearGradient(0, seamTop, 0, seamTop + fadeH);
+      sg.addColorStop(0, `rgba(${q},1)`); sg.addColorStop(0.45, `rgba(${q},0.55)`); sg.addColorStop(1, `rgba(${q},0)`);
+      xr.fillStyle = sg; xr.fillRect(0, seamTop - 0.5, w, fadeH + 1);
     }
     }
     // eyelids are drawn live when she blinks, so they take their colour from the painting itself
