@@ -187,6 +187,11 @@ export function styledSwatch(tone, seed, hairHex, wet = false) {
   if (!best || best.k < 0.97) return null;
   return { canvas: own.canvas, sx: best.x0 * W, sy: 0.54 * H, sw: wd * W, sh: 0.36 * H };
 }
+/** Her own painting in another hairstyle, tinted (null until it has loaded). */
+export function styledLayer(tone, seed, style, hairHex) {
+  const ph = pickPhoto(tone, seed);
+  return ph ? styledFor(ph, style, hairHex) : null;
+}
 /** Called when a hairstyle picture finishes loading, so whoever is showing her can repaint. */
 export function onStyledArt(fn) { styledCb = fn; }
 function styledEntry(key, fit) {
@@ -1289,6 +1294,7 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
     const im = photo.img, iw = im.naturalWidth, ih = im.naturalHeight;
     const k = (2 * ex * hw) / ((photo.eR - photo.eL) * iw);
     const x0 = cx - (photo.eL + photo.eR) / 2 * iw * k, y0 = Y(ey) - photo.eyeY * ih * k;
+    geo.photoTop = y0;            // where the painting starts: close-ups never look above it
     xr.setTransform(dpr, 0, 0, dpr, 0, 0);
     xr.globalAlpha = 1; xr.globalCompositeOperation = 'source-over'; xr.shadowColor = 'transparent'; xr.filter = 'none';
     xr.imageSmoothingQuality = 'high';
@@ -1304,7 +1310,8 @@ export function renderFaceScene(w, h, dpr, tone, seed, look, top, bottom, fit = 
         const ix = Math.round((px - ox) / sk / 2), iy = Math.round((py - oy) / sk / 2);
         return ix >= 0 && iy >= 0 && ix < own.HW && iy < own.HH && own.hairA[iy * own.HW + ix] > 110;
       };
-      geo.wig = true; geo.own = true;
+      geo.wig = true; geo.own = { canvas: own.canvas, hairA: own.hairA, HW: own.HW, HH: own.HH, ox, oy, sk };
+      geo.room = room;
     } else if (look.photoFace && !full) {
       // in the salon her hair is drawn live (washed, cut, dyed, restyled), so only her painted face and
       // neck are laid in, feathered at the edges so they melt into the hair and skin drawn around them

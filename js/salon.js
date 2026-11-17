@@ -198,16 +198,62 @@ export class Haircut {
     const g = G.geo;
     this.hair = G.look.hair;
     this.tol = 14 + 7 * (((G.salonLv && G.salonLv.chair) || 1) - 1);   // how close to the line counts
-    this.y0 = g.hairlineY - (g.own ? 30 : 8);  // where the fringe hangs from (up inside her painted hair, so its top is lost in it)
+    this.y0 = g.hairlineY - (g.own ? 44 : 8);  // where the fringe hangs from (up inside her painted hair, so its top is lost in it)
     this.target = g.browY - 10;                // the line to cut to: just above the brows
     this.locks = [];
-    const n = 13, span = g.hw * 1.62;
+    const n = g.own ? 16 : 13, span = g.hw * (g.own ? 1.5 : 1.62);
     for (let i = 0; i < n; i++) {
       const x = g.cx - span / 2 + (i + 0.5) * (span / n);
-      this.locks.push({ x, w: span / n, len: this.target - this.y0 + 45 + Math.random() * 120, seed: Math.random() * 9, cut: false });
+      const u = (x - g.cx) / (span / 2);
+      // a fringe falls from the crown: longer in the middle, curving toward the temples
+      this.locks.push({ x, u, w: span / n, len: this.target - this.y0 + 22 + Math.random() * 34 + (1 - u * u) * 14 - u * u * 18, seed: Math.random() * 9, cut: false });
     }
     this.bits = [];
     this.snip = { x: g.cx, y: this.target, t: 0, show: false };
+    if (g.own && G.hairLayer) this.setupEnds();
+  }
+
+  /** On her painted hair the job is a trim: the lengths hanging past her shoulders are cut level at
+   *  a line. Where hair is cut away, her bare neck and shoulders show, taken from her own painting
+   *  with her hair up. False (and the fringe instead) when there are no lengths to trim. */
+  setupEnds() {
+    const G = this.G, g = G.geo, own = g.own;
+    const behind = G.hairLayer('bun', this.hair) || G.hairLayer('short', this.hair);
+    if (!own || !behind) return false;
+    const toImg = (x, y) => [Math.floor((x - own.ox) / own.sk / 2), Math.floor((y - own.oy) / own.sk / 2)];
+    const isHair = (x, y) => { const [ix, iy] = toImg(x, y); return ix >= 0 && iy >= 0 && ix < own.HW && iy < own.HH && own.hairA[iy * own.HW + ix] > 170; };
+    const bottom = G.H - G.safeBottom - 120;
+    const line = Math.min(bottom - 50, g.cy + g.hh * 1.12);
+    // the hair crossing the line, cut into narrow locks
+    const cols = [];
+    for (let x = 4; x < G.W - 4; x += 3) {
+      let below = 0;
+      for (let y = line; y < bottom; y += 6) if (isHair(x, y)) below++;
+      if (isHair(x, line) && below >= 3) cols.push(x);
+    }
+    if (cols.length < 8) return false;
+    const locks = [];
+    let start = cols[0], prev = cols[0];
+    const flush = () => { for (let x = start; x < prev; x += 14) locks.push({ x: Math.min(prev, x + 7), w: Math.min(14, prev - x + 3), cut: false, cutY: null, seed: Math.random() * 9 }); };
+    for (const x of cols.slice(1)) { if (x - prev > 6) { flush(); start = x; } prev = x; }
+    flush();
+    if (locks.length < 3) return false;
+    this.ends = { behind, line, bottom };
+    this.style = G.look.style;
+    this.locks = locks;
+    this.target = line;
+    this.tol = 16 + 7 * (((G.salonLv && G.salonLv.chair) || 1) - 1);
+    // where her hair is, as a soft mask over the screen (the cut only ever reveals what was under hair)
+    const dpr = G.dpr || 2, m = document.createElement('canvas');
+    m.width = Math.round(G.W * dpr); m.height = Math.round(G.H * dpr);
+    const mc = document.createElement('canvas'); mc.width = own.HW; mc.height = own.HH;
+    const mq = mc.getContext('2d'), md = mq.createImageData(own.HW, own.HH);
+    for (let i = 0; i < own.HW * own.HH; i++) { md.data[i * 4 + 3] = own.hairA[i]; }
+    mq.putImageData(md, 0, 0);
+    const mx = m.getContext('2d'); mx.setTransform(dpr, 0, 0, dpr, 0, 0); mx.imageSmoothingQuality = 'high';
+    mx.drawImage(mc, own.ox, own.oy, own.HW * 2 * own.sk, own.HH * 2 * own.sk);
+    this.ends.mask = m;
+    return true;
   }
 
   /** A strip of her own painted hair to make the fringe from, once that painting is in. */
@@ -219,7 +265,7 @@ export class Haircut {
     return sw;
   }
 
-  end(l) { return this.y0 + l.len; }
+  end(l) { return this.ends ? (l.cut ? l.cutY : this.ends.bottom + 40) : this.y0 + l.len; }
   ok(l) { return this.end(l) <= this.target + this.tol; }
   get progress() { return this.locks.filter((l) => this.ok(l)).length / this.locks.length; }
   get ready() { return this.progress >= 1; }
@@ -237,6 +283,7 @@ export class Haircut {
   down(id, x, y) { this.snip = { x, y, t: 0, show: true }; }
   move(id, x, y, px, py) {
     this.snip.x = x; this.snip.y = y; this.snip.show = true;
+    if (this.ends) return this.cutEnds(x, y, px, py);
     for (const l of this.locks) {
       // the blades crossed this lock
       if ((px - l.x) * (x - l.x) > 0 && Math.abs(x - l.x) > l.w * 0.5) continue;
@@ -252,6 +299,63 @@ export class Haircut {
     }
   }
   up() { this.snip.show = false; }
+
+  cutEnds(x, y, px, py) {
+    const E = this.ends;
+    for (const l of this.locks) {
+      if (Math.min(px, x) > l.x + l.w / 2 || Math.max(px, x) < l.x - l.w / 2) continue;      // the blades crossed this lock
+      if (y < E.line - 90 || y > E.bottom - 4 || (l.cut && y >= l.cutY - 2)) continue;
+      this.bits.push({ x: l.x, y, len: Math.min(90, (l.cut ? l.cutY : E.bottom) - y), w: l.w, vy: 40, vx: (Math.random() - 0.5) * 60, rot: 0, vr: (Math.random() - 0.5) * 5, t: 0 });
+      l.cut = true; l.cutY = y;
+      this.snip.t = 0.12;
+      audio.snip();
+      buzz('light');
+      if (y < this.target - this.tol) this.G.fx.text(l.x, y - 16, 'too short!', '#ff6b78', 15);
+      else if (this.ok(l)) this.G.fx.text(l.x, y - 16, 'nice', '#8dffa8', 14);
+    }
+  }
+
+  /** The trimmed ends: where hair was cut away, her bare neck and shoulders (and the salon) show. */
+  drawEnds(ctx) {
+    const G = this.G, E = this.ends, g = G.geo, dpr = G.dpr || 2;
+    if (G.look.style !== this.style) return;           // restyled since: the new painting has its own length
+    if (this.locks.some((l) => l.cut)) {
+      if (!E.layer) { E.layer = document.createElement('canvas'); E.layer.width = E.mask.width; E.layer.height = E.mask.height; }
+      const x = E.layer.getContext('2d');
+      x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, E.layer.width, E.layer.height); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      x.globalCompositeOperation = 'source-over';
+      x.save();
+      x.beginPath();
+      for (const l of this.locks) if (l.cut) x.rect(l.x - l.w / 2 - 0.6, l.cutY, l.w + 1.2, G.H - l.cutY);
+      x.clip();
+      if (g.room) x.drawImage(g.room, 0, 0, G.W, G.H);
+      const b = E.behind, f = b.fit, ex = g.eyes, sw2 = b.canvas.width, sh2 = b.canvas.height;
+      const sk = (ex[1].x - ex[0].x) / ((f[2] - f[1]) * sw2), ox = g.cx - (f[1] + f[2]) / 2 * sw2 * sk, oy = ex[0].y - f[0] * sh2 * sk;
+      x.drawImage(b.canvas, ox, oy, sw2 * sk, sh2 * sk);
+      x.restore();
+      x.setTransform(1, 0, 0, 1, 0, 0);
+      x.globalCompositeOperation = 'destination-in';
+      x.drawImage(E.mask, 0, 0);
+      x.globalCompositeOperation = 'source-over';
+      ctx.drawImage(E.layer, 0, 0, E.layer.width, E.layer.height, 0, 0, G.W, G.H);
+      // a fresh, blunt edge on each cut lock
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (const l of this.locks) if (l.cut) { ctx.moveTo(l.x - l.w / 2, l.cutY + 0.5); ctx.lineTo(l.x + l.w / 2, l.cutY + 0.5); }
+      ctx.stroke();
+    }
+    if (!this.ready) {
+      ctx.save();
+      ctx.setLineDash([9, 7]); ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+      ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 3;
+      // one dashed line across each run of hair
+      let runStart = this.locks[0], prev = this.locks[0];
+      const seg = (a, b) => { ctx.beginPath(); ctx.moveTo(a.x - a.w / 2 - 6, E.line); ctx.lineTo(b.x + b.w / 2 + 6, E.line); ctx.stroke(); };
+      for (const l of this.locks.slice(1)) { if (l.x - prev.x > 20) { seg(runStart, prev); runStart = l; } prev = l; }
+      seg(runStart, prev);
+      ctx.restore();
+    }
+  }
 
   update(dt) {
     this.snip.t = Math.max(0, this.snip.t - dt);
@@ -275,42 +379,113 @@ export class Haircut {
     }
   }
 
-  draw(ctx) {
-    const g = this.G.geo;
-    ctx.lineCap = 'round';
-    for (const l of this.locks) {
-      // each lock is a ribbon of hair: dark at the root, lit across the middle, and ending either
-      // in a wispy point (uncut) or a clean blunt edge with a little texture (cut)
-      const top = this.y0 - 6, end = this.end(l) - 4, hw2 = l.w * 0.52, x = l.x;
-      ctx.beginPath();
-      ctx.moveTo(x - hw2, top); ctx.lineTo(x + hw2, top);
-      if (l.cut) {
-        ctx.lineTo(x + hw2, end - 2);
-        for (let k = 4; k >= -4; k--) ctx.lineTo(x + hw2 * k / 4, end + ((k + Math.floor(l.seed * 3)) % 2 ? 1.6 : -1));
-        ctx.lineTo(x - hw2, end - 2);
-      } else {
-        ctx.quadraticCurveTo(x + hw2 * 1.05, top + (end - top) * 0.75, x + Math.sin(l.seed) * hw2 * 0.5, end + 6);
-        ctx.quadraticCurveTo(x - hw2 * 1.05, top + (end - top) * 0.75, x - hw2, top);
-      }
-      ctx.closePath();
-      ctx.fillStyle = this.hair; ctx.fill();
-      const sw = this.swatch();
-      if (sw) {
-        // painted hair: each lock shows its own slice of the strip, so no two look the same
-        const part = sw.sw * 0.5, off = (l.seed / 9) * (sw.sw - part);
-        ctx.save(); ctx.clip();
-        ctx.drawImage(sw.canvas, sw.sx + off, sw.sy, part, sw.sh, x - hw2 - 1, top, l.w * 1.04 + 2, Math.max(60, end - top + 10));
-        ctx.restore();
-      }
-      const lg = ctx.createLinearGradient(0, top, 0, end);
-      lg.addColorStop(0, 'rgba(0,0,0,0)'); lg.addColorStop(0.1, 'rgba(0,0,0,0.14)'); lg.addColorStop(0.25, 'rgba(0,0,0,0.04)'); lg.addColorStop(0.42, 'rgba(255,255,255,0.14)'); lg.addColorStop(0.6, 'rgba(0,0,0,0.02)'); lg.addColorStop(1, 'rgba(0,0,0,0.2)');
-      ctx.fillStyle = lg; ctx.fill();
-      const sg = ctx.createLinearGradient(x - hw2, 0, x + hw2, 0);
-      sg.addColorStop(0, 'rgba(0,0,0,0.16)'); sg.addColorStop(0.3, 'rgba(0,0,0,0)'); sg.addColorStop(0.7, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,0.2)');
-      ctx.fillStyle = sg; ctx.fill();
-      ctx.lineWidth = 1;
-      if (!sw) this.strands(ctx, l.x, l.w, top, this.end(l) - (l.cut ? 3 : 0), l.seed);
+  /** Where a lock starts: high up inside her hair, following the curve of her head. */
+  rootY(l) { return this.y0 + (l.u || 0) ** 2 * 26; }
+
+  /** One lock as a shape: wide at the root, narrowing, ending in a soft point or a blunt cut. */
+  lockPath(l, k = 1) {
+    const top = this.rootY(l) - 10, end = this.end(l), w = l.w * 0.95 * k, lean = (l.u || 0) * 0.16;
+    const p = new Path2D();
+    const tipX = l.x + lean * (end - top) + Math.sin(l.seed) * 2;
+    p.moveTo(l.x - w, top);
+    p.lineTo(l.x + w, top);
+    if (l.cut) {
+      // a blunt, freshly cut end with a little texture
+      p.quadraticCurveTo(l.x + w * 0.95 + lean * (end - top) * 0.5, (top + end) / 2, tipX + w * 0.72, end - 1);
+      for (let i = 3; i >= -3; i--) p.lineTo(tipX + w * 0.72 * i / 3, end + ((i + Math.floor(l.seed * 3)) % 2 ? 1.5 : -1));
+      p.quadraticCurveTo(l.x - w * 0.95 + lean * (end - top) * 0.5, (top + end) / 2, l.x - w, top);
+    } else {
+      // uncut: tapers into a few wispy points
+      p.quadraticCurveTo(l.x + w * 0.9 + lean * (end - top) * 0.5, top + (end - top) * 0.6, tipX + w * 0.35, end - 8);
+      p.lineTo(tipX + w * 0.2, end - 2); p.lineTo(tipX, end + 4); p.lineTo(tipX - w * 0.25, end - 3); p.lineTo(tipX - w * 0.4, end - 9);
+      p.quadraticCurveTo(l.x - w * 0.9 + lean * (end - top) * 0.5, top + (end - top) * 0.6, l.x - w, top);
     }
+    p.closePath();
+    return p;
+  }
+
+  draw(ctx) {
+    const g = this.G.geo, G = this.G, dpr = G.dpr || 2;
+    ctx.lineCap = 'round';
+    if (this.ends) { this.drawEnds(ctx); this.drawBitsAndScissors(ctx); return; }
+    const sw = this.swatch();
+    // the whole fringe is drawn on its own layer first, so it can melt into her hair at the top
+    if (!this.layer || this.layer.width !== Math.round(G.W * dpr) || this.layer.height !== Math.round(G.H * dpr)) {
+      this.layer = document.createElement('canvas'); this.layer.width = Math.round(G.W * dpr); this.layer.height = Math.round(G.H * dpr);
+    }
+    const L = this.layer, x = L.getContext('2d');
+    x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, L.width, L.height); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.globalCompositeOperation = 'source-over';
+    // one continuous sheet of hair: its top is lost in her hair, its bottom edge is each lock's
+    // length, pointed and wispy where uncut and blunt where the scissors went through
+    const locks = this.locks, w0 = locks[0].w, xL = locks[0].x - w0 * 0.6, xR = locks[locks.length - 1].x + w0 * 0.6;
+    const edge = (px) => {
+      let best = locks[0], bd = 1e9;
+      for (const l of locks) { const d = Math.abs(px - l.x); if (d < bd) { bd = d; best = l; } }
+      const t = (px - best.x) / (best.w / 2);                                   // -1..1 across the lock
+      return best.cut ? this.end(best) + Math.sin(px * 1.7 + best.seed) * 0.9 : this.end(best) - 5 * Math.min(1, Math.abs(t)) ** 1.6 + Math.sin(px * 1.3 + best.seed) * 2.5;
+    };
+    const sheet = new Path2D();
+    sheet.moveTo(xL, this.rootY(locks[0]) - 12);
+    for (let px = xL; px <= xR; px += 4) sheet.lineTo(px, this.y0 + ((px - g.cx) / (xR - xL) * 2) ** 2 * 26 - 12);
+    for (let px = xR; px >= xL; px -= 1.5) sheet.lineTo(px, edge(px));
+    sheet.closePath();
+    const hv = parseInt((this.hair || '#3a2618').slice(1), 16), hr = hv >> 16, hg = (hv >> 8) & 255, hb = hv & 255;
+    const shade = (k, a = 1) => `rgba(${Math.round(Math.min(255, hr * k))},${Math.round(Math.min(255, hg * k))},${Math.round(Math.min(255, hb * k))},${a})`;
+    const wet = this.G.look && this.G.look.wet;
+    const yMax = Math.max(...locks.map((l) => this.end(l))) + 6;
+    x.save();
+    x.clip(sheet);
+    const bg = x.createLinearGradient(0, this.y0 - 12, 0, yMax);
+    bg.addColorStop(0, shade(0.55)); bg.addColorStop(0.5, shade(wet ? 0.6 : 0.82)); bg.addColorStop(1, shade(wet ? 0.5 : 0.7));
+    x.fillStyle = bg; x.fillRect(xL - 4, this.y0 - 40, xR - xL + 8, yMax - this.y0 + 50);
+    // hundreds of fine strands in lighter and darker shades of her colour, falling from the crown
+    x.lineCap = 'round';
+    let seed = 7;
+    const R = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const n = Math.round((xR - xL) * 3);
+    for (let i = 0; i < n; i++) {
+      const px = xL + R() * (xR - xL), u = (px - g.cx) / ((xR - xL) / 2), k = R();
+      const y1 = edge(px) + 2, y0 = this.y0 + u * u * 26 - 14, lean = u * 0.16 * (y1 - y0);
+      x.strokeStyle = k < 0.35 ? shade(0.5, 0.35) : k < 0.8 ? shade(wet ? 0.8 : 1.02, 0.32) : shade(wet ? 1.2 : 1.4, 0.4);
+      x.lineWidth = 0.4 + R() * 0.6;
+      x.beginPath(); x.moveTo(px - lean * 0.6, y0); x.quadraticCurveTo(px + (R() - 0.5) * 4, (y0 + y1) / 2, px + lean * 0.4, y1); x.stroke();
+    }
+    // a band of shine across the fringe, and shade where the pieces part
+    const sy0 = this.y0 + 18, sh = x.createLinearGradient(0, sy0, 0, sy0 + 26);
+    sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(0.5, `rgba(255,255,255,${wet ? 0.28 : 0.16})`); sh.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = sh; x.fillRect(xL, sy0, xR - xL, 26);
+    for (const l of locks) {
+      if (R() < 0.5) continue;
+      const gx = l.x + l.w / 2, gg = x.createLinearGradient(gx - 3, 0, gx + 3, 0);
+      gg.addColorStop(0, 'rgba(0,0,0,0)'); gg.addColorStop(0.5, 'rgba(0,0,0,0.18)'); gg.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = gg; x.fillRect(gx - 3, this.y0 + 10, 6, yMax - this.y0);
+    }
+    x.restore();
+    void sw;
+    // melt into her hair: nothing at the very top, fully there a little way down
+    x.globalCompositeOperation = 'destination-in';
+    const fade = x.createLinearGradient(0, this.y0 - 6, 0, this.y0 + 58);
+    fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,1)');
+    x.fillStyle = fade; x.fillRect(0, 0, G.W, G.H);
+    // and at each side, where the fringe runs back into the hair at her temples
+    const sideL = this.locks[0].x - this.locks[0].w * 0.6, sideR = this.locks[this.locks.length - 1].x + this.locks[0].w * 0.6, fw = (sideR - sideL) * 0.12;
+    const sf = x.createLinearGradient(sideL, 0, sideR, 0);
+    sf.addColorStop(0, 'rgba(0,0,0,0)'); sf.addColorStop(fw / (sideR - sideL), 'rgba(0,0,0,1)'); sf.addColorStop(1 - fw / (sideR - sideL), 'rgba(0,0,0,1)'); sf.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = sf; x.fillRect(0, 0, G.W, G.H);
+    x.globalCompositeOperation = 'source-over';
+    // the fringe casts a soft shadow on her forehead
+    ctx.save();
+    ctx.globalAlpha = 0.22; ctx.filter = 'none';
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.drawImage(L, 0, 0, L.width, L.height, 1.5, 5, G.W, G.H);
+    ctx.restore();
+    ctx.drawImage(L, 0, 0, L.width, L.height, 0, 0, G.W, G.H);
+    this.drawBitsAndScissors(ctx, true);
+  }
+
+  drawBitsAndScissors(ctx, fringe = false) {
+    const g = this.G.geo;
     for (const b of this.bits) {
       // the offcut: a little tuft tumbling away
       ctx.save();
@@ -327,7 +502,7 @@ export class Haircut {
       ctx.restore();
     }
     // the line to cut along, until the fringe is done
-    if (!this.ready) {
+    if (fringe && !this.ready) {
       ctx.save();
       ctx.setLineDash([10, 8]);
       ctx.lineWidth = 2.5;

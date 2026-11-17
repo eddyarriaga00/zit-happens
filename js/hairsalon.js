@@ -109,7 +109,7 @@ export class HairService {
     return {
       shampoo: 'Rub shampoo all through her hair 🧴',
       rinse: 'Rinse it out with the shower 🚿',
-      cut: 'Snip each lock at the dashed line ✂️',
+      cut: 'Trim across the dashed line ✂️',
       dye: 'Pick a colour, then brush it through 🎨',
       dry: this.styles.length ? 'Pick a style, then blow-dry it in 💨' : 'Blow-dry her hair 💨',
     }[this.stage];

@@ -1,7 +1,7 @@
 import { Pimple, TYPES, tuning, setPusStyle } from './pimple.js';
 import { CHAPTERS, LEVELS, levelDef, goalLabel, goalMet, timeGoal, UPGRADES, PUS_STYLES, ALL_ZONES, rewardFor, TOOL_LEVEL, AWARDS, rankFor } from './levels.js';
 import { lookFor, portraitURL } from './faces.js';
-import { renderFaceScene, drawLids, drawMood, drawEyes, photosReady, photosLoaded, onStyledArt, styledList, styledSwatch } from './facescene.js';
+import { renderFaceScene, drawLids, drawMood, drawEyes, photosReady, photosLoaded, onStyledArt, styledList, styledSwatch, styledLayer } from './facescene.js';
 import { Makeup, Haircut, LIP_SHADES } from './salon.js';
 import { HairService, STATIONS, WALLS, salonLevel, salonTitle, salonPicture, salonBackdrop } from './hairsalon.js';
 import { Strip, Brows } from './extras.js';
@@ -607,6 +607,10 @@ function startSalon(kind, vip = null) {
     const styles = (have && have.length ? have : ['long', 'pony', 'bun', 'curly', 'short']);
     G.styledHave = have && have.length ? have : null;
     G.hairSwatch = (hex) => styledSwatch(tone(), G.seed, hex, !!(G.look && G.look.wet));     // her painted hair, for the fringe she gets trimmed
+    G.hairLayer = (st, hex) => styledLayer(tone(), G.seed, st, hex);       // her painting in another style (the bun one shows her bare neck and shoulders)
+    // she comes in with long hair, so there are ends to trim
+    const longish = styles.filter((st) => st === 'long' || st === 'curly');
+    if (longish.length && !longish.includes(G.look.style)) G.look.style = longish[Math.floor(Math.random() * longish.length)];
     G.look = { ...G.look, photoFace: true, wall: WALLS[save.salon.decor] || WALLS[0], backdrop: (cx2, w2, h2) => salonBackdrop(cx2, w2, h2, save.salon), style: styles.includes(G.look.style) ? G.look.style : 'long' };
     paintSkin();
   }

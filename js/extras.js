@@ -16,6 +16,9 @@ class Zoom {
     this.G = G; this.fx = fx; this.fy = fy; this.k = k;
     this.sx = G.W / 2;
     this.sy = (G.safeTop + 80 + G.H - G.safeBottom - 108) / 2;
+    // never show above the top of her painting (there is nothing there)
+    const top = G.geo && G.geo.photoTop;
+    if (top != null && top > -1e6) this.fy = Math.max(this.fy, top + 4 + (this.sy - G.safeTop) / k);
   }
   toFace(x, y) { return [this.fx + (x - this.sx) / this.k, this.fy + (y - this.sy) / this.k]; }
   toScreen(x, y) { return [this.sx + (x - this.fx) * this.k, this.sy + (y - this.fy) * this.k]; }
@@ -370,6 +373,55 @@ export class Strip {
   }
 }
 
+/** Finds her real eyebrows in the painted face: the darker pixels in a band above each eye.
+ *  Returns per brow the pixels (in face coordinates, on a grid) and its colour, or null. */
+function findBrows(G) {
+  const g = G.geo, sk = G.skin;
+  if (!g || !sk || !sk.width) return null;
+  const sc = sk.width / G.W, step = 1.5;
+  const out = [];
+  for (const e of g.eyes) {
+    const x0 = e.x - g.hw * 0.42, x1 = e.x + g.hw * 0.42;
+    const y0 = g.browY - g.hh * 0.11, y1 = Math.min(e.y - g.hh * 0.05, g.browY + g.hh * 0.08);
+    const W = Math.ceil((x1 - x0) / step), H = Math.ceil((y1 - y0) / step);
+    if (W < 4 || H < 4) return null;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const q = c.getContext('2d', { willReadFrequently: true });
+    q.imageSmoothingQuality = 'high';
+    q.drawImage(sk, x0 * sc, y0 * sc, (x1 - x0) * sc, (y1 - y0) * sc, 0, 0, W, H);
+    const d = q.getImageData(0, 0, W, H).data, n = W * H, L = new Float32Array(n);
+    for (let i = 0; i < n; i++) L[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+    const sorted = Float32Array.from(L).sort();
+    const skin = sorted[Math.floor(n * 0.7)], dark = sorted[Math.floor(n * 0.04)];
+    if (skin - dark < 18) return null;                       // nothing stands out: no brow found
+    const cut = dark + (skin - dark) * 0.55;
+    const on = new Uint8Array(n);
+    for (let i = 0; i < n; i++) on[i] = L[i] < cut ? 1 : 0;
+    // keep the biggest joined patch (the brow), not lashes or a freckle
+    const lab = new Int32Array(n).fill(-1); let best = -1, bestN = 0;
+    for (let i = 0; i < n; i++) {
+      if (!on[i] || lab[i] >= 0) continue;
+      const st = [i]; lab[i] = i; let cnt = 0;
+      while (st.length) { const j = st.pop(); cnt++; const x = j % W; for (const k of [j - 1, j + 1, j - W, j + W]) { if (k < 0 || k >= n || (k === j - 1 && x === 0) || (k === j + 1 && x === W - 1)) continue; if (on[k] && lab[k] < 0) { lab[k] = i; st.push(k); } } }
+      if (cnt > bestN) { bestN = cnt; best = i; }
+    }
+    if (bestN < 20) return null;
+    const px = []; let r = 0, gg = 0, b = 0;
+    let minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
+    for (let i = 0; i < n; i++) if (lab[i] === best) {
+      const fx = x0 + (i % W + 0.5) * step, fy = y0 + (Math.floor(i / W) + 0.5) * step;
+      px.push([fx, fy]); r += d[i * 4]; gg += d[i * 4 + 1]; b += d[i * 4 + 2];
+      minx = Math.min(minx, fx); maxx = Math.max(maxx, fx); miny = Math.min(miny, fy); maxy = Math.max(maxy, fy);
+    }
+    const m = px.length;
+    // the top and bottom edge of the brow along its length, for placing the strays just outside it
+    const cols = new Map();
+    for (const [fx, fy] of px) { const k = Math.round(fx / 3); const v = cols.get(k) || [1e9, -1e9]; v[0] = Math.min(v[0], fy); v[1] = Math.max(v[1], fy); cols.set(k, v); }
+    out.push({ px, col: `rgb(${Math.round(r / m * 0.85)},${Math.round(gg / m * 0.82)},${Math.round(b / m * 0.8)})`, box: [minx, miny, maxx, maxy], cols, d: Math.sign(e.x - g.cx) || 1 });
+  }
+  return out.length === 2 ? out : null;
+}
+
 // ---------------------------------------------------------------- brows
 export class Brows {
   constructor(G, toast) {
@@ -381,19 +433,42 @@ export class Brows {
     this.intro = 'Grab each stray hair and pull it out. Leave the brows alone!';
     const by = g.browY - g.hh * 0.02;
     this.zones = g.eyes.map((e) => ({ x: e.x, y: by, rx: g.hw * 0.29, ry: g.hh * 0.05, d: Math.sign(e.x - g.cx) || 1 }));
+    // her own painted brows, found in the picture: their real shape and colour
+    this.real = findBrows(G);
+    if (this.real) {
+      this.zones = this.real.map((b) => ({ x: (b.box[0] + b.box[2]) / 2, y: (b.box[1] + b.box[3]) / 2, rx: (b.box[2] - b.box[0]) / 2 + 3, ry: (b.box[3] - b.box[1]) / 2 + 3, d: b.d }));
+      this.browPath = new Path2D();
+      for (const b of this.real) for (const [x, y] of b.px) { this.browPath.moveTo(x + 2.6, y); this.browPath.arc(x, y, 2.6, 0, Math.PI * 2); }
+      this.browSet = new Set(); for (const b of this.real) for (const [x, y] of b.px) this.browSet.add(Math.round(x / 3) + ',' + Math.round(y / 3));
+    }
     const span = Math.max(...this.zones.map((b) => Math.abs(b.x - g.cx) + b.rx)) + g.hw * 0.1;
     this.z = new Zoom(G, g.cx, by + g.hh * 0.03, clamp((G.W / 2 - 8) / span, 1.3, 2.2));
-    this.col = (G.look && typeof G.look.hair === 'string' && G.look.hair) || g.lash || '#2a1712';
+    this.col = this.real ? this.real[0].col : (g.lash || '#2a1712');
     this.hairs = [];
-    const add = (x, y, a) => this.hairs.push({ x, y, a, len: rnd(10, 15), bend: rnd(-0.8, 0.8), gone: false });
-    for (const b of this.zones) {
+    const add = (x, y, a) => this.hairs.push({ x, y, a, len: rnd(9, 14), bend: rnd(-0.8, 0.8), gone: false });
+    if (this.real) {
+      // strays just under each brow, a few above, one past the tail, and some fuzz between them
+      for (const b of this.real) {
+        const keys = [...b.cols.keys()].sort((p, q) => p - q), pick = () => keys[Math.floor(rnd(0.1, 0.9) * keys.length)];
+        for (let i = 0; i < 5; i++) { const k = pick(), [, bot] = b.cols.get(k); add(k * 3 + rnd(-1, 1), bot + rnd(4, 8), Math.PI / 2 + b.d * rnd(0.2, 0.9)); }
+        for (let i = 0; i < 3; i++) { const k = pick(), [top] = b.cols.get(k); add(k * 3 + rnd(-1, 1), top - rnd(4, 7), -Math.PI / 2 + b.d * rnd(0.2, 0.9)); }
+        const tail = b.d > 0 ? b.box[2] : b.box[0], tk = Math.round(tail / 3), tc = b.cols.get(tk) || [b.box[1], b.box[3]];
+        add(tail + b.d * rnd(5, 9), (tc[0] + tc[1]) / 2 + rnd(2, 6), b.d > 0 ? rnd(-0.2, 0.7) : Math.PI + rnd(-0.7, 0.2));
+      }
+      const midY = (this.real[0].box[1] + this.real[0].box[3] + this.real[1].box[1] + this.real[1].box[3]) / 4;
+      for (let i = 0; i < 4; i++) add(g.cx + (i - 1.5) * 0.055 * g.hw + rnd(-2, 2), midY + rnd(-5, 5), -Math.PI / 2 + (i - 1.5) * 0.35 + rnd(-0.2, 0.2));
+    } else for (const b of this.zones) {
       for (let i = 0; i < 5; i++) add(b.x + rnd(-0.24, 0.24) * g.hw, by + rnd(0.066, 0.085) * g.hh, Math.PI / 2 + b.d * rnd(0.2, 1));
       for (let i = 0; i < 3; i++) add(b.x + rnd(-0.22, 0.22) * g.hw, by - rnd(0.068, 0.095) * g.hh, -Math.PI / 2 + b.d * rnd(0.2, 1));
       add(b.x + b.d * rnd(0.33, 0.39) * g.hw, by + rnd(-0.005, 0.04) * g.hh, b.d > 0 ? rnd(-0.3, 0.6) : Math.PI + rnd(-0.6, 0.3));
     }
     for (let i = 0; i < 4; i++) add(g.cx + rnd(-0.1, 0.1) * g.hw, by + rnd(-0.035, 0.04) * g.hh, -Math.PI / 2 + rnd(-0.8, 0.8));
     this.cells = [];
-    for (const b of this.zones) for (let y = b.y - b.ry; y <= b.y + b.ry; y += 3.5) for (let x = b.x - b.rx; x <= b.x + b.rx; x += 3.5) {
+    if (this.real) {
+      // filling in covers the brow she has (and a hair's breadth around it), nothing more
+      const seen = new Set();
+      for (const b of this.real) for (const [x, y] of b.px) { const k = Math.round(x / 3.5) + ',' + Math.round(y / 3.5); if (!seen.has(k)) { seen.add(k); this.cells.push({ x: Math.round(x / 3.5) * 3.5, y: Math.round(y / 3.5) * 3.5, on: false, d: b.d }); } }
+    } else for (const b of this.zones) for (let y = b.y - b.ry; y <= b.y + b.ry; y += 3.5) for (let x = b.x - b.rx; x <= b.x + b.rx; x += 3.5) {
       if (((x - b.x) / b.rx) ** 2 + ((y - b.y) / b.ry) ** 2 < 1) this.cells.push({ x, y, on: false });
     }
     this.filled = 0;
@@ -419,7 +494,10 @@ export class Brows {
   label() { return this.stage === 'pluck' ? `1/2 Pluck · ${this.left} left` : `2/2 Fill in ${Math.round(Math.min(1, this.fillCov / 0.85) * 100)}%`; }
   hint() { return this.intro; }
 
-  inBrow(fx, fy) { return this.zones.some((b) => ((fx - b.x) / b.rx) ** 2 + ((fy - b.y) / b.ry) ** 2 < 1); }
+  inBrow(fx, fy) {
+    if (this.browSet) { for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) if (this.browSet.has((Math.round(fx / 3) + dx) + ',' + (Math.round(fy / 3) + dy))) return true; return false; }
+    return this.zones.some((b) => ((fx - b.x) / b.rx) ** 2 + ((fy - b.y) / b.ry) ** 2 < 1);
+  }
 
   down(id, x, y) {
     const [fx, fy] = this.z.toFace(x, y);
@@ -474,10 +552,10 @@ export class Brows {
   pencil(x, y) {
     this.hand = { x, y };
     const [fx, fy] = this.z.toFace(x, y);
-    const zb = this.zones.find((b) => ((fx - b.x) / (b.rx + 6)) ** 2 + ((fy - b.y) / (b.ry + 6)) ** 2 < 1);
+    const zb = this.zones.find((b) => ((fx - b.x) / (b.rx + 8)) ** 2 + ((fy - b.y) / (b.ry + 8)) ** 2 < 1);
     if (!zb) return;
     let hit = 0;
-    for (const c of this.cells) if (!c.on && (c.x - fx) ** 2 + (c.y - fy) ** 2 < 36) { c.on = true; this.filled++; hit++; }
+    for (const c of this.cells) if (!c.on && (c.x - fx) ** 2 + (c.y - fy) ** 2 < 49) { c.on = true; this.filled++; hit++; }
     if (hit) {
       this.strokes.push({ x: fx, y: fy, d: zb.d, j: Math.random() });
       if (this.strokes.length > 400) this.strokes.shift();
@@ -501,13 +579,16 @@ export class Brows {
     // pencil: soft strokes clipped to the brow shapes
     if (this.strokes.length) {
       ctx.save();
-      ctx.beginPath();
-      for (const b of this.zones) { ctx.moveTo(b.x + b.rx, b.y); ctx.ellipse(b.x, b.y, b.rx, b.ry, 0, 0, Math.PI * 2); }
-      ctx.clip();
-      ctx.fillStyle = this.col; ctx.globalAlpha = 0.09;
+      if (this.browPath) ctx.clip(this.browPath);
+      else {
+        ctx.beginPath();
+        for (const b of this.zones) { ctx.moveTo(b.x + b.rx, b.y); ctx.ellipse(b.x, b.y, b.rx, b.ry, 0, 0, Math.PI * 2); }
+        ctx.clip();
+      }
+      ctx.fillStyle = this.col; ctx.globalAlpha = this.browPath ? 0.07 : 0.09;
       for (const s of this.strokes) { ctx.beginPath(); ctx.arc(s.x, s.y, 6, 0, 7); ctx.fill(); }
       // the pencil lays down fine hair-like strokes in the direction the brow grows
-      ctx.strokeStyle = this.col; ctx.globalAlpha = 0.5; ctx.lineWidth = 0.7; ctx.lineCap = 'round';
+      ctx.strokeStyle = this.col; ctx.globalAlpha = this.browPath ? 0.42 : 0.5; ctx.lineWidth = 0.7; ctx.lineCap = 'round';
       ctx.beginPath();
       for (const s of this.strokes) for (let k = -1; k <= 1; k++) {
         const ox = k * 2.3 + (s.j - 0.5) * 2;
@@ -522,7 +603,15 @@ export class Brows {
       g.addColorStop(0, 'rgba(255,170,160,0.75)'); g.addColorStop(1, 'rgba(255,170,160,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, 7); ctx.fill();
     }
-    if (this.stage === 'pluck') {
+    if (this.browPath) {
+      // no drawn outlines on her real brows: while filling in, the parts still to do shimmer softly
+      if (this.stage === 'fill' && this.fillCov > 0.4) {
+        ctx.fillStyle = `rgba(255,236,170,${0.16 + 0.12 * Math.sin(this.t * 5)})`;
+        ctx.beginPath();
+        for (const c of this.cells) if (!c.on) { ctx.moveTo(c.x + 2.2, c.y); ctx.arc(c.x, c.y, 2.2, 0, 7); }
+        ctx.fill();
+      }
+    } else if (this.stage === 'pluck') {
       ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 0.9;
       for (const b of this.zones) { ctx.beginPath(); ctx.ellipse(b.x, b.y, b.rx, b.ry, 0, 0, Math.PI * 2); ctx.stroke(); }
       ctx.setLineDash([]);
@@ -545,9 +634,9 @@ export class Brows {
         ctx.fillStyle = `rgba(255,150,140,${0.5 * pull})`; ctx.beginPath(); ctx.arc(h.x, h.y, 2 + 2 * pull, 0, 7); ctx.fill();
       }
       const qx = (h.x + tx) / 2 + h.bend * 2, qy = (h.y + ty) / 2 + h.bend * 2;
-      ctx.strokeStyle = this.col; ctx.lineWidth = 0.9;                       // fine along its length
+      ctx.strokeStyle = this.col; ctx.lineWidth = this.real ? 0.55 : 0.9;   // fine along its length
       ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.quadraticCurveTo(qx, qy, tx, ty); ctx.stroke();
-      ctx.lineWidth = 1.7;                                                   // thicker toward the root
+      ctx.lineWidth = this.real ? 1.05 : 1.7;                               // thicker toward the root
       ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.quadraticCurveTo((h.x + qx) / 2, (h.y + qy) / 2, (h.x + 2 * qx + tx) / 4, (h.y + 2 * qy + ty) / 4); ctx.stroke();
       ctx.fillStyle = 'rgba(120,60,50,0.45)'; ctx.beginPath(); ctx.arc(h.x, h.y, 1.1, 0, 7); ctx.fill();   // the follicle
     }

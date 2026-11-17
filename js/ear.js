@@ -30,7 +30,10 @@ export const EAR_CASES = [
   { id: 'object', title: "Something's stuck", tip: 'Grab the stuck things with Tweezers', say: 'My little brother put something in there…' },
   { id: 'crumbs', title: 'Crumbly flakes', tip: 'Hold Flush to wash the flakes out', say: 'It itches and it crackles!' },
   { id: 'bug', title: "There's a bug in there!", tip: 'Catch the bug with Tweezers. It runs!', say: 'SOMETHING IS MOVING IN MY EAR' },
+  { id: 'critters', title: 'A whole family moved in', tip: 'Catch every critter with Tweezers before they hide', say: 'It tickles… and it keeps MOVING' },
 ];
+const BUGS = ['ladybird', 'ant', 'spider', 'beetle'];
+const BUG_NAMES = { ladybird: 'a ladybird', ant: 'an ant', spider: 'a teeny spider', beetle: 'a shiny beetle' };
 const HAIRS = ['#3a2218', '#1a1310', '#c9a45c', '#8a3b1e', '#5a3825', '#7d55c7', '#b9b9b9'];
 const OBJECTS = ['bead', 'pebble', 'cotton', 'kernel', 'bead'];
 
@@ -82,10 +85,13 @@ export class Ear {
     if (id === 'object') { for (let i = 0; i < 3 + Math.min(2, more); i++) this.addChunk('object'); for (let i = 0; i < 4; i++) this.addChunk('wax'); }
     if (id === 'crumbs') { for (let i = 0; i < 20 + more * 3; i++) this.addChunk('crumb'); for (let i = 0; i < 3; i++) this.addChunk('wax'); }
     if (id === 'bug') { for (let i = 0; i < 5 + more; i++) this.addChunk('wax'); for (let i = 0; i < (level > 10 ? 2 : 1); i++) this.addChunk('bug'); }
+    if (id === 'critters') { for (let i = 0; i < 4 + more; i++) this.addChunk('wax'); for (const v of ['ant', 'ant', 'ant', 'spider']) this.addChunk('bug', false, v); if (level > 12) this.addChunk('bug', false, 'beetle'); }
+    // from level 4 on, any ear might have an uninvited guest
+    if (id !== 'bug' && id !== 'critters' && level >= 4 && (level * 7) % 3 === 0) this.addChunk('bug', false, 'ant');
     this.total = this.chunks.length;
   }
 
-  addChunk(kind, big = false) {
+  addChunk(kind, big = false, variant = null) {
     const { R, Rd, cx, cy } = this;
     let x, y, r;
     if (big) {
@@ -117,7 +123,9 @@ export class Ear {
       prog: 0, state: 'stuck', held: null,
       fx: x, fy: y, gx: 0, gy: 0, t: 0, vy: 0, vx: 0, tick: 0,
       dir: Math.random() * 6.28, turn: 0,        // bugs wander
+      bug: variant || BUGS[(this.level + this.chunks.length) % BUGS.length],
     };
+    if (kind === 'bug') c.r = (c.bug === 'ant' ? 0.115 : c.bug === 'spider' ? 0.125 : 0.14) * R;
     // big plug sits underneath everything else
     if (big) this.chunks.unshift(c); else this.chunks.push(c);
   }
@@ -261,7 +269,7 @@ export class Ear {
     const pts = Math.round(base * mult);
     G.score += pts;
     if (c.kind === 'crumb') { if (Math.random() < 0.3) audio.plip(); G.onEarPull(c); return; }
-    const label = c.big ? `THE BIG ONE! +${pts}` : c.kind === 'bug' ? `GOT IT! +${pts}` : c.kind === 'object' ? `a ${c.what === 'kernel' ? 'popcorn kernel' : c.what === 'cotton' ? 'bit of cotton' : c.what}! +${pts}` : `+${pts}`;
+    const label = c.big ? `THE BIG ONE! +${pts}` : c.kind === 'bug' ? `${BUG_NAMES[c.bug] || 'a bug'}! +${pts}` : c.kind === 'object' ? `a ${c.what === 'kernel' ? 'popcorn kernel' : c.what === 'cotton' ? 'bit of cotton' : c.what}! +${pts}` : `+${pts}`;
     G.fx.text(clamp(c.x, 90, G.W - 90), c.y - c.r - 14, label, c.big || c.kind === 'bug' ? '#ffd84d' : '#fff', c.big || c.kind === 'bug' ? 24 : 19);
     if (c.big || c.kind === 'bug') { G.fx.sparkleBurst(c.x, c.y, 20); audio.sparkle(); } else audio.perfect(G.combo);
     buzz('medium');
@@ -309,6 +317,19 @@ export class Ear {
         if (Math.random() < dt * 9) audio.bloop();
         if (c.softT > 1.6) { c.soft = true; c.stick = c.big ? 1.2 : 0.5; c.prog = 0; c.col = ['#b9803a', '#6a3f14']; this.G.fx.text(c.x, c.y - c.r - 16, 'softened!', '#8dffa8', 15); audio.plip(); }
       }
+      // a steady stream works wax loose too (and slowly softens hard wax), so a good flush clears it all
+      if (this.flush && c.held == null && c.state === 'stuck' && (c.kind === 'wax' || c.kind === 'hard')) {
+        const d = Math.hypot(c.x - this.flush.x, c.y - this.flush.y);
+        if (d < 90) {
+          if (!c.soft) { c.softT = Math.max(c.softT || 0, 0.01) + dt * 0.6; }
+          else {
+            c.prog += dt * (1 - d / 90) * 1.6;
+            c.x = c.hx + (Math.random() - 0.5) * 2.5; c.y = c.hy + (Math.random() - 0.5) * 2.5;      // jiggling in the water
+            if (c.prog >= c.stick) this.loosen(c);
+          }
+        }
+      }
+      if (this.flush && c.kind === 'object' && c.held == null && Math.hypot(c.x - this.flush.x, c.y - this.flush.y) < 60) this.say(c, 'water won\'t shift that: Tweezers');
       // carried by the water
       if (this.flush && c.held == null && (c.kind === 'crumb' || c.state === 'loose')) {
         const f = this.flush, d = Math.hypot(c.x - f.x, c.y - f.y);
@@ -330,8 +351,9 @@ export class Ear {
       if (c.kind === 'bug' && c.held == null) {
         c.turn -= dt;
         if (c.turn <= 0) { c.turn = rand(0.3, 1.1); c.dir += rand(-1.6, 1.6); }
-        let speed = 26;
+        let speed = c.bug === 'ant' ? 40 : c.bug === 'spider' ? 34 : 26;
         for (const [, p] of this.G.pointersNear || []) { if (Math.hypot(p.x - c.x, p.y - c.y) < 90) { speed = 95; c.dir = Math.atan2(c.y - p.y, c.x - p.x) + rand(-0.5, 0.5); } }
+        if (this.flush && Math.hypot(this.flush.x - c.x, this.flush.y - c.y) < 110) { speed = 110; c.dir = Math.atan2(c.y - this.flush.y, c.x - this.flush.x) + rand(-0.4, 0.4); if (Math.random() < dt * 2) this.say(c, 'it\'s swimming! grab it'); }
         c.x += Math.cos(c.dir) * speed * dt; c.y += Math.sin(c.dir) * speed * dt;
         const d = Math.hypot(c.x - cx, c.y - cy);
         if (d > R * 0.82 || d < this.Rd * 1.6) c.dir = Math.atan2(cy - c.y, cx - c.x) + (d < this.Rd * 1.6 ? Math.PI : 0) + rand(-0.6, 0.6);
@@ -380,6 +402,43 @@ export class Ear {
     if (c.kind === 'crumb') {
       ctx.fillStyle = c.col[1]; this.blob(ctx, c, r * 1.1); ctx.fill();
       ctx.fillStyle = c.col[0]; this.blob(ctx, c, r * 0.8); ctx.fill();
+    } else if (c.kind === 'bug' && c.bug === 'ant') {
+      // an ant: three shiny segments, elbowed antennae, six busy legs
+      const wig = Math.sin(this.time * 30 + c.x * 0.1) * 0.4;
+      ctx.strokeStyle = '#2a140c'; ctx.lineWidth = Math.max(0.8, r * 0.1); ctx.lineCap = 'round';
+      for (const d of [-1, 1]) for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(0, k * r * 0.35); ctx.quadraticCurveTo(d * r * 0.8, k * r * 0.4 - r * 0.2, d * r * 1.25, k * r * 0.8 + wig * r * (k || 1) * d); ctx.stroke(); }
+      for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(0, -r * 1.1); ctx.lineTo(d * r * 0.45, -r * 1.6); ctx.lineTo(d * r * 0.8, -r * 1.75 + wig * r * 0.3); ctx.stroke(); }
+      for (const [y, rx, ry] of [[-r * 1.0, r * 0.32, r * 0.34], [-r * 0.1, r * 0.26, r * 0.42], [r * 0.95, r * 0.5, r * 0.7]]) {
+        const g2 = ctx.createRadialGradient(-rx * 0.4, y - ry * 0.4, 0.5, 0, y, Math.max(rx, ry));
+        g2.addColorStop(0, '#7a3a22'); g2.addColorStop(1, '#1f0d07');
+        ctx.fillStyle = g2; ctx.beginPath(); ctx.ellipse(0, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.ellipse(-r * 0.15, r * 0.7, r * 0.15, r * 0.08, -0.5, 0, Math.PI * 2); ctx.fill();
+    } else if (c.kind === 'bug' && c.bug === 'spider') {
+      // a teeny round spider: eight long jointed legs
+      const wig = Math.sin(this.time * 18) * 0.25;
+      ctx.strokeStyle = '#2b2320'; ctx.lineWidth = Math.max(0.7, r * 0.09); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (const d of [-1, 1]) for (let k = 0; k < 4; k++) {
+        const a = (-0.9 + k * 0.6) + wig * (k % 2 ? 1 : -1);
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(d * Math.cos(a) * r * 1.1, Math.sin(a) * r * 1.1 - r * 0.5); ctx.lineTo(d * Math.cos(a) * r * 1.9, Math.sin(a) * r * 1.9 + r * 0.3); ctx.stroke();
+      }
+      const g2 = ctx.createRadialGradient(-r * 0.25, -r * 0.2, 0.5, 0, r * 0.2, r * 0.75);
+      g2.addColorStop(0, '#8a6e5a'); g2.addColorStop(1, '#2a1d17');
+      ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(0, r * 0.25, r * 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a2c25'; ctx.beginPath(); ctx.arc(0, -r * 0.5, r * 0.36, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; for (const d of [-1, 1]) { ctx.beginPath(); ctx.arc(d * r * 0.13, -r * 0.65, r * 0.08, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(-r * 0.25, r * 0.05, r * 0.2, r * 0.1, -0.6, 0, Math.PI * 2); ctx.fill();
+    } else if (c.kind === 'bug' && c.bug === 'beetle') {
+      // a little jewel beetle: metallic green shell catching the light
+      const wig = Math.sin(this.time * 20) * 0.3;
+      ctx.strokeStyle = '#13261a'; ctx.lineWidth = Math.max(1, r * 0.11); ctx.lineCap = 'round';
+      for (const d of [-1, 1]) for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(d * r * 0.5, k * r * 0.45); ctx.lineTo(d * r * 1.15, k * r * 0.7 + wig * r * d); ctx.stroke(); }
+      const g2 = ctx.createLinearGradient(-r, -r, r, r);
+      g2.addColorStop(0, '#7dffb0'); g2.addColorStop(0.45, '#1f9d6a'); g2.addColorStop(1, '#0b3b40');
+      ctx.fillStyle = g2; ctx.beginPath(); ctx.ellipse(0, r * 0.15, r * 0.75, r * 1.05, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,30,20,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, -r * 0.55); ctx.lineTo(0, r * 1.15); ctx.stroke();
+      ctx.fillStyle = '#123'; ctx.beginPath(); ctx.ellipse(0, -r * 0.85, r * 0.42, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.1, r * 0.14, r * 0.4, 0.2, 0, Math.PI * 2); ctx.fill();
     } else if (c.kind === 'bug') {
       // a ladybird: legs first, then shell, spots and head
       const wig = Math.sin(this.time * 22) * 0.35;
